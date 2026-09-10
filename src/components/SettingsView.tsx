@@ -369,9 +369,14 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             })}
           </div>
 
-          <button onClick={saveRoles} className="w-full mt-5 py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
-            Simpan Role & Otorisasi Menu
-          </button>
+          <div className="sticky bottom-4 z-10 flex justify-end mt-5">
+            <button onClick={saveRoles}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all"
+              style={{ background: "var(--foreground)", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.3)" }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              Simpan Role & Otorisasi Menu
+            </button>
+          </div>
         </div>
       )}
 

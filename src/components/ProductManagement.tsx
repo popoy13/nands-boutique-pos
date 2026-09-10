@@ -2,6 +2,7 @@
 import type { ChangeEvent } from "react";
 import type { Product, ProductVariant, Size } from "../data/types";
 import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
+import { compressImage } from "../lib/compressImage";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -156,6 +157,8 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [catModal, setCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [editingCatVal, setEditingCatVal] = useState("");
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<string | null>(null);
 
@@ -250,6 +253,26 @@ export default function ProductManagement({ products, stores, categories, onUpda
     };
     setEditing(prev => prev ? { ...prev, variants: [...prev.variants, newV] } : null);
     setActiveVariantIdx(editing.variants.length);
+  };
+
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setToast("File harus berupa gambar."); return; }
+    setPhotoBusy(true);
+    try {
+      const dataUrl = await compressImage(file, 800, 0.7);
+      setEditing(prev => prev ? { ...prev, image: dataUrl } : null);
+    } catch {
+      setToast("Gagal memuat gambar.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const handlePhotoRemove = () => {
+    setEditing(prev => prev ? { ...prev, image: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=300&h=300&fit=crop&auto=format" } : null);
   };
 
   const removeVariant = (idx: number) => {
@@ -608,13 +631,21 @@ export default function ProductManagement({ products, stores, categories, onUpda
           </div>
 
           <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            {/* Product image preview */}
+            {/* Product image */}
             <div className="flex items-center gap-3">
               <img src={editing.image} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0 bg-gray-100" onError={e => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=80&h=80&fit=crop&auto=format"; }} />
               <div className="flex-1">
-                <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>URL GAMBAR</label>
-                <input type="text" value={editing.image} onChange={e => setEditing(p => p ? { ...p, image: e.target.value } : null)}
-                  className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
+                <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>FOTO PRODUK</label>
+                <div className="flex gap-2">
+                  <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                    className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white", opacity: photoBusy ? 0.6 : 1 }}>
+                    {photoBusy ? "Memuat..." : "Ubah Foto"}
+                  </button>
+                  <button onClick={handlePhotoRemove} className="px-3 py-2 rounded-xl text-xs font-semibold text-red-500" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                    Hapus
+                  </button>
+                </div>
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
               </div>
             </div>
 

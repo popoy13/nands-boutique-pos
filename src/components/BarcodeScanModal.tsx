@@ -37,6 +37,16 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
       }
     };
 
+    const getBackCameraId = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const vids = devices.filter(d => d.kind === "videoinput" && d.deviceId);
+        return vids.find(d => /back|rear|belakang|0/i.test(d.label))?.deviceId ?? vids[0]?.deviceId;
+      } catch {
+        return undefined;
+      }
+    };
+
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setStatus("error");
@@ -46,8 +56,12 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
       }
 
       let stream: MediaStream | null = null;
+      const backDeviceId = await getBackCameraId();
+      const constraints: MediaStreamConstraints = backDeviceId
+        ? { video: { deviceId: { exact: backDeviceId } }, audio: false }
+        : { video: { facingMode: "environment" }, audio: false };
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });

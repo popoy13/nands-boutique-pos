@@ -17,7 +17,11 @@ const fmtDate = (d: string) => {
   return `${day}-${m}-${y}`;
 };
 
-const fmtTime = () => new Date().toLocaleTimeString("id-ID", { hour12: false });
+const fmtTime = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
 
 const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "") > `${openHour || "08:00"}:00`;
 

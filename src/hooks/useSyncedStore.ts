@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { supabase } from "../lib/supabase";
 import {
-  loadAll, saveRows, saveSettingsRows, writeProducts,
+  loadAll, saveRows, saveSettingsRows, writeProducts, setCategoriesCache,
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB,
 } from "../data/sync";
 import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord } from "../data/types";
+import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { initialProducts } from "../data/products";
@@ -31,6 +32,7 @@ export interface SyncedStore {
   transactions: Transaction[]; setTransactions: Dispatch<SetStateAction<Transaction[]>>;
   deletedTransactions: DeletedTransaction[]; setDeletedTransactions: Dispatch<SetStateAction<DeletedTransaction[]>>;
   settings: AppSettings; setSettings: Dispatch<SetStateAction<AppSettings>>;
+  categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
 }
 
 export function useSyncedStore(): SyncedStore {
@@ -44,6 +46,7 @@ export function useSyncedStore(): SyncedStore {
   const [transactions, setTransactionsState] = useState<Transaction[]>(seedTransactions);
   const [deletedTransactions, setDeletedTransactionsState] = useState<DeletedTransaction[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
+  const [categories, setCategoriesState] = useState<Category[]>([]);
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -121,6 +124,14 @@ export function useSyncedStore(): SyncedStore {
     if (next !== prev) propagate("settings", settingsToDB(next));
     return next;
   });
+  const setCategories: Dispatch<SetStateAction<Category[]>> = (upd) => setCategoriesState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: Category[]) => Category[])(prev) : upd;
+    if (next !== prev) {
+      setCategoriesCache(new Map(next.map(c => [c.id, c.name])));
+      propagate("categories", next);
+    }
+    return next;
+  });
 
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
     if (!payload || !Array.isArray(payload.rows)) return;
@@ -135,6 +146,10 @@ export function useSyncedStore(): SyncedStore {
       case "transactions": setTransactionsState(rows.map(trxFromDB)); break;
       case "deleted_transactions": setDeletedTransactionsState(rows.map(delFromDB)); break;
       case "settings": setSettingsState(settingsFromDB(rows)); break;
+      case "categories":
+        setCategoriesCache(new Map(rows.map(c => [String(c.id), String(c.name)])));
+        setCategoriesState(rows.map(c => ({ id: String(c.id), name: String(c.name) })));
+        break;
     }
   };
   appliedRef.current = applyRemote;
@@ -156,6 +171,8 @@ export function useSyncedStore(): SyncedStore {
         setTransactionsState(d.transactions);
         setDeletedTransactionsState(d.deletedTransactions);
         setSettingsState(d.settings);
+        setCategoriesState(d.categories);
+        setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {
         console.warn("[sync] Supabase belum disetup — jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
@@ -188,6 +205,8 @@ export function useSyncedStore(): SyncedStore {
             setTransactionsState(d.transactions);
             setDeletedTransactionsState(d.deletedTransactions);
             setSettingsState(d.settings);
+            setCategoriesState(d.categories);
+            setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
           }
         }
         lastStatusRef.current = status;
@@ -206,5 +225,6 @@ export function useSyncedStore(): SyncedStore {
     transactions, setTransactions,
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
+    categories, setCategories,
   };
 }

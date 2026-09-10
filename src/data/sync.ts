@@ -215,7 +215,10 @@ export interface AllData {
   transactions: Transaction[];
   deletedTransactions: DeletedTransaction[];
   settings: AppSettings;
+  categories: Category[];
 }
+
+export interface Category { id: string; name: string; }
 
 export interface LoadResult { ok: boolean; data: AllData | null; }
 
@@ -251,6 +254,7 @@ export async function loadAll(): Promise<LoadResult> {
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(first(setR)),
+        categories: first(catR).map(c => ({ id: s(c.id), name: s(c.name) })),
       },
     };
   } catch (e) {

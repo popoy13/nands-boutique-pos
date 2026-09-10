@@ -1,24 +1,29 @@
 ﻿import { useState, useMemo } from "react";
 import type { Product, ProductVariant, Size } from "../data/types";
-import { categories as allCategories } from "../data/products";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
+const FALLBACK_CATEGORIES = ["Kemeja", "Kaos", "Celana", "Jaket", "Blazer", "Polo", "Hoodie", "Sweater"];
+
+interface Category { id: string; name: string; }
+
 interface Props {
   products: Product[];
   stores: { id: string; name: string }[];
+  categories: Category[];
+  onUpdateCategories: (next: Category[]) => void;
   onSave: (products: Product[]) => void;
   canEdit: boolean;
 }
 
 const SIZES: Size[] = ["XS", "S", "M", "L", "XL", "XXL"];
 
-const emptyProduct = (storeIds: string[]): Product => ({
+const emptyProduct = (storeIds: string[], defaultCategory: string): Product => ({
   id: `p-${Date.now()}`,
   name: "",
   brand: "NAND'S",
-  category: "Kemeja",
+  category: defaultCategory,
   basePrice: 0,
   image: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=300&h=300&fit=crop&auto=format",
   variants: [{
@@ -29,16 +34,17 @@ const emptyProduct = (storeIds: string[]): Product => ({
   }],
 });
 
-function BulkActionModal({ action, stores, count, onApply, onClose }: {
+function BulkActionModal({ action, stores, categories, count, onApply, onClose }: {
   action: "price" | "category" | "stock";
   stores: { id: string; name: string }[];
+  categories: string[];
   count: number;
   onApply: (payload: any) => void;
   onClose: () => void;
 }) {
   const [priceOp, setPriceOp] = useState<"set" | "inc" | "dec">("set");
   const [value, setValue] = useState("");
-  const [category, setCategory] = useState(allCategories.find(c => c !== "Semua") ?? "Kemeja");
+  const [category, setCategory] = useState(categories[0] ?? "Kemeja");
   const [stockStore, setStockStore] = useState(stores[0]?.id ?? "");
   const [stockOp, setStockOp] = useState<"set" | "add">("set");
 
@@ -87,7 +93,7 @@ function BulkActionModal({ action, stores, count, onApply, onClose }: {
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KATEGORI BARU</label>
             <select value={category} onChange={e => setCategory(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
-              {allCategories.filter(c => c !== "Semua").map(c => <option key={c}>{c}</option>)}
+              {categories.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         )}
@@ -133,7 +139,7 @@ function BulkActionModal({ action, stores, count, onApply, onClose }: {
   );
 }
 
-export default function ProductManagement({ products, stores, onSave, canEdit }: Props) {
+export default function ProductManagement({ products, stores, categories, onUpdateCategories, onSave, canEdit }: Props) {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -145,8 +151,16 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkModal, setBulkModal] = useState<null | "price" | "category" | "stock">(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [catModal, setCatModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatVal, setEditingCatVal] = useState("");
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const catNames = useMemo(() => categories.length ? categories.map(c => c.name) : FALLBACK_CATEGORIES, [categories]);
+  const filterCats = useMemo(() => ["Semua", ...catNames], [catNames]);
 
   const filtered = useMemo(() =>
     products.filter(p =>
@@ -266,6 +280,33 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
     exitBulk();
   };
 
+  const addCategory = () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) { showToast("Kategori sudah ada"); return; }
+    onUpdateCategories([...categories, { id: `c-${Date.now()}`, name }]);
+    setNewCatName("");
+    showToast("Kategori ditambahkan");
+  };
+
+  const renameCategory = (cat: Category) => {
+    const name = editingCatVal.trim();
+    if (!name || name === cat.name) { setEditingCatId(null); setEditingCatVal(""); return; }
+    if (categories.some(c => c.id !== cat.id && c.name.toLowerCase() === name.toLowerCase())) { showToast("Nama kategori sudah dipakai"); return; }
+    onUpdateCategories(categories.map(c => c.id === cat.id ? { ...c, name } : c));
+    onSave(products.map(p => p.category === cat.name ? { ...p, category: name } : p));
+    setEditingCatId(null);
+    setEditingCatVal("");
+    showToast("Kategori diubah");
+  };
+
+  const deleteCategory = (cat: Category) => {
+    onUpdateCategories(categories.filter(c => c.id !== cat.id));
+    onSave(products.map(p => p.category === cat.name ? { ...p, category: "" } : p));
+    setConfirmDeleteCat(null);
+    showToast("Kategori dihapus");
+  };
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>{toast}</div>}
@@ -290,13 +331,19 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Produk</div>
             {canEdit && (
               <div className="flex items-center gap-2">
+                <button onClick={() => setCatModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
+                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4zm3 2a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
+                  Kelola Kategori
+                </button>
                 <button onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
                   style={{ background: bulkMode ? "var(--background)" : "var(--secondary)", border: "1px solid var(--border)", color: bulkMode ? "var(--foreground)" : "var(--secondary-foreground)" }}>
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
                   {bulkMode ? "Selesai" : "Edit Banyak"}
                 </button>
-                <button onClick={() => { setEditing(emptyProduct(stores.map(s => s.id))); setIsNew(true); setActiveVariantIdx(0); }}
+                <button onClick={() => { setEditing(emptyProduct(stores.map(s => s.id), catNames[0] ?? "Kemeja")); setIsNew(true); setActiveVariantIdx(0); }}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                   Tambah Produk
@@ -312,7 +359,7 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
             </div>
             <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-              {allCategories.map(c => <option key={c}>{c}</option>)}
+              {filterCats.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -396,7 +443,7 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
       </div>
 
       {bulkModal && (
-        <BulkActionModal key={bulkModal} action={bulkModal} stores={stores} count={selected.size}
+        <BulkActionModal key={bulkModal} action={bulkModal} stores={stores} categories={catNames} count={selected.size}
           onApply={payload => applyBulk(bulkModal, payload)}
           onClose={() => setBulkModal(null)} />
       )}
@@ -409,6 +456,91 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
             <div className="flex gap-2">
               <button onClick={() => setConfirmBulkDelete(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
               <button onClick={handleBulkDelete} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {catModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-96 max-w-[92vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div className="flex items-center justify-between mb-1">
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Kelola Kategori</div>
+              <button onClick={() => setCatModal(false)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Tambah, ubah, atau hapus kategori produk.</div>
+
+            <div className="flex flex-col gap-2 mb-4 max-h-64 overflow-y-auto">
+              {catNames.map(name => {
+                const cat = categories.find(c => c.name === name);
+                const isEditing = editingCatId !== null && cat?.id === editingCatId;
+                const usedCount = products.filter(p => p.category === name).length;
+                return (
+                  <div key={name} className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+                    {isEditing ? (
+                      <input type="text" value={editingCatVal} onChange={e => setEditingCatVal(e.target.value)}
+                        autoFocus defaultValue={name}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg text-sm outline-none" style={{ background: "var(--card)", border: "1.5px solid var(--accent)" }}
+                        onKeyDown={e => { if (e.key === "Enter" && cat) renameCategory(cat); if (e.key === "Escape") { setEditingCatId(null); setEditingCatVal(""); } }} />
+                    ) : (
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate">{name}</div>
+                        <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{usedCount} produk</div>
+                      </div>
+                    )}
+                    {isEditing ? (
+                      <button onClick={() => cat && renameCategory(cat)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "var(--accent)" }}>Simpan</button>
+                    ) : (
+                      <>
+                        <button onClick={() => { setEditingCatId(cat?.id ?? null); setEditingCatVal(name); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--secondary)" }}>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        {cat && (
+                          <button onClick={() => setConfirmDeleteCat(cat.id)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }}>
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              {catNames.length === 0 && (
+                <div className="text-center py-8 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada kategori. Tambahkan di bawah.</div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input type="text" value={newCatName} onChange={e => setNewCatName(e.target.value)}
+                placeholder="Nama kategori baru" maxLength={40}
+                className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+                onKeyDown={e => { if (e.key === "Enter") addCategory(); }} />
+              <button onClick={addCategory} disabled={!newCatName.trim()}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: newCatName.trim() ? "var(--foreground)" : "var(--muted)", color: newCatName.trim() ? "white" : "var(--muted-foreground)" }}>
+                Tambah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteCat && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Kategori?</div>
+            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>
+              Produk dalam kategori ini akan menjadi "Tanpa Kategori" (kategori tidak ikut terhapus). Lanjutkan?
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteCat(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
+              <button onClick={() => { const cat = categories.find(c => c.id === confirmDeleteCat); if (cat) deleteCategory(cat); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya</button>
             </div>
           </div>
         </div>
@@ -451,7 +583,7 @@ export default function ProductManagement({ products, stores, onSave, canEdit }:
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KATEGORI</label>
                 <select value={editing.category} onChange={e => setEditing(p => p ? { ...p, category: e.target.value } : null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
-                  {allCategories.filter(c => c !== "Semua").map(c => <option key={c}>{c}</option>)}
+                  {catNames.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>

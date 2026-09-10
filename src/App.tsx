@@ -28,6 +28,7 @@ export default function App() {
     transactions, setTransactions,
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
+    categories, setCategories,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(() => {
     try {
@@ -206,6 +207,8 @@ export default function App() {
           <ProductManagement
             products={products}
             stores={stores}
+            categories={categories}
+            onUpdateCategories={setCategories}
             onSave={setProducts}
             canEdit={canEditProduct}
           />

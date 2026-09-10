@@ -249,9 +249,9 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const storeStockQty = selectedVariant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
 
   return (
-    <div className="flex flex-col sm:flex-row h-full overflow-y-auto sm:overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {/* Catalog */}
-      <div className="flex flex-col min-w-0 sm:flex-1 sm:overflow-hidden">
+      <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
         <div className="px-5 pt-5 pb-3 shrink-0" style={{ background: "var(--background)", borderBottom: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3 mb-3">
             <div className="relative flex-1">
@@ -280,7 +280,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           </div>
         </div>
 
-        <div className="sm:flex-1 sm:overflow-y-auto p-5">
+        <div className="lg:flex-1 lg:overflow-y-auto p-5">
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" }}>
             {filteredProducts.map(product => {
               const totalStock = product.variants.reduce((s, v) => s + (v.stocks.find(st => st.storeId === activeStore)?.quantity ?? 0), 0);
@@ -312,7 +312,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
       {/* Cart */}
       {cart.length > 0 && (
-      <div className="flex flex-col shrink-0 w-full sm:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
+      <div className="flex flex-col shrink-0 w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
         <div className="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Keranjang Belanja</div>
           <button onClick={() => setCart([])} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
@@ -360,7 +360,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
         </div>
 
         {/* Items */}
-        <div className="sm:flex-1 sm:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
           <div className="flex flex-col gap-2">
             {cart.map(item => (
               <div key={item.variantSku} className="flex gap-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>

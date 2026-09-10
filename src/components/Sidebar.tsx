@@ -38,7 +38,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
   return (
     <>
       {/* Mobile header */}
-      <div className="lg:hidden flex flex-col shrink-0" style={{ background: "var(--sidebar)", paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="md:hidden flex flex-col shrink-0" style={{ background: "var(--sidebar)", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-2.5 px-4 pt-3 pb-2.5">
           <img src={brand.logo} alt={`Logo ${brand.name}`} className="w-8 h-8 rounded-lg object-cover shrink-0" style={{ background: "var(--accent)" }} />
           <div className="flex-1 min-w-0">
@@ -63,7 +63,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex flex-col h-full shrink-0" style={{ width: 228, background: "var(--sidebar)", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="hidden md:flex flex-col h-full shrink-0" style={{ width: 228, background: "var(--sidebar)", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
       {/* Brand */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-1">
@@ -169,7 +169,7 @@ export function MobileBottomNav({ allowed, activeTab, onSelect }: { allowed: str
   return (
     <>
       {/* Bottom nav bar */}
-      <nav className="lg:hidden shrink-0 flex items-stretch w-full"
+      <nav className="md:hidden shrink-0 flex items-stretch w-full"
         style={{ background: "#0f1117", borderTop: "1px solid rgba(255,255,255,0.06)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         {primary.map(item => renderItem(item, true))}
         {more.length > 0 && (

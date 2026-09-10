@@ -185,7 +185,7 @@ export default function App() {
   const safeTab = allowed.includes(activeTab) ? activeTab : allowed[0];
 
   return (
-    <div className="flex flex-col lg:flex-row h-full overflow-hidden" style={{ background: "var(--background)" }}>
+    <div className="flex flex-col md:flex-row h-full overflow-hidden" style={{ background: "var(--background)" }}>
       <Sidebar
         activeTab={safeTab}
         setActiveTab={tab => { if (allowed.includes(tab)) setActiveTab(tab); }}

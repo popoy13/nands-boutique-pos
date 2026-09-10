@@ -50,6 +50,7 @@ export function useSyncedStore(): SyncedStore {
 
   const readyRef = useRef(false);
   readyRef.current = ready;
+  const validEmpIdsRef = useRef<Set<string>>(new Set());
 
   const pendingRef = useRef<Record<string, unknown>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
@@ -86,10 +87,10 @@ async function writeTable(table: string, payload: unknown) {
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
       default: await saveRows(table, payload as Record<string, unknown>[]);
     }
+    try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
   } catch (e) {
     console.warn("[sync] tulis ke database gagal:", table, e);
   }
-  try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
 }
 
   /* --- wrapped setters (value or functional updater) --- */
@@ -105,7 +106,10 @@ async function writeTable(table: string, payload: unknown) {
   });
   const setEmployees: Dispatch<SetStateAction<Employee[]>> = (upd) => setEmployeesState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Employee[]) => Employee[])(prev) : upd;
-    if (next !== prev) propagate("employees", next.map(empToDB));
+    if (next !== prev) {
+      validEmpIdsRef.current = new Set(next.map(e => e.id));
+      propagate("employees", next.map(empToDB));
+    }
     return next;
   });
   const setMembers: Dispatch<SetStateAction<Member[]>> = (upd) => setMembersState(prev => {
@@ -120,7 +124,11 @@ async function writeTable(table: string, payload: unknown) {
   });
   const setAttendance: Dispatch<SetStateAction<AttendanceRecord[]>> = (upd) => setAttendanceState(prev => {
     const next = typeof upd === "function" ? (upd as (p: AttendanceRecord[]) => AttendanceRecord[])(prev) : upd;
-    if (next !== prev) propagate("attendance_records", next.map(attToDB));
+    if (next !== prev) {
+      const validIds = validEmpIdsRef.current;
+      const rows = next.filter(r => validIds.has(r.employeeId)).map(attToDB);
+      propagate("attendance_records", rows);
+    }
     return next;
   });
   const setTransactions: Dispatch<SetStateAction<Transaction[]>> = (upd) => setTransactionsState(prev => {
@@ -153,7 +161,7 @@ async function writeTable(table: string, payload: unknown) {
     switch (payload.table) {
       case "products": setProductsState(payload.rows as Product[]); break;
       case "stores": setStoresState(rows.map(storeFromDB)); break;
-      case "employees": setEmployeesState(rows.map(empFromDB)); break;
+      case "employees": setEmployeesState(rows.map(empFromDB)); validEmpIdsRef.current = new Set(rows.map(r => String(r.id))); break;
       case "members": setMembersState(rows.map(memFromDB)); break;
       case "discounts": setDiscountsState(rows.map(discFromDB)); break;
       case "attendance_records": setAttendanceState(rows.map(attFromDB)); break;
@@ -176,6 +184,7 @@ async function writeTable(table: string, payload: unknown) {
       if (cancelled) return;
       if (res.ok && res.data) {
         const d = res.data;
+        validEmpIdsRef.current = new Set(d.employees.map(e => e.id));
         setProductsState(d.products);
         setStoresState(d.stores);
         setEmployeesState(d.employees);
@@ -210,6 +219,7 @@ async function writeTable(table: string, payload: unknown) {
           const res = await loadAll();
           if (res.ok && res.data) {
             const d = res.data;
+            validEmpIdsRef.current = new Set(d.employees.map(e => e.id));
             setProductsState(d.products);
             setStoresState(d.stores);
             setEmployeesState(d.employees);

@@ -13,6 +13,7 @@ import MemberView from "./components/MemberView";
 import AttendanceView from "./components/AttendanceView";
 import SettingsView from "./components/SettingsView";
 import { useSyncedStore } from "./hooks/useSyncedStore";
+import { deleteAttendance } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
 import { ROLE_PERMISSIONS } from "./data/types";
 
@@ -128,6 +129,7 @@ export default function App() {
 
   const handleDeleteAttendance = (id: string) => {
     setAttendance(prev => prev.filter(r => r.id !== id));
+    void deleteAttendance(id).catch(e => console.warn("[sync] hapus absensi gagal:", e));
   };
 
   if (!ready) {

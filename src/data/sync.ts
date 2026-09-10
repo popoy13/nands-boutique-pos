@@ -203,12 +203,20 @@ export async function saveRows(table: string, rows: Record<string, unknown>[]): 
   if (error) throw error;
 }
 
-/* ---------------- attendance (delete-all + upsert) ---------------- */
+/* ---------------- attendance (upsert-only + hapus per-id) ---------------- */
+
+const VALID_ROLES = ["admin", "manager", "manager_operasional", "kasir", "staff"];
 
 export async function writeAttendance(rows: Record<string, unknown>[]): Promise<void> {
-  await supabase.from("attendance_records").delete().neq("id", "");
-  if (!rows.length) return;
-  const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "id" });
+  const valid = rows.filter(r => r && typeof r.id === "string" && r.id && typeof r.employee_id === "string" && r.employee_id && VALID_ROLES.includes(String(r.role)));
+  if (!valid.length) return;
+  const { error } = await supabase.from("attendance_records").upsert(valid, { onConflict: "id" });
+  if (error) throw error;
+}
+
+export async function deleteAttendance(id: string): Promise<void> {
+  if (!id) return;
+  const { error } = await supabase.from("attendance_records").delete().eq("id", id);
   if (error) throw error;
 }
 

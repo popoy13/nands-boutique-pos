@@ -6,6 +6,7 @@ import { compressImage } from "../lib/compressImage";
 interface Props {
   records: AttendanceRecord[];
   stores: { id: string; name: string; openHour?: string; closeHour?: string }[];
+  employees: Employee[];
   currentUser: Employee;
   onClock: (record: AttendanceRecord) => void;
   onDelete?: (id: string) => void;
@@ -73,7 +74,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   return (
     <div>
       <div className="relative rounded-xl overflow-hidden" style={{ background: "#0f1115", border: "1.5px dashed var(--border)" }}>
-        <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" style={{ display: ready ? "block" : "none" }} />
+        <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" style={{ display: ready ? "block" : "none", transform: "scaleX(-1)" }} />
         {!ready && !err && (
           <div className="aspect-video flex flex-col items-center justify-center gap-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
             <div className="animate-pulse">Menyiapkan kamera...</div>
@@ -96,7 +97,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   );
 }
 
-export default function AttendanceView({ records, stores, currentUser, onClock, onDelete }: Props) {
+export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [usingFile, setUsingFile] = useState(false);
   const [note, setNote] = useState("");
@@ -203,9 +204,7 @@ export default function AttendanceView({ records, stores, currentUser, onClock, 
     .filter(r => filterEmp === "all" || r.employeeId === filterEmp)
     .sort((a, b) => (a.date + a.clockIn).localeCompare(b.date + b.clockIn) * -1);
 
-  const empOptions = records
-    .filter(r => viewAll || r.employeeId === currentUser.id)
-    .reduce<AttendanceRecord[]>((acc, r) => acc.some(x => x.employeeId === r.employeeId) ? acc : [...acc, r], []);
+  const empOptions = employees.filter(e => e.status === "active");
 
   const photoArea = (
     <div className="mb-3">
@@ -379,7 +378,7 @@ export default function AttendanceView({ records, stores, currentUser, onClock, 
                 <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}
                   className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                   <option value="all">Semua Karyawan</option>
-                  {empOptions.map(r => <option key={r.employeeId} value={r.employeeId}>{r.employeeName}</option>)}
+                  {empOptions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
               )}
             </div>

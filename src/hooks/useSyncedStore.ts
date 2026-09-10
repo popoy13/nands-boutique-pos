@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { supabase } from "../lib/supabase";
 import {
-  loadAll, saveRows, saveSettingsRows, writeProducts, setCategoriesCache,
+  loadAll, saveRows, saveSettingsRows, writeProducts, writeAttendance, setCategoriesCache,
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB,
@@ -82,6 +82,7 @@ async function writeTable(table: string, payload: unknown) {
   try {
     switch (table) {
       case "products": await writeProducts(payload as Product[]); break;
+      case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
       default: await saveRows(table, payload as Record<string, unknown>[]);
     }

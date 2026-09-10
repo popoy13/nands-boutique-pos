@@ -137,7 +137,7 @@ export default function App() {
           <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 20, color: "var(--accent)" }}>{(settings.brand?.name || "N").charAt(0)}</span>
         </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>
-        <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>Memuat data dari database online...</div>
+        <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>sabar guys loading dulu</div>
       </div>
     );
   }
@@ -258,6 +258,7 @@ export default function App() {
           <AttendanceView
             records={attendance}
             stores={stores}
+            employees={employees}
             currentUser={currentUser}
             onClock={handleClock}
             onDelete={role === "admin" ? handleDeleteAttendance : undefined}

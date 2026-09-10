@@ -203,6 +203,15 @@ export async function saveRows(table: string, rows: Record<string, unknown>[]): 
   if (error) throw error;
 }
 
+/* ---------------- attendance (delete-all + upsert) ---------------- */
+
+export async function writeAttendance(rows: Record<string, unknown>[]): Promise<void> {
+  await supabase.from("attendance_records").delete().neq("id", "");
+  if (!rows.length) return;
+  const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "id" });
+  if (error) throw error;
+}
+
 /* ---------------- load all ---------------- */
 
 export interface AllData {

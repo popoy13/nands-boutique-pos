@@ -50,6 +50,10 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const [draftRoles, setDraftRoles] = useState(() => ensureRoles(settings.roles));
   const [draftBarcode, setDraftBarcode] = useState({ ...defaultSettings.barcode, ...settings.barcode });
   const [newRoleLabel, setNewRoleLabel] = useState("");
+  const [roleSearch, setRoleSearch] = useState("");
+  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast(msg);
@@ -143,6 +147,24 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     setDraftRoles(prev => { const next = { ...prev }; delete next[roleKey]; return next; });
     showToast("Role dihapus");
   };
+
+  const armDelete = (roleKey: string) => {
+    if (confirmDel === roleKey) {
+      handleDeleteRole(roleKey);
+      setConfirmDel(null);
+      if (confirmTimer.current) { clearTimeout(confirmTimer.current); confirmTimer.current = null; }
+      return;
+    }
+    setConfirmDel(roleKey);
+    if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    confirmTimer.current = setTimeout(() => setConfirmDel(null), 2500);
+  };
+
+  const filteredRoles = Object.entries(draftRoles).filter(([key, cfg]) => {
+    const q = roleSearch.trim().toLowerCase();
+    if (!q) return true;
+    return cfg.label.toLowerCase().includes(q) || key.toLowerCase().includes(q);
+  });
 
   const toggle = (on: boolean, onChange: (v: boolean) => void) => (
     <button onClick={() => onChange(!on)}
@@ -267,7 +289,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             Tambah role karyawan baru dan atur menu mana saja yang boleh dilihat tiap role. Perubahan berlaku otomatis ke semua perangkat.
           </div>
 
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-2 mb-3">
             <input type="text" placeholder="Nama role baru (mis. Supervisor)" value={newRoleLabel}
               onChange={e => setNewRoleLabel(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleAddRole()}
@@ -278,92 +300,62 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             </button>
           </div>
 
-          <div className="flex flex-col gap-4">
-            {Object.entries(draftRoles).map(([roleKey, cfg]) => {
+          <div className="relative mb-4">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input type="text" placeholder="Cari role..." value={roleSearch} onChange={e => setRoleSearch(e.target.value)}
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl text-sm outline-none" style={field} />
+            {roleSearch && (
+              <button onClick={() => setRoleSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }} title="Bersihkan">
+                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-[10px] font-bold" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>DAFTAR ROLE</span>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>{filteredRoles.length} role</span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {filteredRoles.length === 0 && (
+              <div className="text-center text-xs py-8 rounded-xl" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                Role tidak ditemukan untuk kata kunci "{roleSearch.trim()}".
+              </div>
+            )}
+
+            {filteredRoles.map(([roleKey, cfg]) => {
               const builtin = isBuiltinRole(roleKey);
               const inUse = employees.some(e => e.role === roleKey);
+              const menuCount = MENU_ITEMS.filter(m => cfg.menus.includes(m.id)).length;
+              const armed = confirmDel === roleKey;
               return (
-                <div key={roleKey} className="p-4 rounded-xl" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
-                  <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    <input type="color" value={cfg.color} onChange={e => setRoleColor(roleKey, e.target.value)}
-                      className="w-7 h-7 rounded-lg border-0 cursor-pointer shrink-0" style={{ background: "transparent" }} title="Warna badge" />
-                    <input type="text" value={cfg.label} onChange={e => setRoleLabel(roleKey, e.target.value)}
-                      className="px-2.5 py-1.5 rounded-lg text-sm font-semibold outline-none"
-                      style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{roleKey}</span>
-                    {builtin && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "#eff6ff", color: "#2563eb" }}>Bawaan</span>}
-                    {!builtin && inUse && <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "#fef3c7", color: "#d97706" }}>dipakai {employees.filter(e => e.role === roleKey).length} karyawan</span>}
+                <div key={roleKey} className="p-3.5 rounded-xl flex items-center gap-3" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+                  <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: cfg.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate">{cfg.label}</div>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md" style={{ background: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{roleKey}</span>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{menuCount} menu</span>
+                      {builtin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#eff6ff", color: "#2563eb" }}>Bawaan</span>}
+                      {!builtin && inUse && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#fef3c7", color: "#d97706" }}>dipakai {employees.filter(e => e.role === roleKey).length} karyawan</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setEditingRole(roleKey)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all"
+                      style={{ background: "var(--foreground)" }}>
+                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      Edit
+                    </button>
                     {!builtin && (
-                      <button onClick={() => handleDeleteRole(roleKey)} disabled={inUse}
-                        className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
-                        style={{ background: inUse ? "var(--muted)" : "#fef2f2" }} title="Hapus role">
-                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke={inUse ? "#9ca3af" : "#ef4444"} strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      <button onClick={() => armDelete(roleKey)} disabled={inUse}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: inUse ? "var(--muted)" : armed ? "#ef4444" : "#fef2f2", color: inUse ? "#9ca3af" : armed ? "white" : "#ef4444" }}>
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        {armed ? "Yakin?" : "Hapus"}
                       </button>
                     )}
                   </div>
-
-                  <div className="text-[10px] font-semibold mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>MENU YANG DITAMPILKAN</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {MENU_ITEMS.map(menu => {
-                      const on = cfg.menus.includes(menu.id);
-                      const locked = roleKey === "admin" && (menu.id === "settings" || menu.id === "employee");
-                      return (
-                        <div key={menu.id} onClick={locked ? undefined : () => toggleMenu(roleKey, menu.id)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all select-none"
-                          style={{ cursor: locked ? "not-allowed" : "pointer", background: on ? `${cfg.color}14` : "var(--card)", border: `1px solid ${on ? cfg.color : "var(--border)"}`, opacity: locked ? 0.75 : 1 }}>
-                          <span className="w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0"
-                            style={{ background: on ? cfg.color : "var(--card)", border: `1.5px solid ${on ? cfg.color : "var(--border)"}` }}>
-                            {on && <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                          </span>
-                          <span className="flex-1 text-[12px] font-semibold" style={{ color: on ? cfg.color : "var(--foreground)" }}>{menu.label}</span>
-                          {locked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Wajib</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {MENU_ITEMS.some(m => cfg.menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0) && (
-                    <>
-                      <div className="text-[10px] font-semibold mt-4 mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>IZIN AKSES TOMBOL</div>
-                      <div className="flex flex-col gap-2">
-                        {MENU_ITEMS.filter(m => cfg.menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0).map(menu => {
-                          const acts = cfg.permissions?.[menu.id];
-                          const actList = ACTION_ITEMS[menu.id];
-                          const locked = roleKey === "admin" && menu.id === "settings";
-                          const enabledCount = actList.filter(a => acts?.includes(a) ?? true).length;
-                          return (
-                            <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", opacity: locked ? 0.7 : 1 }}>
-                              <div className="flex items-center justify-between px-3 py-2" style={{ background: `${cfg.color}10` }}>
-                                <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: cfg.color }}>
-                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.color }} />
-                                  {menu.label}
-                                </div>
-                                <span className="text-[9px] font-semibold" style={{ color: locked ? "var(--muted-foreground)" : cfg.color }}>
-                                  {locked ? "Wajib" : `${enabledCount}/${actList.length}`}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2" style={{ background: "var(--card)" }}>
-                                {actList.map(action => {
-                                  const on = acts?.includes(action) ?? true;
-                                  return (
-                                    <button key={action} onClick={() => toggleAction(roleKey, menu.id, action)} disabled={locked}
-                                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[11px] font-medium text-left transition-all select-none disabled:cursor-not-allowed"
-                                      style={{ background: on ? `${cfg.color}12` : "var(--background)", border: `1px solid ${on ? cfg.color : "var(--border)"}`, color: on ? cfg.color : "var(--muted-foreground)" }}>
-                                      <span className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                        style={{ background: on ? cfg.color : "transparent", border: `1.5px solid ${on ? cfg.color : "var(--border)"}` }}>
-                                        {on && <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                                      </span>
-                                      <span className="flex-1 truncate">{ACTION_LABELS[menu.id]?.[action] ?? action}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
                 </div>
               );
             })}
@@ -376,6 +368,114 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
               Simpan Role & Otorisasi Menu
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROLE MODAL */}
+      {tab === "roles" && editingRole && draftRoles[editingRole] && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3" onClick={() => setEditingRole(null)}>
+          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+          <div className="relative w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 16 }}>Edit Role</div>
+              <button onClick={() => setEditingRole(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="text-xs mb-4 flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+              <span className="w-3 h-3 rounded-full inline-block" style={{ background: draftRoles[editingRole].color }} />
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>{draftRoles[editingRole].label}</span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>{editingRole}</span>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[10px] font-bold mb-1.5" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>NAMA ROLE & WARNA</label>
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <input type="text" value={draftRoles[editingRole].label} onChange={e => setRoleLabel(editingRole, e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold outline-none" style={field} />
+                <input type="color" value={draftRoles[editingRole].color} onChange={e => setRoleColor(editingRole, e.target.value)}
+                  className="w-9 h-9 rounded-lg border-0 cursor-pointer shrink-0" style={{ background: "transparent" }} title="Warna custom" />
+              </div>
+              <div className="flex items-center gap-2">
+                {PALETTE.map(c => (
+                  <button key={c} onClick={() => setRoleColor(editingRole, c)}
+                    className="w-6 h-6 rounded-full transition-all"
+                    style={{ background: c, outline: draftRoles[editingRole].color === c ? "2px solid var(--foreground)" : "2px solid transparent", outlineOffset: 2 }} />
+                ))}
+              </div>
+            </div>
+
+            <div className="text-[10px] font-bold mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>MENU YANG DITAMPILKAN</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-4">
+              {MENU_ITEMS.map(menu => {
+                const on = draftRoles[editingRole].menus.includes(menu.id);
+                const locked = editingRole === "admin" && (menu.id === "settings" || menu.id === "employee");
+                return (
+                  <div key={menu.id} onClick={locked ? undefined : () => toggleMenu(editingRole, menu.id)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all select-none"
+                    style={{ cursor: locked ? "not-allowed" : "pointer", background: on ? `${draftRoles[editingRole].color}14` : "var(--background)", border: `1px solid ${on ? draftRoles[editingRole].color : "var(--border)"}`, opacity: locked ? 0.75 : 1 }}>
+                    <span className="w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0"
+                      style={{ background: on ? draftRoles[editingRole].color : "var(--card)", border: `1.5px solid ${on ? draftRoles[editingRole].color : "var(--border)"}` }}>
+                      {on && <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                    </span>
+                    <span className="flex-1 text-[12px] font-semibold" style={{ color: on ? draftRoles[editingRole].color : "var(--foreground)" }}>{menu.label}</span>
+                    {locked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Wajib</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {MENU_ITEMS.some(m => draftRoles[editingRole].menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0) && (
+              <>
+                <div className="text-[10px] font-bold mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>IZIN AKSES TOMBOL</div>
+                <div className="flex flex-col gap-2 mb-4">
+                  {MENU_ITEMS.filter(m => draftRoles[editingRole].menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0).map(menu => {
+                    const acts = draftRoles[editingRole].permissions?.[menu.id];
+                    const actList = ACTION_ITEMS[menu.id];
+                    const locked = editingRole === "admin" && menu.id === "settings";
+                    const enabledCount = actList.filter(a => acts?.includes(a) ?? true).length;
+                    return (
+                      <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", opacity: locked ? 0.7 : 1 }}>
+                        <div className="flex items-center justify-between px-3 py-2" style={{ background: `${draftRoles[editingRole].color}10` }}>
+                          <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: draftRoles[editingRole].color }}>
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: draftRoles[editingRole].color }} />
+                            {menu.label}
+                          </div>
+                          <span className="text-[9px] font-semibold" style={{ color: locked ? "var(--muted-foreground)" : draftRoles[editingRole].color }}>
+                            {locked ? "Wajib" : `${enabledCount}/${actList.length}`}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2" style={{ background: "var(--card)" }}>
+                          {actList.map(action => {
+                            const on = acts?.includes(action) ?? true;
+                            return (
+                              <button key={action} onClick={() => toggleAction(editingRole, menu.id, action)} disabled={locked}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[11px] font-medium text-left transition-all select-none disabled:cursor-not-allowed"
+                                style={{ background: on ? `${draftRoles[editingRole].color}12` : "var(--background)", border: `1px solid ${on ? draftRoles[editingRole].color : "var(--border)"}`, color: on ? draftRoles[editingRole].color : "var(--muted-foreground)" }}>
+                                <span className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                  style={{ background: on ? draftRoles[editingRole].color : "transparent", border: `1.5px solid ${on ? draftRoles[editingRole].color : "var(--border)"}` }}>
+                                  {on && <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                </span>
+                                <span className="flex-1 truncate">{ACTION_LABELS[menu.id]?.[action] ?? action}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
+              <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Perubahan otomatis tampil pada tombol "Simpan Role"</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => setEditingRole(null)} className="px-4 py-2.5 rounded-xl text-xs font-semibold transition-all" style={{ background: "var(--muted)", color: "var(--foreground)" }}>Batal</button>
+                <button onClick={() => { setEditingRole(null); showToast("Perubahan role disimpan"); }} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>Selesai</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

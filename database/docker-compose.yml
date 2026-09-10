@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nands-pos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nands
+      POSTGRES_PASSWORD: nands123
+      POSTGRES_DB: nands_pos
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Schema + data awal dijalankan otomatis saat container PERTAMA kali dibuat.
+      # Jika ingin reset database: docker compose down -v lalu up -d
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nands -d nands_pos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

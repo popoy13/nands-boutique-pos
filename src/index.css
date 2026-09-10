@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
+}
+
+select,
+input,
+textarea,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --background: #f0f2f5;
+  --foreground: #0d0f14;
+  --card: #ffffff;
+  --card-foreground: #0d0f14;
+  --primary: #111827;
+  --primary-foreground: #ffffff;
+  --accent: #7c3aed;
+  --accent-foreground: #ffffff;
+  --secondary: #f4f6f8;
+  --secondary-foreground: #374151;
+  --muted: #e9ecef;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --ring: #7c3aed;
+  --radius: 12px;
+  --sidebar: #0d0f14;
+  --sidebar-fg: #9ca3af;
+  --sidebar-active: #1a1d26;
+}
+
+* { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Print styles for receipt */
+@media print {
+  @page { size: 80mm auto; margin: 0; }
+  body * { visibility: hidden; }
+  #print-receipt, #print-receipt * { visibility: visible; }
+  #print-receipt {
+    position: fixed;
+    left: 0; top: 0;
+    width: 80mm;
+    background: white;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #000;
+    padding: 8mm;
+  }
+}

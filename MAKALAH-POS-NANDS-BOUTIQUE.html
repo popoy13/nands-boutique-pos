@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Makalah – Sistem POS NAND'S BOUTIQUE</title>
+<style>
+  @page { size: A4; margin: 2.5cm 2.5cm 2.5cm 2.5cm; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.6; color: #111; max-width: 800px; margin: 0 auto; padding: 24px; background: #fff; text-align: justify; }
+  .cover { text-align: center; padding: 50px 0 30px; }
+  .cover .title { font-size: 18pt; font-weight: bold; text-transform: uppercase; margin: 20px 0 4px; }
+  .cover .subtitle { font-size: 14pt; margin: 8px 0; }
+  .cover .meta { margin-top: 40px; line-height: 1.8; }
+  .cover .footer { margin-top: 50px; }
+  h1 { font-size: 14pt; text-transform: uppercase; text-align: center; margin: 28px 0 12px; page-break-after: avoid; }
+  h2 { font-size: 12.5pt; margin: 18px 0 8px; page-break-after: avoid; }
+  h3 { font-size: 12pt; font-style: italic; font-weight: bold; margin: 14px 0 6px; page-break-after: avoid; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; padding: 0; }
+  li { margin: 4px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 11pt; }
+  th, td { border: 1px solid #444; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; }
+  .toc { margin: 12px 0 12px 24px; }
+  .toc li { margin: 3px 0; }
+  .page-break { page-break-before: always; }
+  .center { text-align: center; }
+  .ref li { margin: 6px 0; }
+  @media print { body { padding: 0; } .no-print { display: none; } }
+  .no-print { margin: 12px 0; padding: 10px 14px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-size: 11pt; font-family: Arial, sans-serif; text-align: left; }
+</style>
+</head>
+<body>
+
+<div class="no-print">Untuk mencetak / menyimpan sebagai PDF, tekan &ldquo;Cetak&rdquo; di bawah lalu pilih tujuan penyimpanan (Print to PDF). Jangan tampilkan header/footer browser pada opsi cetak.</div>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div style="font-size:13pt; font-weight:bold; letter-spacing:2px;">MAKALAH</div>
+  <div class="title">Sistem Informasi Point of Sale (POS)<br>NAND&rsquo;S BOUTIQUE</div>
+  <div class="subtitle">Prototype Aplikasi Kasir Multi-Cabang Berbasis Web Responsif dan Android</div>
+
+  <div class="meta">
+    <p>Disusun Oleh:</p>
+    <p style="margin:2px 0;"><u>[Nama Mahasiswa 1]</u></p>
+    <p style="margin:2px 0;"><u>[Nama Mahasiswa 2]</u></p>
+    <p style="margin:2px 0;"><u>[Nama Mahasiswa 3]</u></p>
+  </div>
+
+  <div class="footer">
+    <p>Program Studi [Program Studi]</p>
+    <p>[Nama Sekolah / Perguruan Tinggi]</p>
+    <p>[Tahun Ajaran 2026]</p>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ================= KATA PENGANTAR ================= -->
+<h1>Kata Pengantar</h1>
+<p>Puji syukur kami panjatkan ke hadirat Tuhan Yang Maha Esa karena atas rahmat dan karunia-Nya kami dapat menyelesaikan makalah yang berjudul <strong>&ldquo;Sistem Informasi Point of Sale (POS) NAND&rsquo;S BOUTIQUE&rdquo;</strong> ini dengan baik.</p>
+<p>Makalah ini disusun untuk memenuhi tugas <em>[sebutkan mata kuliah / jenis tugas]</em> serta sebagai bentuk pengembangan keterampilan kami dalam merancang dan membangun aplikasi sistem informasi. Aplikasi yang dibahas merupakan prototype sistem kasir (Point of Sale) untuk toko pakaian NAND&rsquo;S BOUTIQUE yang mendukung operasional multi-cabang, mulai dari transaksi penjualan, pengelolaan produk dan stok, keanggotaan pelanggan, absensi karyawan, hingga pelaporan.</p>
+<p>Kami menyadari makalah ini masih jauh dari sempurna. Oleh karena itu, kritik dan saran yang membangun sangat kami harapkan demi perbaikan ke depannya. Semoga makalah ini bermanfaat bagi pembaca.</p>
+<p style="margin-top:40px;">[Kota], [tanggal]<br>Penulis,</p>
+<p style="margin-top:40px;">________________________<br><em>[Nama Mahasiswa]</em></p>
+
+<div class="page-break"></div>
+
+<!-- ================= DAFTAR ISI ================= -->
+<h1>Daftar Isi</h1>
+<ol class="toc">
+  <li>Kata Pengantar</li>
+  <li>Daftar Isi</li>
+  <li>BAB I &ndash; Pendahuluan</li>
+  <li>&nbsp;&nbsp;1.1 Latar Belakang</li>
+  <li>&nbsp;&nbsp;1.2 Rumusan Masalah</li>
+  <li>&nbsp;&nbsp;1.3 Tujuan Penulisan</li>
+  <li>&nbsp;&nbsp;1.4 Manfaat</li>
+  <li>BAB II &ndash; Tinjauan Pustaka</li>
+  <li>&nbsp;&nbsp;2.1 Konsep Point of Sale (POS)</li>
+  <li>&nbsp;&nbsp;2.2 Aplikasi Web Responsif dan Android</li>
+  <li>&nbsp;&nbsp;2.3 Teknologi yang Digunakan</li>
+  <li>&nbsp;&nbsp;2.4 Penyimpanan Data Lokal</li>
+  <li>BAB III &ndash; Pembahasan</li>
+  <li>&nbsp;&nbsp;3.1 Gambaran Umum Sistem</li>
+  <li>&nbsp;&nbsp;3.2 Arsitektur Sistem</li>
+  <li>&nbsp;&nbsp;3.3 Pengguna dan Hak Akses</li>
+  <li>&nbsp;&nbsp;3.4 Analisis Kebutuhan Fungsional</li>
+  <li>&nbsp;&nbsp;3.5 Implementasi Fitur Per Modul</li>
+  <li>&nbsp;&nbsp;3.6 Antarmuka Pengguna dan Responsivitas</li>
+  <li>&nbsp;&nbsp;3.7 Hasil Uji Coba</li>
+  <li>BAB IV &ndash; Penutup</li>
+  <li>&nbsp;&nbsp;4.1 Kesimpulan</li>
+  <li>&nbsp;&nbsp;4.2 Saran</li>
+  <li>Daftar Pustaka</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ================= BAB I ================= -->
+<h1>Bab I<br>Pendahuluan</h1>
+
+<h2>1.1 Latar Belakang</h2>
+<p>Kemajuan teknologi informasi telah mengubah berbagai aspek kegiatan usaha, termasuk pada sektor usaha mikro dan menengah (UMKM) hingga usaha ritel bermerek. Salah satu kebutuhan utama sebuah toko ritel adalah sistem kasir yang mampu mencatat transaksi secara cepat, akurat, dan terdokumentasi. NAND&rsquo;S BOUTIQUE, sebuah toko pakaian dengan tiga cabang, membutuhkan sistem Point of Sale (POS) yang dapat digunakan oleh kasir dan pengelola toko secara real-time untuk menjalankan transaksi penjualan, mengelola stok produk pada tiap cabang, melayani program keanggotaan pelanggan, memantau absensi karyawan, serta menyusun laporan penjualan.</p>
+<p>Selama ini, pencatatan penjualan yang dilakukan secara manual atau menggunakan aplikasi kasir sederhana memiliki kelemahan, antara lain data yang tidak tersimpan rapi, kesulitan menghitung stok antar-cabang, dan laporan yang baru dapat disusun setelah waktu yang lama. Oleh karena itu, dibuatlah prototype sistem POS &ldquo;NAND&rsquo;S BOUTIQUE&rdquo; berbasis web responsif yang juga dapat dijalankan pada perangkat Android. Dengan sistem ini, diharapkan proses transaksi dan pengelolaan data toko menjadi lebih efisien, transparan, dan dapat diakses dari berbagai perangkat.</p>
+
+<h2>1.2 Rumusan Masalah</h2>
+<p>Berdasarkan latar belakang di atas, rumusan masalah dalam penulisan makalah ini adalah:</p>
+<ol>
+  <li>Bagaimana merancang dan membangun sistem Point of Sale (POS) yang mampu menangani transaksi penjualan untuk usaha multi-cabang?</li>
+  <li>Fitur-fitur apa saja yang diperlukan untuk mendukung operasional kasir, pengelolaan produk dan stok, keanggotaan pelanggan, absensi karyawan, serta pelaporan?</li>
+  <li>Bagaimana mengimplementasikan sistem agar tampilan bersifat responsif sehingga dapat digunakan pada perangkat komputer maupun Android?</li>
+</ol>
+
+<h2>1.3 Tujuan Penulisan</h2>
+<p>Tujuan dari penulisan makalah ini adalah:</p>
+<ol>
+  <li>Memaparkan perancangan dan pembangunan prototype sistem POS untuk NAND&rsquo;S BOUTIQUE.</li>
+  <li>Menjelaskan fitur-fitur fungsional sistem beserta hak akses penggunanya.</li>
+  <li>Menjelaskan penerapan tampilan responsif dan pengemasan aplikasi menjadi berkas Android (APK).</li>
+</ol>
+
+<h2>1.4 Manfaat</h2>
+<p>Manfaat yang diharapkan dari aplikasi ini adalah:</p>
+<ol>
+  <li><strong>Bagi kasir:</strong> Mempercepat proses transaksi, pencetakan struk, dan pencatatan penjualan.</li>
+  <li><strong>Bagi pengelola/manajemen:</strong> Mendapatkan laporan penjualan yang akurat, pengawasan stok antar-cabang, serta pengelolaan karyawan dan absensi yang lebih tertib.</li>
+  <li><strong>Bagi pelanggan:</strong> Mendapatkan layanan lebih cepat serta dapat memanfaatkan program poin dan tier keanggotaan.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ================= BAB II ================= -->
+<h1>Bab II<br>Tinjauan Pustaka</h1>
+
+<h2>2.1 Konsep Point of Sale (POS)</h2>
+<p>Point of Sale (POS) adalah sistem yang digunakan untuk mencatat dan memproses transaksi penjualan pada lokasi penjualan, meliputi penghitungan harga barang, pemberian diskon, pembayaran, hingga penerbitan struk. Sistem POS modern tidak hanya berfungsi sebagai cash register digital, tetapi juga terintegrasi dengan manajemen stok, data pelanggan, dan laporan keuangan. Dalam aplikasi ini, sistem POS dikembangkan berbasis web sehingga dapat diakses dari berbagai perangkat melalui browser.</p>
+
+<h2>2.2 Aplikasi Web Responsif dan Android</h2>
+<p>Aplikasi web responsif adalah aplikasi yang tampilannya menyesuaikan lebar layar perangkat pengguna, baik komputer, tablet, maupun ponsel. Pendekatan ini memungkinkan satu aplikasi digunakan untuk banyak jenis perangkat tanpa perlu membuat aplikasi terpisah. Agar dapat diinstal dan dijalankan seperti aplikasi Android pada umumnya, aplikasi web dapat dibungkus menggunakan Capacitor, yaitu sebuah kerangka kerja (framework) yang mengemas aplikasi web menjadi aplikasi mobile sehingga menghasilkan berkas APK.</p>
+
+<h2>2.3 Teknologi yang Digunakan</h2>
+<p>Aplikasi ini dibangun menggunakan teknologi sebagai berikut:</p>
+<ol>
+  <li><strong>React 19</strong> &ndash; Pustaka JavaScript untuk membangun antarmuka pengguna berbasis komponen.</li>
+  <li><strong>TypeScript 5.7</strong> &ndash; Bahasa pemrograman yang menambahkan penulisan tipe data (type checking) untuk meminimalkan kesalahan kode.</li>
+  <li><strong>Vite 8</strong> &ndash; Alat build yang menyediakan proses pengembangan dan pengemasan aplikasi secara cepat serta efisien.</li>
+  <li><strong>Tailwind CSS v4</strong> &ndash; Kerangka kerja CSS berbasis utilitas untuk mempercepat pembuatan tampilan yang konsisten dan menarik.</li>
+  <li><strong>Capacitor</strong> &ndash; Framework untuk mengemas aplikasi web menjadi aplikasi Android (menghasilkan APK).</li>
+  <li><strong>HTML5 &amp; localStorage</strong> &ndash; Digunakan untuk menyimpan data aplikasi pada perangkat pengguna.</li>
+</ol>
+
+<h2>2.4 Penyimpanan Data Lokal</h2>
+<p>Prototype ini menggunakan localStorage, yaitu mekanisme penyimpanan data pada peramban web berbasis penyimpanan kunci-nilai (key-value) yang tidak terhapus saat halaman ditutup. Dengan pendekatan ini, seluruh data aplikasi tersimpan pada perangkat pengguna sehingga cocok untuk keperluan prototype dan demonstrasi tanpa membutuhkan server. Setiap perubahan data (data transaksi, produk, karyawan, dan lainnya) disimpan otomatis dan langsung tersedia kembali saat aplikasi dibuka.</p>
+
+<div class="page-break"></div>
+
+<!-- ================= BAB III ================= -->
+<h1>Bab III<br>Pembahasan</h1>
+
+<h2>3.1 Gambaran Umum Sistem</h2>
+<p>Sistem POS &ldquo;NAND&rsquo;S BOUTIQUE&rdquo; merupakan aplikasi kasir multi-cabang yang mencakup tiga toko: <strong>Sudirman</strong> (Jakarta Pusat), <strong>Kemang</strong> (Jakarta Selatan), dan <strong>BSD City</strong> (Tangerang Selatan). Aplikasi mencatat seluruh data secara real-time pada enam modul utama, yaitu:</p>
+<ol>
+  <li><strong>Kasir (POS)</strong> &ndash; proses transaksi penjualan.</li>
+  <li><strong>Produk &amp; Stok</strong> &ndash; pengelolaan barang dan ketersediaan stok per cabang.</li>
+  <li><strong>Riwayat &amp; Laporan</strong> &ndash; dokumentasi transaksi dan rekap penjualan.</li>
+  <li><strong>Karyawan &amp; Absensi</strong> &ndash; data pegawai dan pencatatan kehadiran.</li>
+  <li><strong>Pelanggan (Member)</strong> &ndash; data keanggotaan dan poin.</li>
+  <li><strong>Pengaturan (Settings)</strong> &ndash; konfigurasi toko, printer, dan tampilan aplikasi.</li>
+</ol>
+
+<h2>3.2 Arsitektur Sistem</h2>
+<p>Aplikasi dibangun dengan arsitektur komponen tunggal (single-page application, SPA) dengan pembagian folder sebagai berikut:</p>
+<ul>
+  <li><code>src/data</code> &ndash; berisi definisi tipe data dan data awal (produk, toko, karyawan, member, diskon).</li>
+  <li><code>src/components</code> &ndash; berisi komponen antarmuka untuk setiap modul (POSView, ProductManagement, StockView, EmployeeManagement, MemberView, AttendanceView, ReportView, HistoryView, SettingsView, dan lain-lain).</li>
+  <li><code>src/App.tsx</code> &ndash; komponen utama yang mengatur navigasi, status login, dan koordinasi antar modul.</li>
+  <li><code>src/data/settings.ts</code> &ndash; konfigurasi pengaturan aplikasi yang dapat diubah pengguna.</li>
+</ul>
+<p>Setiap modul menerima data melalui props dari komponen utama, dan setiap pembaruan data langsung disimpan ke localStorage sehingga seluruh tampilan selalu sinkron (state management berbasis komponen).</p>
+
+<h2>3.3 Pengguna dan Hak Akses</h2>
+<p>Sistem memiliki lima jenis pengguna dengan hak akses berbeda sesuai dengan <code>ROLE_PERMISSIONS</code>:</p>
+<table>
+  <tr><th>Role</th><th>Hak Akses</th></tr>
+  <tr><td><strong>Admin</strong></td><td>Semua menu: POS, Riwayat, Laporan, Inventori, Karyawan, Toko, Diskon, Produk, Member, Absensi, Pengaturan</td></tr>
+  <tr><td><strong>Manager</strong></td><td>POS, Riwayat, Laporan, Inventori, Karyawan, Produk, Absensi, Pengaturan</td></tr>
+  <tr><td><strong>Manager Operasional</strong></td><td>POS, Riwayat, Laporan, Inventori, Karyawan, Produk, Absensi, Pengaturan</td></tr>
+  <tr><td><strong>Kasir</strong></td><td>POS, Riwayat, Laporan, Inventori, Absensi</td></tr>
+  <tr><td><strong>Staff</strong></td><td>Inventori, Absensi</td></tr>
+</table>
+<p>Setiap karyawan memiliki PIN untuk masuk ke aplikasi. Pemisahan hak akses ini memastikan setiap pengguna hanya dapat mengerjakan tugas sesuai perannya, sehingga data pengelolaan (misalnya penggajian dan harga pokok) tidak dapat diakses oleh kasir atau staff.</p>
+
+<h2>3.4 Analisis Kebutuhan Fungsional</h2>
+<p>Kebutuhan fungsional sistem dirinci sebagai berikut:</p>
+<ol>
+  <li><strong>Login berbasis PIN</strong> &ndash; Karyawan memilih akun dari daftar (dengan foto/avatar) dan memasukkan PIN.</li>
+  <li><strong>Transaksi penjualan (POS)</strong> &ndash; Pencarian produk, pemilihan varian (ukuran, warna, SKU), keranjang belanja, pemberian diskon, penentuan metode pembayaran (Tunai, Debit, QRIS), penghitungan uang kembali, pencetakan struk, serta pencatatan poin pelanggan.</li>
+  <li><strong>Pengelolaan produk</strong> &ndash; CRUD produk dengan varian (ukuran, warna, SKU), harga dasar, kategori, gambar, stok per cabang, dan edit massal (ubah harga/kategori/stok atau hapus banyak produk sekaligus).</li>
+  <li><strong>Manajemen stok</strong> &ndash; Pencatatan stok per toko, mutasi stok antar toko, dan laporan stok.</li>
+  <li><strong>Riwayat transaksi</strong> &ndash; Pencarian berdasarkan tanggal/toko/kasir, pencetakan ulang struk, serta penghapusan transaksi disertai alasan (tercatat di laporan khusus &ldquo;Transaksi Dihapus&rdquo;).</li>
+  <li><strong>Laporan</strong> &ndash; Rekap penjualan harian/7 hari/30 hari/rentang kustom, produk terlaris, perbandingan per kategori, rincian metode pembayaran, statistik transaksi, serta ekspor data ke berkas Excel.</li>
+  <li><strong>Keanggotaan</strong> &ndash; Pendaftaran member, akumulasi belanja, poin (1 poin per Rp10.000), dan tier otomatis: <strong>Bronze</strong> (0), <strong>Silver</strong> (&ge;Rp1.000.000), <strong>Gold</strong> (&ge;Rp5.000.000), <strong>Platinum</strong> (&ge;Rp15.000.000).</li>
+  <li><strong>Absensi</strong> &ndash; Klok masuk/keluar dengan bukti foto, pilihan lokasi/toko saat absen, jam operasional per toko (jam buka&ndash;tutup), penentuan status tepat waktu/terlambat berdasarkan jam buka toko, dan jam yang berjalan secara real-time.</li>
+  <li><strong>Manajemen toko</strong> &ndash; CRUD cabang toko beserta alamat, telepon, dan jam operasional.</li>
+  <li><strong>Pengaturan</strong> &ndash; Nama dan logo aplikasi, nama printer, lebar kertas struk (58/72/80 mm), jumlah salinan struk, serta cetak otomatis; logo dan nama tampil pada layar login, navigasi, dan struk.</li>
+</ol>
+
+<h2>3.5 Implementasi Fitur Per Modul</h2>
+
+<h3>a. Modul Kasir (POS)</h3>
+<p>Modul POS menyediakan tampilan belanja dengan pencarian produk berdasarkan nama atau SKU, pemilihan ukuran dan warna, serta penambahan jumlah. Keranjang menampilkan subtotal, diskon, pajak, dan total tagihan. Tersedia juga pemindaian kode batang (barcode scanner atau masukan manual) untuk mempercepat pencarian produk. Saat pembayaran berhasil, sistem membuat struk yang dapat dicetak sesuai pengaturan printer, sekaligus memperbarui stok produk dan menambahkan poin ke akun pelanggan jika terdapat member.</p>
+
+<h3>b. Modul Produk dan Stok</h3>
+<p>Setiap produk memiliki beberapa varian dengan SKU unik, misalnya <code>KMJ-OXF-WHT-M</code> untuk kemeja Oxford putih ukuran M. Stok dicatat terpisah untuk setiap cabang sehingga jumlah barang setiap toko dapat dipantau dan diatur, termasuk fitur transfer stok antar toko. Fitur pengaturan massal (edit banyak) memungkinkan pengelola mengubah harga, kategori, stok, atau menghapus banyak produk dalam satu langkah.</p>
+
+<h3>c. Modul Riwayat dan Laporan</h3>
+<p>Modul riwayat menampilkan seluruh transaksi yang dapat dipilih untuk dilihat rincian ataupun dicetak ulang struknya. Modul laporan menampilkan ringkasan penjualan dalam bentuk angka dan grafik, dilengkapi pemilihan rentang tanggal, serta fitur ekspor ke Microsoft Excel yang mencakup beberapa lembar kerja (rekap transaksi, produk, per kategori, metode pembayaran, dan transaksi yang dihapus).</p>
+
+<h3>d. Modul Karyawan dan Absensi</h3>
+<p>Admin dapat menambah, mengubah, menghapus, mengatur PIN, jabatan, gaji, dan status karyawan. Pada modul absensi, karyawan menekan tombol masuk, mengambil foto, memilih lokasi toko, lalu sistem mencatat jam masuk; demikian pula saat pulang. Data kehadiran dapat difilter berdasarkan tanggal, toko, dan karyawan, serta diunduh sebagai berkas Excel. Karena penentuan terlambat mengacu pada jam buka cabang masing-masing, sistem ini menghargai perbedaan jam operasional tiap toko.</p>
+
+<h3>e. Modul Pelanggan</h3>
+<p>Modul ini mengelola data pelanggan, total belanja, poin, dan tier. Tier pelanggan dihitung otomatis dari total belanja sehingga pelanggan dapat naik kelas (misalnya dari Bronze ke Silver) secara otomatis. Poin pelanggan juga bertambah setiap transaksi yang membubuhkan member.</p>
+
+<h3>f. Modul Pengaturan</h3>
+<p>Melalui menu pengaturan, pengelola dapat mengunggah logo, mengubah nama dan slogan aplikasi, memilih nama printer, lebar kertas struk, jumlah salinan, dan mengaktifkan cetak otomatis. Seluruh pengaturan disimpan otomatis dan langsung diterapkan pada tampilan login, menu aplikasi, serta kop struk.</p>
+
+<h2>3.6 Antarmuka Pengguna dan Responsivitas</h2>
+<p>Antarmuka aplikasi dirancang dengan identitas visual toko bertema warna ungu (accent violet) dengan tipografi modern (Outfit untuk judul dan JetBrains Mono untuk angka/kode). Pengguna desktop mendapatkan tata letak dua kolom (menu samping dan area kerja), sedangkan pada layar ponsel menu berpindah ke bilah bawah (bottom navigation) sehingga tetap nyaman digunakan satu tangan. Responsivitas ini membuat aplikasi berfungsi sama baik diakses dari komputer maupun dari ponsel.</p>
+
+<h2>3.7 Hasil Uji Coba</h2>
+<p>Pengujian dilakukan melalui beberapa aspek:</p>
+<ol>
+  <li><strong>Fungsional</strong> &ndash; Seluruh alur kerja diuji: login, transaksi, pembayaran, pembuatan struk, CRUD produk/toko/karyawan/member, mutasi stok, absensi, laporan, hingga ekspor Excel. Seluruhnya berjalan sesuai kebutuhan.</li>
+  <li><strong>Kualitas kode</strong> &ndash; Pemeriksaan tipe data TypeScript (<code>tsc --noEmit</code>) berhasil tanpa kesalahan.</li>
+  <li><strong>Deployment</strong> &ndash; Aplikasi di-build dengan Vite dan berhasil dikemas menggunakan Capacitor menjadi berkas APK (&plusmn;4,6 MB) yang dapat diinstal pada perangkat Android, selain dapat diakses langsung melalui peramban web.</li>
+</ol>
+<p>Dari hasil uji coba tersebut, aplikasi dinyatakan layak digunakan sebagai prototype sistem kasir multi-cabang untuk NAND&rsquo;S BOUTIQUE.</p>
+
+<div class="page-break"></div>
+
+<!-- ================= BAB IV ================= -->
+<h1>Bab IV<br>Penutup</h1>
+
+<h2>4.1 Kesimpulan</h2>
+<p>Berdasarkan pembahasan di atas dapat disimpulkan:</p>
+<ol>
+  <li>Sistem POS &ldquo;NAND&rsquo;S BOUTIQUE&rdquo; berhasil dibangun sebagai aplikasi web responsif yang dapat berjalan di peramban maupun Android, melayani tiga cabang toko secara terpadu.</li>
+  <li>Sistem mencakup modul lengkap: transaksi kasir dengan struk, pengelolaan produk ber-varian dan stok per cabang, keanggotaan dengan poin dan tier, diskon, karyawan, absensi dengan bukti foto dan jam operasional per toko, laporan, buku besar transaksi, serta pengaturan aplikasi.</li>
+  <li>Tampilan yang responsif dan pengemasan menjadi APK memungkinkan aplikasi digunakan pada berbagai perangkat sehingga mendukung mobilitas kasir dan pengelola toko.</li>
+</ol>
+
+<h2>4.2 Saran</h2>
+<p>Untuk pengembangan selanjutnya disarankan:</p>
+<ol>
+  <li>Mengganti penyimpanan localStorage dengan basis data (misalnya SQLite/Firebase) dan backend server agar data dapat dibagikan antar perangkat secara real-time dalam jaringan.</li>
+  <li>Menambahkan integrasi dengan printer struk fisik (Bluetooth/ESC-POS) agar pencetakan struk dilakukan langsung dari perangkat Android.</li>
+  <li>Menambahkan fitur manajemen retur/penukaran barang dan pembelian berbasis PPN yang lebih detail.</li>
+  <li>Melengkapi pengujian dengan pengguna sesungguhnya (user acceptance test) dan pengujian keamanan data.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ================= DAFTAR PUSTAKA ================= -->
+<h1>Daftar Pustaka</h1>
+<ol class="ref">
+  <li>Meta Media / React Team. <em>React Documentation</em>. Tersedia di: https://react.dev/</li>
+  <li>The TypeScript Team. <em>TypeScript Documentation</em>. Tersedia di: https://www.typescriptlang.org/docs/</li>
+  <li>Vite Team. <em>Vite Documentation</em>. Tersedia di: https://vite.dev/</li>
+  <li>Tailwind Labs. <em>Tailwind CSS Documentation</em>. Tersedia di: https://tailwindcss.com/docs</li>
+  <li>Ionic. <em>Capacitor Documentation</em>. Tersedia di: https://capacitorjs.com/docs</li>
+  <li>Laudon, K. C., &amp; Laudon, J. P. <em>Management Information Systems: Managing the Digital Firm</em>. Pearson.</li>
+  <li>Pressman, R. S. <em>Software Engineering: A Practitioner&rsquo;s Approach</em>. McGraw-Hill.</li>
+</ol>
+
+<p style="margin-top:24px;"><em>Catatan: Nama penyusun, program studi, serta nama sekolah/perguruan tinggi dapat disesuaikan sesuai kebutuhan.</em></p>
+
+<div class="no-print" style="text-align:center; margin-top:24px;">
+  <button onclick="window.print()" style="background:#7c3aed;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13pt;cursor:pointer;">Cetak / Simpan sebagai PDF</button>
+</div>
+
+</body>
+</html>

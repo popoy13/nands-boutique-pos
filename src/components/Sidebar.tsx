@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
 import type { Employee } from "../data/types";
 import { ROLE_PERMISSIONS } from "../data/types";
+import Avatar from "./Avatar";
 
 interface Props {
   activeTab: string;
@@ -44,9 +45,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
           </div>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: ROLE_COLOR[currentUser.role] }}>
-            {currentUser.name.charAt(0)}
-          </div>
+          <Avatar src={currentUser.photo} name={currentUser.name} role={currentUser.role} className="w-7 h-7 text-xs" />
           <button onClick={onLogout} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
@@ -108,9 +107,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
       {/* User footer */}
       <div className="px-4 py-4 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: ROLE_COLOR[currentUser.role] }}>
-            {currentUser.name.charAt(0)}
-          </div>
+          <Avatar src={currentUser.photo} name={currentUser.name} role={currentUser.role} className="w-8 h-8 text-xs" />
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 12, fontWeight: 600, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
             <div style={{ fontSize: 10, color: ROLE_COLOR[currentUser.role] }}>{ROLE_LABEL[currentUser.role]}</div>

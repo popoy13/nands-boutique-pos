@@ -1,5 +1,6 @@
 ﻿import { useState } from "react";
 import type { Employee } from "../data/types";
+import Avatar from "./Avatar";
 
 interface Props {
   employees: Employee[];
@@ -107,10 +108,7 @@ export default function LoginView({ employees, stores, brand, onLogin }: Props) 
                   className="p-4 rounded-xl text-left transition-all duration-150 hover:-translate-y-0.5 group"
                   style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
                 >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm mb-3 transition-all"
-                    style={{ background: ROLE_COLOR[emp.role] }}>
-                    {emp.name.charAt(0)}
-                  </div>
+                  <Avatar src={emp.photo} name={emp.name} role={emp.role} className="w-10 h-10 text-sm mb-3" />
                   <div className="text-sm font-semibold mb-0.5 truncate">{emp.name}</div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -136,9 +134,7 @@ export default function LoginView({ employees, stores, brand, onLogin }: Props) 
               <button onClick={() => { setStep("select"); setError(""); setPin(""); }} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ background: ROLE_COLOR[selected?.role ?? "staff"] }}>
-                {selected?.name.charAt(0)}
-              </div>
+<Avatar src={selected?.photo} name={selected?.name ?? ""} role={selected?.role} className="w-9 h-9 text-sm shrink-0" />
               <div>
                 <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Masukkan PIN</div>
                 <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{selected?.name}</div>

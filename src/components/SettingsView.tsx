@@ -266,23 +266,22 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                     )}
                   </div>
 
-                  <div className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>MENU YANG DITAMPILKAN</div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="text-[10px] font-semibold mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>MENU YANG DITAMPILKAN</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {MENU_ITEMS.map(menu => {
                       const on = cfg.menus.includes(menu.id);
                       const locked = roleKey === "admin" && (menu.id === "settings" || menu.id === "employee");
                       return (
-                        <button key={menu.id} onClick={() => toggleMenu(roleKey, menu.id)} disabled={locked}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                          style={{
-                            background: on ? cfg.color : "var(--card)",
-                            color: on ? "white" : "var(--muted-foreground)",
-                            border: locked ? `1.5px dashed ${cfg.color}` : `1.5px solid ${on ? cfg.color : "var(--border)"}`,
-                            opacity: locked ? 1 : undefined,
-                          }}
-                          title={locked ? "Admin wajib punya akses ini" : menu.label}>
-                          {menu.label}{locked ? " ·" : ""}
-                        </button>
+                        <div key={menu.id} onClick={locked ? undefined : () => toggleMenu(roleKey, menu.id)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all select-none"
+                          style={{ cursor: locked ? "not-allowed" : "pointer", background: on ? `${cfg.color}14` : "var(--card)", border: `1px solid ${on ? cfg.color : "var(--border)"}`, opacity: locked ? 0.75 : 1 }}>
+                          <span className="w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0"
+                            style={{ background: on ? cfg.color : "var(--card)", border: `1.5px solid ${on ? cfg.color : "var(--border)"}` }}>
+                            {on && <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                          </span>
+                          <span className="flex-1 text-[12px] font-semibold" style={{ color: on ? cfg.color : "var(--foreground)" }}>{menu.label}</span>
+                          {locked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Wajib</span>}
+                        </div>
                       );
                     })}
                   </div>

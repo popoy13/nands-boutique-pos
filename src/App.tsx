@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
 import POSView from "./components/POSView";
@@ -29,14 +29,28 @@ export default function App() {
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
   } = useSyncedStore();
-  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(() => {
+    try {
+      const raw = localStorage.getItem("nands-current-user");
+      if (raw) return JSON.parse(raw) as Employee;
+    } catch { /* ignore */ }
+    return null;
+  });
   const [activeTab, setActiveTab] = useState("pos");
   const [activeStore, setActiveStore] = useState("s1");
+
+  useEffect(() => {
+    if (ready && currentUser && !employees.some(e => e.id === currentUser.id)) {
+      setCurrentUser(null);
+      try { localStorage.removeItem("nands-current-user"); } catch { /* ignore */ }
+    }
+  }, [ready, employees]);
 
   const storeName = stores.find(s => s.id === activeStore)?.name ?? "";
 
   const handleLogin = (emp: Employee) => {
     setCurrentUser(emp);
+    try { localStorage.setItem("nands-current-user", JSON.stringify(emp)); } catch { /* ignore */ }
     // Default to first allowed tab
     const allowed = ROLE_PERMISSIONS[emp.role];
     setActiveTab(allowed[0]);
@@ -46,7 +60,11 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => { setCurrentUser(null); setActiveTab("pos"); };
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab("pos");
+    try { localStorage.removeItem("nands-current-user"); } catch { /* ignore */ }
+  };
 
   const handleNewTransaction = (t: Transaction) => {
     setTransactions(prev => [...prev, t]);

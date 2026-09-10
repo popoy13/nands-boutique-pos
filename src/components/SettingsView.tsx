@@ -79,56 +79,52 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const savePrinter = () => { onSaveSettings({ ...settings, printer: { ...draftPrinter, paperWidth: Number(draftPrinter.paperWidth) } }); showToast("Setelan printer disimpan"); };
   const saveBrand = () => { onSaveSettings({ ...settings, brand: draftBrand }); showToast("Menu utama diperbarui"); };
   const saveAttendance = () => { onSaveStores(draftStores); showToast("Jam operasional toko tersimpan"); };
-  const saveRoles = () => { onSaveSettings({ ...settings, roles: draftRoles }); showToast("Role & otorisasi menu disimpan"); };
   const saveBarcode = () => { onSaveSettings({ ...settings, barcode: draftBarcode }); showToast("Setelan perangkat barcode disimpan"); };
+
+  const commitRoles = (updated: AppSettings["roles"]) => {
+    setDraftRoles(updated);
+    onSaveSettings({ ...settings, roles: updated });
+  };
 
   const setStoreDraft = (id: string, key: keyof Store, val: string) => {
     setDraftStores(prev => prev.map(s => s.id === id ? ({ ...s, [key]: val } as Store) : s));
   };
 
   const toggleMenu = (roleKey: string, menu: string) => {
-    setDraftRoles(prev => {
-      const cfg = prev[roleKey];
-      if (!cfg) return prev;
-      const locked = roleKey === "admin" && (menu === "settings" || menu === "employee");
-      const has = cfg.menus.includes(menu);
-      if (locked) return prev;
-      const permissions = { ...(cfg.permissions ?? {}) };
-      if (!has && !permissions[menu] && (ACTION_ITEMS[menu]?.length ?? 0) > 0) {
-        permissions[menu] = [...ACTION_ITEMS[menu]];
-      }
-      return { ...prev, [roleKey]: { ...cfg, menus: has ? cfg.menus.filter(m => m !== menu) : [...cfg.menus, menu], permissions } };
-    });
+    const cfg = draftRoles[roleKey];
+    if (!cfg) return;
+    const locked = roleKey === "admin" && (menu === "settings" || menu === "employee");
+    const has = cfg.menus.includes(menu);
+    if (locked) return;
+    const permissions = { ...(cfg.permissions ?? {}) };
+    if (!has && !permissions[menu] && (ACTION_ITEMS[menu]?.length ?? 0) > 0) {
+      permissions[menu] = [...ACTION_ITEMS[menu]];
+    }
+    commitRoles({ ...draftRoles, [roleKey]: { ...cfg, menus: has ? cfg.menus.filter(m => m !== menu) : [...cfg.menus, menu], permissions } });
   };
 
   const toggleAction = (roleKey: string, menu: string, action: string) => {
-    setDraftRoles(prev => {
-      const cfg = prev[roleKey];
-      if (!cfg) return prev;
-      const locked = roleKey === "admin" && menu === "settings";
-      if (locked) return prev;
-      const permissions = { ...(cfg.permissions ?? {}) };
-      const acts = permissions[menu] ? [...permissions[menu]] : [...(ACTION_ITEMS[menu] ?? [])];
-      const has = acts.includes(action);
-      permissions[menu] = has ? acts.filter(a => a !== action) : [...acts, action];
-      return { ...prev, [roleKey]: { ...cfg, permissions } };
-    });
+    const cfg = draftRoles[roleKey];
+    if (!cfg) return;
+    const locked = roleKey === "admin" && menu === "settings";
+    if (locked) return;
+    const permissions = { ...(cfg.permissions ?? {}) };
+    const acts = permissions[menu] ? [...permissions[menu]] : [...(ACTION_ITEMS[menu] ?? [])];
+    const has = acts.includes(action);
+    permissions[menu] = has ? acts.filter(a => a !== action) : [...acts, action];
+    commitRoles({ ...draftRoles, [roleKey]: { ...cfg, permissions } });
   };
 
   const setRoleColor = (roleKey: string, color: string) => {
-    setDraftRoles(prev => {
-      const cfg = prev[roleKey];
-      if (!cfg) return prev;
-      return { ...prev, [roleKey]: { ...cfg, color } };
-    });
+    const cfg = draftRoles[roleKey];
+    if (!cfg) return;
+    commitRoles({ ...draftRoles, [roleKey]: { ...cfg, color } });
   };
 
   const setRoleLabel = (roleKey: string, label: string) => {
-    setDraftRoles(prev => {
-      const cfg = prev[roleKey];
-      if (!cfg) return prev;
-      return { ...prev, [roleKey]: { ...cfg, label } };
-    });
+    const cfg = draftRoles[roleKey];
+    if (!cfg) return;
+    commitRoles({ ...draftRoles, [roleKey]: { ...cfg, label } });
   };
 
   const handleAddRole = () => {
@@ -136,7 +132,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     const key = slugifyRoleKey(label);
     if (!key || !label) { showToast("Isi nama role terlebih dahulu", false); return; }
     if (key in draftRoles) { showToast(`Role "${label}" sudah ada`, false); return; }
-    setDraftRoles(prev => ({ ...prev, [key]: { label, color: PALETTE[(Object.keys(prev).length) % PALETTE.length], menus: ["pos", "attendance"], permissions: defaultPermissionsForMenus(["pos", "attendance"]) } }));
+    commitRoles({ ...draftRoles, [key]: { label, color: PALETTE[Object.keys(draftRoles).length % PALETTE.length], menus: ["pos", "attendance"], permissions: defaultPermissionsForMenus(["pos", "attendance"]) } });
     setNewRoleLabel("");
     showToast(`Role "${label}" ditambahkan`);
   };
@@ -144,7 +140,9 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const handleDeleteRole = (roleKey: string) => {
     if (isBuiltinRole(roleKey)) { showToast("Role bawaan tidak dapat dihapus", false); return; }
     if (employees.some(e => e.role === roleKey)) { showToast("Role sedang dipakai karyawan. Ubah dulu jabatannya.", false); return; }
-    setDraftRoles(prev => { const next = { ...prev }; delete next[roleKey]; return next; });
+    const next = { ...draftRoles };
+    delete next[roleKey];
+    commitRoles(next);
     showToast("Role dihapus");
   };
 
@@ -360,15 +358,6 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               );
             })}
           </div>
-
-          <div className="sticky bottom-4 z-10 flex justify-end mt-5">
-            <button onClick={saveRoles}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all"
-              style={{ background: "var(--foreground)", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.3)" }}>
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-              Simpan Role & Otorisasi Menu
-            </button>
-          </div>
         </div>
       )}
 
@@ -470,10 +459,10 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             )}
 
             <div className="flex items-center justify-between gap-3 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
-              <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Perubahan otomatis tampil pada tombol "Simpan Role"</span>
+              <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Perubahan langsung tersimpan otomatis</span>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => setEditingRole(null)} className="px-4 py-2.5 rounded-xl text-xs font-semibold transition-all" style={{ background: "var(--muted)", color: "var(--foreground)" }}>Batal</button>
-                <button onClick={() => { setEditingRole(null); showToast("Perubahan role disimpan"); }} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>Selesai</button>
+                <button onClick={() => { setEditingRole(null); showToast("Role disimpan"); }} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>Simpan</button>
               </div>
             </div>
           </div>

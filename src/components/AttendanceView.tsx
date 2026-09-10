@@ -67,6 +67,8 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
     onCapture(canvas.toDataURL("image/jpeg", 0.6));
   };
@@ -74,7 +76,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   return (
     <div>
       <div className="relative rounded-xl overflow-hidden" style={{ background: "#0f1115", border: "1.5px dashed var(--border)" }}>
-        <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" style={{ display: ready ? "block" : "none", transform: "scaleX(-1)" }} />
+        <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" style={{ display: ready ? "block" : "none" }} />
         {!ready && !err && (
           <div className="aspect-video flex flex-col items-center justify-center gap-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
             <div className="animate-pulse">Menyiapkan kamera...</div>

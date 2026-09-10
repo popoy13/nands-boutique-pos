@@ -74,7 +74,7 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
 
   return (
     <div className="relative rounded-2xl overflow-hidden" style={{ background: "#0d0f14" }}>
-      <video ref={videoRef} muted playsInline className="w-full h-56 sm:h-64 object-cover" style={{ transform: "scaleX(-1)" }} />
+      <video ref={videoRef} muted playsInline className="w-full h-56 sm:h-64 object-cover" />
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-4/5 h-24 rounded-xl" style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
       </div>

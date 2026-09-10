@@ -33,6 +33,7 @@ export const ALL_NAV = [
 
 export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiveStore, stores, currentUser, onLogout, brand, roles, allowed }: Props) {
   const navItems = ALL_NAV.filter(n => allowed.includes(n.id));
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <>
@@ -45,7 +46,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
           </div>
           <Avatar src={currentUser.photo} name={currentUser.name} role={currentUser.role} className="w-7 h-7 text-xs" />
-          <button onClick={onLogout} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <button onClick={() => setConfirming(true)} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
         </div>
@@ -111,12 +112,32 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
             <div style={{ fontSize: 12, fontWeight: 600, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
             <div style={{ fontSize: 10, color: getRoleColor(currentUser.role, roles) }}>{getRoleLabel(currentUser.role, roles)}</div>
           </div>
-          <button onClick={onLogout} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-white/10" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <button onClick={() => setConfirming(true)} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-white/10" style={{ color: "rgba(255,255,255,0.4)" }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
         </div>
       </div>
     </div>
+
+      {/* Logout confirmation */}
+      {confirming && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-5" onClick={() => setConfirming(false)}>
+          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+          <div className="relative w-full max-w-xs rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Keluar aplikasi?</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.5, marginBottom: 16 }}>Anda akan keluar dari sesi {currentUser.name}. Sesi bisa dimulai ulang dengan PIN yang sama nanti.</div>
+            <div className="flex gap-2.5">
+              <button onClick={() => setConfirming(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "var(--muted)", color: "var(--foreground)" }}>Batal</button>
+              <button onClick={onLogout} className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#ef4444", color: "white" }}>Keluar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

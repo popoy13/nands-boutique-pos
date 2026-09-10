@@ -330,22 +330,30 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                           const acts = cfg.permissions?.[menu.id];
                           const actList = ACTION_ITEMS[menu.id];
                           const locked = roleKey === "admin" && menu.id === "settings";
+                          const enabledCount = actList.filter(a => acts?.includes(a) ?? true).length;
                           return (
-                            <div key={menu.id} className="p-3 rounded-xl" style={{ background: "var(--card)", border: "1px solid var(--border)", opacity: locked ? 0.75 : 1 }}>
-                              <div className="text-[11px] font-bold mb-1.5" style={{ color: cfg.color }}>{menu.label}</div>
-                              <div className="flex flex-wrap gap-1.5">
+                            <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", opacity: locked ? 0.7 : 1 }}>
+                              <div className="flex items-center justify-between px-3 py-2" style={{ background: `${cfg.color}10` }}>
+                                <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: cfg.color }}>
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.color }} />
+                                  {menu.label}
+                                </div>
+                                <span className="text-[9px] font-semibold" style={{ color: locked ? "var(--muted-foreground)" : cfg.color }}>
+                                  {locked ? "Wajib" : `${enabledCount}/${actList.length}`}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2" style={{ background: "var(--card)" }}>
                                 {actList.map(action => {
                                   const on = acts?.includes(action) ?? true;
                                   return (
                                     <button key={action} onClick={() => toggleAction(roleKey, menu.id, action)} disabled={locked}
-                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all select-none disabled:cursor-not-allowed"
-                                      style={{ background: on ? `${cfg.color}18` : "var(--background)", border: `1.5px solid ${on ? cfg.color : "var(--border)"}`, color: on ? cfg.color : "var(--muted-foreground)" }}>
-                                      <span className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0"
+                                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[11px] font-medium text-left transition-all select-none disabled:cursor-not-allowed"
+                                      style={{ background: on ? `${cfg.color}12` : "var(--background)", border: `1px solid ${on ? cfg.color : "var(--border)"}`, color: on ? cfg.color : "var(--muted-foreground)" }}>
+                                      <span className="w-4 h-4 rounded flex items-center justify-center shrink-0"
                                         style={{ background: on ? cfg.color : "transparent", border: `1.5px solid ${on ? cfg.color : "var(--border)"}` }}>
-                                        {on && <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                        {on && <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                       </span>
-                                      {ACTION_LABELS[menu.id]?.[action] ?? action}
-                                      {locked && <span className="text-[9px] font-bold ml-0.5">• Wajib</span>}
+                                      <span className="flex-1 truncate">{ACTION_LABELS[menu.id]?.[action] ?? action}</span>
                                     </button>
                                   );
                                 })}

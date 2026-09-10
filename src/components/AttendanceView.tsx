@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import type { AttendanceRecord, Employee, UserRole } from "../data/types";
+import { compressImage } from "../lib/compressImage";
 
 interface Props {
   records: AttendanceRecord[];
@@ -37,7 +38,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } }, audio: false });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) {
@@ -65,7 +66,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    onCapture(canvas.toDataURL("image/jpeg", 0.8));
+    onCapture(canvas.toDataURL("image/jpeg", 0.6));
   };
 
   return (
@@ -126,13 +127,17 @@ export default function AttendanceView({ records, stores, currentUser, onClock }
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { showToast("File harus berupa gambar"); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => { setPhoto(ev.target?.result as string); setUsingFile(true); };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setPhoto(compressed);
+      setUsingFile(true);
+    } catch {
+      showToast("Gagal memproses gambar");
+    }
     e.target.value = "";
   };
 

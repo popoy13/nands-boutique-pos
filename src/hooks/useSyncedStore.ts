@@ -57,26 +57,39 @@ export function useSyncedStore(): SyncedStore {
   const appliedRef = useRef<(payload: { table: string; rows: unknown[] }) => void>(() => {});
   const lastStatusRef = useRef("");
 
-  const propagate = (table: string, rows: unknown) => {
-    pendingRef.current[table] = rows;
-    if (timersRef.current[table]) return;
-    timersRef.current[table] = setTimeout(async () => {
-      timersRef.current[table] = null;
-      const payload = pendingRef.current[table];
-      pendingRef.current[table] = null;
-      if (payload === undefined) return;
-      try {
-        switch (table) {
-          case "products": await writeProducts(payload as Product[]); break;
-          case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
-          default: await saveRows(table, payload as Record<string, unknown>[]);
-        }
-      } catch (e) {
-        console.warn("[sync] tulis ke database gagal:", table, e);
-      }
-      try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
-    }, DEBOUNCE_MS);
-  };
+const propagate = (table: string, rows: unknown) => {
+  pendingRef.current[table] = rows;
+  if (table === "attendance_records") {
+    // Attendance is critical & low-frequency — flush immediately (no debounce
+    // delay) and retry so clock-in/out is not silently lost.
+    const payload = pendingRef.current[table];
+    pendingRef.current[table] = null;
+    void writeTable(table, payload);
+    return;
+  }
+  if (timersRef.current[table]) return;
+  timersRef.current[table] = setTimeout(async () => {
+    timersRef.current[table] = null;
+    const payload = pendingRef.current[table];
+    pendingRef.current[table] = null;
+    if (payload === undefined) return;
+    await writeTable(table, payload);
+  }, DEBOUNCE_MS);
+};
+
+async function writeTable(table: string, payload: unknown) {
+  if (payload === undefined) return;
+  try {
+    switch (table) {
+      case "products": await writeProducts(payload as Product[]); break;
+      case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
+      default: await saveRows(table, payload as Record<string, unknown>[]);
+    }
+  } catch (e) {
+    console.warn("[sync] tulis ke database gagal:", table, e);
+  }
+  try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
+}
 
   /* --- wrapped setters (value or functional updater) --- */
   const setProducts: Dispatch<SetStateAction<Product[]>> = (upd) => setProductsState(prev => {

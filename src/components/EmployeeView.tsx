@@ -22,6 +22,9 @@ interface Props {
   stores: { id: string; name: string }[];
   onSave: (employees: Employee[]) => void;
   canEdit?: boolean;
+  canImport?: boolean;
+  canExport?: boolean;
+  canAdd?: boolean;
   roles?: Record<string, RoleConfig>;
 }
 
@@ -38,7 +41,7 @@ const emptyEmployee = (): Employee => ({
   pin: "1234",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true, roles }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles }: Props) {
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
@@ -197,25 +200,31 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-              <button onClick={() => importRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                Import
-              </button>
-              <button onClick={handleExport}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Export
-              </button>
-              <button
-                onClick={() => { setEditing(emptyEmployee()); setIsNew(true); }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
-                style={{ background: "var(--foreground)" }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                Tambah
-              </button>
+              {canImport && (
+                <button onClick={() => importRef.current?.click()}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Import
+                </button>
+              )}
+              {canExport && (
+                <button onClick={handleExport}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Export
+                </button>
+              )}
+              {canAdd && (
+                <button
+                  onClick={() => { setEditing(emptyEmployee()); setIsNew(true); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
+                  style={{ background: "var(--foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  Tambah
+                </button>
+              )}
             </div>
           </div>
 
@@ -320,7 +329,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       </div>
 
       {/* Edit Panel */}
-      {editing && canEdit && (
+      {editing && (canEdit || canAdd) && (
         <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
           <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Karyawan" : "Edit Karyawan"}</div>

@@ -15,7 +15,7 @@ import SettingsView from "./components/SettingsView";
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
-import { getAllowedMenus } from "./data/roles";
+import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
 
 export default function App() {
   const {
@@ -151,13 +151,35 @@ export default function App() {
   const role = currentUser.role;
   const allowed = getAllowedMenus(role, settings.roles).length > 0 ? getAllowedMenus(role, settings.roles) : ["pos"];
   const managerRole = (r: string) => r === "manager" || r === "manager_operasional";
+  const permRoles = ensureRoles(settings.roles);
+  const has = (menu: string, action: string) => hasAction(role, permRoles, menu, action);
   const canEditEmployees = role === "admin" || managerRole(role);
-  const canEditStore = role === "admin";
-  const canEditDiscount = role === "admin";
-  const canEditProduct = role === "admin" || managerRole(role);
-  const canEditMember = role === "admin";
   const canEditStock = role === "admin" || managerRole(role);
   const canEditSettings = role === "admin" || managerRole(role);
+
+  const canHistoryDelete = has("history", "delete");
+  const canHistoryPrint = has("history", "print");
+  const canProductExport = has("product", "export");
+  const canProductImport = has("product", "import");
+  const canProductBulk = has("product", "bulk");
+  const canProductCategory = has("product", "category");
+  const canProductAdd = has("product", "add");
+  const canProductEdit = has("product", "edit");
+  const canProductDelete = has("product", "delete");
+  const canEmpImport = has("employee", "import");
+  const canEmpExport = has("employee", "export");
+  const canEmpAdd = has("employee", "add");
+  const canStoreAdd = has("store", "add");
+  const canStoreEdit = has("store", "edit");
+  const canStoreDelete = has("store", "delete");
+  const canDiscAdd = has("discount", "add");
+  const canDiscEdit = has("discount", "edit");
+  const canDiscDelete = has("discount", "delete");
+  const canMemAdd = has("member", "add");
+  const canMemEdit = has("member", "edit");
+  const canMemDelete = has("member", "delete");
+  const canDeleteAttendance = has("attendance", "delete");
+  const settingsPerms = permRoles[role]?.permissions;
 
   // Guard: if current tab not allowed, redirect
   const safeTab = allowed.includes(activeTab) ? activeTab : allowed[0];
@@ -199,9 +221,10 @@ export default function App() {
             transactions={transactions}
             stores={stores}
             activeStore={activeStore}
-            userRole={role}
-            onDelete={canEditEmployees ? (id, reason) => handleDeleteTransaction(id, reason, currentUser.name) : undefined}
-            onUpdate={canEditEmployees ? handleUpdateTransaction : undefined}
+            canDelete={canHistoryDelete}
+            canPrint={canHistoryPrint}
+            onDelete={canHistoryDelete ? (id, reason) => handleDeleteTransaction(id, reason, currentUser.name) : undefined}
+            onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
             brandName={settings.brand.name}
             printer={settings.printer}
           />
@@ -225,7 +248,13 @@ export default function App() {
             categories={categories}
             onUpdateCategories={setCategories}
             onSave={setProducts}
-            canEdit={canEditProduct}
+            canExport={canProductExport}
+            canImport={canProductImport}
+            canBulk={canProductBulk}
+            canCategory={canProductCategory}
+            canAdd={canProductAdd}
+            canEdit={canProductEdit}
+            canDelete={canProductDelete}
           />
         )}
         {safeTab === "employee" && (
@@ -234,6 +263,9 @@ export default function App() {
             stores={stores}
             onSave={setEmployees}
             canEdit={canEditEmployees}
+            canImport={canEmpImport}
+            canExport={canEmpExport}
+            canAdd={canEmpAdd}
             roles={settings.roles}
           />
         )}
@@ -241,7 +273,9 @@ export default function App() {
           <StoreManagement
             stores={stores}
             onSave={setStores}
-            canEdit={canEditStore}
+            canAdd={canStoreAdd}
+            canEdit={canStoreEdit}
+            canDelete={canStoreDelete}
           />
         )}
         {safeTab === "discount" && (
@@ -249,7 +283,9 @@ export default function App() {
             discounts={discounts}
             stores={stores}
             onSave={setDiscounts}
-            canEdit={canEditDiscount}
+            canAdd={canDiscAdd}
+            canEdit={canDiscEdit}
+            canDelete={canDiscDelete}
           />
         )}
         {safeTab === "member" && (
@@ -257,7 +293,9 @@ export default function App() {
             members={members}
             stores={stores}
             onSave={setMembers}
-            canEdit={canEditMember}
+            canAdd={canMemAdd}
+            canEdit={canMemEdit}
+            canDelete={canMemDelete}
           />
         )}
         {safeTab === "attendance" && (
@@ -267,7 +305,7 @@ export default function App() {
             employees={employees}
             currentUser={currentUser}
             onClock={handleClock}
-            onDelete={role === "admin" ? handleDeleteAttendance : undefined}
+            onDelete={canDeleteAttendance ? handleDeleteAttendance : undefined}
             roles={settings.roles}
           />
         )}
@@ -279,6 +317,7 @@ export default function App() {
             onSaveSettings={setSettings}
             onSaveStores={setStores}
             canEdit={canEditSettings}
+            permissions={settingsPerms}
           />
         )}
       </div>

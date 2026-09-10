@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Store, Employee } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
-import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey } from "../data/roles";
+import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 
 interface Props {
   settings: AppSettings;
@@ -11,6 +11,7 @@ interface Props {
   onSaveSettings: (s: AppSettings) => void;
   onSaveStores: (stores: Store[]) => void;
   canEdit: boolean;
+  permissions?: Record<string, string[]>;
 }
 
 type Tab = "printer" | "attendance" | "brand" | "roles" | "barcode";
@@ -22,11 +23,26 @@ const field = {
 
 const PALETTE = ["#7c3aed", "#2563eb", "#0d9488", "#16a34a", "#ea580c", "#db2777", "#ca8a04", "#4f46e5"];
 
-export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit }: Props) {
+export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, permissions }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
+
+  const canOpenTab = (id: Tab): boolean => {
+    const acts = permissions?.settings;
+    return !acts || acts.includes(id);
+  };
+  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "brand"];
+
+  useEffect(() => {
+    const acts = permissions?.settings;
+    if (!acts) return;
+    if (!acts.includes(tab)) {
+      const first = allTabs.find(t => acts.includes(t));
+      if (first) setTab(first);
+    }
+  }, [permissions, tab]);
 
   const [draftPrinter, setDraftPrinter] = useState({ ...settings.printer });
   const [draftBrand, setDraftBrand] = useState({ ...settings.brand });
@@ -73,7 +89,25 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
       const locked = roleKey === "admin" && (menu === "settings" || menu === "employee");
       const has = cfg.menus.includes(menu);
       if (locked) return prev;
-      return { ...prev, [roleKey]: { ...cfg, menus: has ? cfg.menus.filter(m => m !== menu) : [...cfg.menus, menu] } };
+      const permissions = { ...(cfg.permissions ?? {}) };
+      if (!has && !permissions[menu] && (ACTION_ITEMS[menu]?.length ?? 0) > 0) {
+        permissions[menu] = [...ACTION_ITEMS[menu]];
+      }
+      return { ...prev, [roleKey]: { ...cfg, menus: has ? cfg.menus.filter(m => m !== menu) : [...cfg.menus, menu], permissions } };
+    });
+  };
+
+  const toggleAction = (roleKey: string, menu: string, action: string) => {
+    setDraftRoles(prev => {
+      const cfg = prev[roleKey];
+      if (!cfg) return prev;
+      const locked = roleKey === "admin" && menu === "settings";
+      if (locked) return prev;
+      const permissions = { ...(cfg.permissions ?? {}) };
+      const acts = permissions[menu] ? [...permissions[menu]] : [...(ACTION_ITEMS[menu] ?? [])];
+      const has = acts.includes(action);
+      permissions[menu] = has ? acts.filter(a => a !== action) : [...acts, action];
+      return { ...prev, [roleKey]: { ...cfg, permissions } };
     });
   };
 
@@ -98,7 +132,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     const key = slugifyRoleKey(label);
     if (!key || !label) { showToast("Isi nama role terlebih dahulu", false); return; }
     if (key in draftRoles) { showToast(`Role "${label}" sudah ada`, false); return; }
-    setDraftRoles(prev => ({ ...prev, [key]: { label, color: PALETTE[(Object.keys(prev).length) % PALETTE.length], menus: ["pos", "attendance"] } }));
+    setDraftRoles(prev => ({ ...prev, [key]: { label, color: PALETTE[(Object.keys(prev).length) % PALETTE.length], menus: ["pos", "attendance"], permissions: defaultPermissionsForMenus(["pos", "attendance"]) } }));
     setNewRoleLabel("");
     showToast(`Role "${label}" ditambahkan`);
   };
@@ -138,7 +172,9 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
           { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
           { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-        ] as { id: Tab; label: string; icon: React.ReactNode }[]).map(t => (
+        ] as { id: Tab; label: string; icon: React.ReactNode }[])
+          .filter(t => canOpenTab(t.id))
+          .map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all"
             style={{ background: tab === t.id ? "var(--foreground)" : "var(--card)", color: tab === t.id ? "white" : "var(--muted-foreground)", border: `1.5px solid ${tab === t.id ? "var(--foreground)" : "var(--border)"}` }}>
@@ -285,6 +321,41 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                       );
                     })}
                   </div>
+
+                  {MENU_ITEMS.some(m => cfg.menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0) && (
+                    <>
+                      <div className="text-[10px] font-semibold mt-4 mb-2" style={{ color: "var(--muted-foreground)", letterSpacing: "0.06em" }}>IZIN AKSES TOMBOL</div>
+                      <div className="flex flex-col gap-2">
+                        {MENU_ITEMS.filter(m => cfg.menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0).map(menu => {
+                          const acts = cfg.permissions?.[menu.id];
+                          const actList = ACTION_ITEMS[menu.id];
+                          const locked = roleKey === "admin" && menu.id === "settings";
+                          return (
+                            <div key={menu.id} className="p-3 rounded-xl" style={{ background: "var(--card)", border: "1px solid var(--border)", opacity: locked ? 0.75 : 1 }}>
+                              <div className="text-[11px] font-bold mb-1.5" style={{ color: cfg.color }}>{menu.label}</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {actList.map(action => {
+                                  const on = acts?.includes(action) ?? true;
+                                  return (
+                                    <button key={action} onClick={() => toggleAction(roleKey, menu.id, action)} disabled={locked}
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all select-none disabled:cursor-not-allowed"
+                                      style={{ background: on ? `${cfg.color}18` : "var(--background)", border: `1.5px solid ${on ? cfg.color : "var(--border)"}`, color: on ? cfg.color : "var(--muted-foreground)" }}>
+                                      <span className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0"
+                                        style={{ background: on ? cfg.color : "transparent", border: `1.5px solid ${on ? cfg.color : "var(--border)"}` }}>
+                                        {on && <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                      </span>
+                                      {ACTION_LABELS[menu.id]?.[action] ?? action}
+                                      {locked && <span className="text-[9px] font-bold ml-0.5">• Wajib</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}

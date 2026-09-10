@@ -17,7 +17,13 @@ interface Props {
   categories: Category[];
   onUpdateCategories: (next: Category[]) => void;
   onSave: (products: Product[]) => void;
-  canEdit: boolean;
+  canExport?: boolean;
+  canImport?: boolean;
+  canBulk?: boolean;
+  canCategory?: boolean;
+  canAdd?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const SIZES: Size[] = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -142,7 +148,7 @@ function BulkActionModal({ action, stores, categories, count, onApply, onClose }
   );
 }
 
-export default function ProductManagement({ products, stores, categories, onUpdateCategories, onSave, canEdit }: Props) {
+export default function ProductManagement({ products, stores, categories, onUpdateCategories, onSave, canExport = true, canImport = true, canBulk = true, canCategory = true, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -390,38 +396,48 @@ export default function ProductManagement({ products, stores, categories, onUpda
         <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Produk</div>
-            {canEdit && (
+            {(canExport || canImport || canCategory || canBulk || canAdd) && (
               <div className="flex items-center gap-2">
-                <button onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
-                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-                  Export
-                </button>
-                <label
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15V3m0 0l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-                  Import
-                  <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
-                </label>
-                <button onClick={() => setCatModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
-                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4zm3 2a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
-                  Kelola Kategori
-                </button>
-                <button onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
-                  style={{ background: bulkMode ? "var(--background)" : "var(--secondary)", border: "1px solid var(--border)", color: bulkMode ? "var(--foreground)" : "var(--secondary-foreground)" }}>
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
-                  {bulkMode ? "Selesai" : "Edit Banyak"}
-                </button>
-                <button onClick={() => { setEditing(emptyProduct(stores.map(s => s.id), catNames[0] ?? "Kemeja")); setIsNew(true); setActiveVariantIdx(0); }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                  Tambah Produk
-                </button>
+                {canExport && (
+                  <button onClick={handleExport}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
+                    style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+                    Export
+                  </button>
+                )}
+                {canImport && (
+                  <label
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+                    style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15V3m0 0l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+                    Import
+                    <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
+                  </label>
+                )}
+                {canCategory && (
+                  <button onClick={() => setCatModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
+                    style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4zm3 2a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
+                    Kelola Kategori
+                  </button>
+                )}
+                {canBulk && (
+                  <button onClick={() => bulkMode ? exitBulk() : setBulkMode(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
+                    style={{ background: bulkMode ? "var(--background)" : "var(--secondary)", border: "1px solid var(--border)", color: bulkMode ? "var(--foreground)" : "var(--secondary-foreground)" }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
+                    {bulkMode ? "Selesai" : "Edit Banyak"}
+                  </button>
+                )}
+                {canAdd && (
+                  <button onClick={() => { setEditing(emptyProduct(stores.map(s => s.id), catNames[0] ?? "Kemeja")); setIsNew(true); setActiveVariantIdx(0); }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    Tambah Produk
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -484,15 +500,19 @@ export default function ProductManagement({ products, stores, categories, onUpda
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {canEdit && !bulkMode && (
+                    {!bulkMode && (canEdit || canDelete) && (
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => { setEditing({ ...p, variants: p.variants.map(v => ({ ...v, stocks: [...v.stocks] })) }); setIsNew(false); setActiveVariantIdx(0); }}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={() => setConfirmDelete(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => { setEditing({ ...p, variants: p.variants.map(v => ({ ...v, stocks: [...v.stocks] })) }); setIsNew(false); setActiveVariantIdx(0); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setConfirmDelete(p.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -510,7 +530,9 @@ export default function ProductManagement({ products, stores, categories, onUpda
               <button onClick={() => setBulkModal("price")} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>Harga</button>
               <button onClick={() => setBulkModal("category")} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>Kategori</button>
               <button onClick={() => setBulkModal("stock")} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>Stok</button>
-              <button onClick={() => setConfirmBulkDelete(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "#ef4444" }}>Hapus</button>
+              {canDelete && (
+                <button onClick={() => setConfirmBulkDelete(true)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: "#ef4444" }}>Hapus</button>
+              )}
             </div>
           </div>
         )}
@@ -621,7 +643,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
       )}
 
       {/* Edit Panel */}
-      {editing && canEdit && (
+      {editing && (canEdit || canAdd) && (
         <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[380px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
           <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Produk" : "Edit Produk"}</div>

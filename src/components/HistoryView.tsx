@@ -11,7 +11,8 @@ interface Props {
   transactions: Transaction[];
   stores: { id: string; name: string }[];
   activeStore: string;
-  userRole: string;
+  canDelete?: boolean;
+  canPrint?: boolean;
   onDelete?: (id: string, reason: string) => void;
   onUpdate?: (t: Transaction) => void;
   brandName?: string;
@@ -25,7 +26,7 @@ const methodColor: Record<string, { bg: string; text: string }> = {
   qris:  { bg: "#faf5ff", text: "#7c3aed" },
 };
 
-export default function HistoryView({ transactions, stores, userRole, onDelete, onUpdate, brandName, printer }: Props) {
+export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer }: Props) {
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
@@ -36,8 +37,6 @@ export default function HistoryView({ transactions, stores, userRole, onDelete, 
   const [editingNote, setEditingNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-
-  const canEditDelete = userRole === "admin" || userRole === "manager" || userRole === "manager_operasional";
 
   const filtered = useMemo(() => {
     return [...transactions].reverse().filter(t => {
@@ -166,10 +165,12 @@ export default function HistoryView({ transactions, stores, userRole, onDelete, 
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Detail Transaksi</div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => handlePrint(selected)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--foreground)", color: "white" }} title="Cetak Struk">
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                </button>
-                {canEditDelete && (
+                {canPrint && (
+                  <button onClick={() => handlePrint(selected)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--foreground)", color: "white" }} title="Cetak Struk">
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                  </button>
+                )}
+                {canDelete && (
                   <button onClick={() => { setConfirmDelete(selected.id); setDeleteReason(""); }} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus">
                     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
@@ -221,7 +222,7 @@ export default function HistoryView({ transactions, stores, userRole, onDelete, 
               {selected.change > 0 && <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Kembalian</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.change)}</span></div>}
             </div>
 
-            {canEditDelete && (
+            {canDelete && (
               <div className="mt-4">
                 <div className="text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>CATATAN</div>
                 {editingNote ? (

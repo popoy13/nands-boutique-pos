@@ -4,12 +4,14 @@ import type { Store } from "../data/types";
 interface Props {
   stores: Store[];
   onSave: (stores: Store[]) => void;
-  canEdit: boolean;
+  canAdd?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const empty = (): Store => ({ id: `s-${Date.now()}`, name: "NAND'S BOUTIQUE - ", address: "", phone: "", openHour: "08:00", closeHour: "21:00" });
 
-export default function StoreManagement({ stores, onSave, canEdit }: Props) {
+export default function StoreManagement({ stores, onSave, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [editing, setEditing] = useState<Store | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
@@ -63,7 +65,7 @@ export default function StoreManagement({ stores, onSave, canEdit }: Props) {
         <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Toko</div>
-            {canEdit && (
+            {canAdd && (
               <button onClick={() => { setEditing(empty()); setIsNew(true); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white"
                 style={{ background: "var(--foreground)" }}>
@@ -83,16 +85,20 @@ export default function StoreManagement({ stores, onSave, canEdit }: Props) {
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ background: ["#7c3aed", "#2563eb", "#7c3aed", "#16a34a"][i % 4] }}>
                     {i + 1}
                   </div>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <div className="flex gap-1.5">
-                      <button onClick={() => { setEditing({ ...store }); setIsNew(false); }}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
-                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      </button>
-                      <button onClick={() => setConfirmDelete(store.id)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
-                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                      {canEdit && (
+                        <button onClick={() => { setEditing({ ...store }); setIsNew(false); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => setConfirmDelete(store.id)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -116,7 +122,7 @@ export default function StoreManagement({ stores, onSave, canEdit }: Props) {
       </div>
 
       {/* Edit Panel */}
-      {editing && canEdit && (
+      {editing && (canEdit || canAdd) && (
         <div className="shrink-0 flex flex-col w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
           <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Toko" : "Edit Toko"}</div>

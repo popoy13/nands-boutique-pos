@@ -9,7 +9,9 @@ interface Props {
   members: Member[];
   stores: { id: string; name: string }[];
   onSave: (members: Member[]) => void;
-  canEdit: boolean;
+  canAdd?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const TIER_LABEL = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
@@ -27,7 +29,7 @@ const empty = (storeId: string): Member => ({
   note: "",
 });
 
-export default function MemberView({ members, stores, onSave, canEdit }: Props) {
+export default function MemberView({ members, stores, onSave, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [search, setSearch] = useState("");
   const [filterTier, setFilterTier] = useState("all");
   const [filterStore, setFilterStore] = useState("all");
@@ -87,7 +89,7 @@ export default function MemberView({ members, stores, onSave, canEdit }: Props) 
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Program Member</div>
               <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{members.length} total member</div>
             </div>
-            {canEdit && (
+            {canAdd && (
               <button onClick={() => { setEditing(empty(stores[0]?.id ?? "s1")); setIsNew(true); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -156,14 +158,18 @@ export default function MemberView({ members, stores, onSave, canEdit }: Props) 
                       <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{m.points} pts</div>
                       <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>bergabung {m.joinDate}</div>
                     </div>
-                    {canEdit && (
+                    {(canEdit || canDelete) && (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => { setEditing({ ...m }); setIsNew(false); }} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={() => setConfirmDelete(m.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => { setEditing({ ...m }); setIsNew(false); }} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setConfirmDelete(m.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }}>
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

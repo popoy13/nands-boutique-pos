@@ -440,7 +440,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                         <div className="flex items-center justify-between px-3 py-2" style={{ background: `${draftRoles[editingRole].color}10` }}>
                           <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: draftRoles[editingRole].color }}>
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: draftRoles[editingRole].color }} />
-                            {menu.label}
+                            <span className="uppercase">{menu.label}</span>
                           </div>
                           <span className="text-[9px] font-semibold" style={{ color: locked ? "var(--muted-foreground)" : draftRoles[editingRole].color }}>
                             {locked ? "Wajib" : `${enabledCount}/${actList.length}`}

@@ -8,6 +8,7 @@ interface Props {
   stores: { id: string; name: string; openHour?: string; closeHour?: string }[];
   currentUser: Employee;
   onClock: (record: AttendanceRecord) => void;
+  onDelete?: (id: string) => void;
 }
 
 const fmtDate = (d: string) => {
@@ -95,7 +96,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   );
 }
 
-export default function AttendanceView({ records, stores, currentUser, onClock }: Props) {
+export default function AttendanceView({ records, stores, currentUser, onClock, onDelete }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [usingFile, setUsingFile] = useState(false);
   const [note, setNote] = useState("");
@@ -106,6 +107,7 @@ export default function AttendanceView({ records, stores, currentUser, onClock }
   const [attStore, setAttStore] = useState(currentUser.storeId);
   const [now, setNow] = useState(new Date());
   const [cameraKey, setCameraKey] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function AttendanceView({ records, stores, currentUser, onClock }
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const viewAll = CAN_VIEW_ALL.includes(currentUser.role);
-  const clockStores = viewAll ? stores : stores.filter(s => s.id === currentUser.storeId);
+  const clockStores = stores;
   const selStoreId = clockStores.some(s => s.id === attStore) ? attStore : clockStores[0]?.id ?? currentUser.storeId;
   const attStoreObj = clockStores.find(s => s.id === selStoreId);
   const attStoreName = attStoreObj?.name ?? "—";
@@ -415,6 +417,13 @@ export default function AttendanceView({ records, stores, currentUser, onClock }
                       )}
                     </div>
                     {r.photoOut && <img src={r.photoOut} alt="Foto pulang" className="w-8 h-8 rounded-lg object-cover shrink-0" title="Foto pulang" />}
+                    {onDelete && (
+                      <button onClick={() => setDeleteTarget(r)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-red-50"
+                        title="Hapus catatan">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -422,6 +431,23 @@ export default function AttendanceView({ records, stores, currentUser, onClock }
           )}
         </div>
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Catatan Absensi?</div>
+            <div className="text-sm mb-1" style={{ color: "var(--muted-foreground)" }}>
+              <b>{deleteTarget.employeeName}</b> — {fmtDate(deleteTarget.date)}, masuk <span className="font-mono">{deleteTarget.clockIn}</span>
+            </div>
+            <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Data yang dihapus tidak dapat dikembalikan.</div>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
+              <button onClick={() => { onDelete!(deleteTarget.id); setDeleteTarget(null); showToast("Catatan absensi dihapus"); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -126,6 +126,10 @@ export default function App() {
     });
   };
 
+  const handleDeleteAttendance = (id: string) => {
+    setAttendance(prev => prev.filter(r => r.id !== id));
+  };
+
   if (!ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
@@ -256,6 +260,7 @@ export default function App() {
             stores={stores}
             currentUser={currentUser}
             onClock={handleClock}
+            onDelete={role === "admin" ? handleDeleteAttendance : undefined}
           />
         )}
         {safeTab === "settings" && (

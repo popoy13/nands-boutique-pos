@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
 import type { Employee } from "../data/types";
-import { ROLE_PERMISSIONS } from "../data/types";
+import { getRoleLabel, getRoleColor } from "../data/roles";
+import type { RoleConfig } from "../data/roles";
 import Avatar from "./Avatar";
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   currentUser: Employee;
   onLogout: () => void;
   brand: { logo: string; name: string; tagline: string };
+  roles?: Record<string, RoleConfig>;
+  allowed: string[];
 }
 
 export const ALL_NAV = [
@@ -28,11 +31,7 @@ export const ALL_NAV = [
   { id: "settings", label: "Setelan",       icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
 ];
 
-const ROLE_COLOR: Record<string, string> = { admin: "#7c3aed", manager: "#2563eb", manager_operasional: "#0d9488", kasir: "#7c3aed", staff: "#16a34a" };
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager Toko", manager_operasional: "Manager Operasional", kasir: "Kasir", staff: "Staff" };
-
-export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiveStore, stores, currentUser, onLogout, brand }: Props) {
-  const allowed = ROLE_PERMISSIONS[currentUser.role];
+export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiveStore, stores, currentUser, onLogout, brand, roles, allowed }: Props) {
   const navItems = ALL_NAV.filter(n => allowed.includes(n.id));
 
   return (
@@ -110,7 +109,7 @@ export default function Sidebar({ activeTab, setActiveTab, activeStore, setActiv
           <Avatar src={currentUser.photo} name={currentUser.name} role={currentUser.role} className="w-8 h-8 text-xs" />
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 12, fontWeight: 600, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.name}</div>
-            <div style={{ fontSize: 10, color: ROLE_COLOR[currentUser.role] }}>{ROLE_LABEL[currentUser.role]}</div>
+            <div style={{ fontSize: 10, color: getRoleColor(currentUser.role, roles) }}>{getRoleLabel(currentUser.role, roles)}</div>
           </div>
           <button onClick={onLogout} title="Keluar" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-white/10" style={{ color: "rgba(255,255,255,0.4)" }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>

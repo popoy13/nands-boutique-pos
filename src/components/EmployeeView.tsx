@@ -1,24 +1,28 @@
 ﻿import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import type { Employee } from "../data/types";
+import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
+import type { RoleConfig } from "../data/roles";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager Toko", manager_operasional: "Manager Operasional", kasir: "Kasir", staff: "Staff" };
-const ROLE_COLOR: Record<string, { bg: string; text: string }> = {
-  admin:   { bg: "#f5f3ff", text: "#7c3aed" },
-  manager: { bg: "#fdf4ff", text: "#7c3aed" },
-  manager_operasional: { bg: "#f0fdfa", text: "#0d9488" },
-  kasir: { bg: "#eff6ff", text: "#2563eb" },
-  staff: { bg: "#f0fdf4", text: "#16a34a" },
+const BUILTIN_LABEL_ROLES: Record<string, string> = {
+  Admin: "admin",
+  "Manager Toko": "manager",
+  Manager: "manager",
+  "Manager Operasional": "manager_operasional",
+  Kasir: "kasir",
+  Staff: "staff",
 };
+const allRoleByLabel = (label: string): string | undefined => BUILTIN_LABEL_ROLES[label];
 
 interface Props {
   employees: Employee[];
   stores: { id: string; name: string }[];
   onSave: (employees: Employee[]) => void;
   canEdit?: boolean;
+  roles?: Record<string, RoleConfig>;
 }
 
 const emptyEmployee = (): Employee => ({
@@ -34,7 +38,7 @@ const emptyEmployee = (): Employee => ({
   pin: "1234",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, roles }: Props) {
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
@@ -44,6 +48,9 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  const roleConfigs = ensureRoles(roles);
+  const roleOptions = Object.entries(roleConfigs);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
@@ -93,7 +100,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     const rows = employees.map(e => ({
       "ID": e.id,
       "Nama": e.name,
-      "Jabatan": ROLE_LABEL[e.role],
+      "Jabatan": getRoleLabel(e.role, roles),
       "Toko": stores.find(s => s.id === e.storeId)?.name ?? e.storeId,
       "No. HP": e.phone,
       "Email": e.email,
@@ -122,11 +129,13 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
         const imported: Employee[] = rows.map((row: any) => {
           const storeMatch = stores.find(s => s.name === row["Toko"]);
-          const roleMap: Record<string, Employee["role"]> = { "Admin": "admin", "Manager Toko": "manager", "Manager": "manager", "Manager Operasional": "manager_operasional", "Kasir": "kasir", "Staff": "staff" };
+          const jabatan = String(row["Jabatan"] ?? "").trim();
+          const labelToKey = new Map(roleOptions.map(([k, c]) => [c.label, k]));
+          const roleKey = labelToKey.get(jabatan) ?? allRoleByLabel(jabatan) ?? "staff";
           return {
             id: row["ID"] || `e-${Date.now()}-${Math.random()}`,
             name: row["Nama"] || "",
-            role: roleMap[row["Jabatan"]] ?? "staff",
+            role: roleKey,
             storeId: storeMatch?.id ?? "s1",
             phone: row["No. HP"] || "",
             email: row["Email"] || "",
@@ -224,10 +233,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Jabatan</option>
-              <option value="manager">Manager Toko</option>
-              <option value="manager_operasional">Manager Operasional</option>
-              <option value="kasir">Kasir</option>
-              <option value="staff">Staff</option>
+              {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
             </select>
           </div>
         </div>
@@ -262,7 +268,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className="text-sm font-semibold">{emp.name}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: ROLE_COLOR[emp.role].bg, color: ROLE_COLOR[emp.role].text }}>{ROLE_LABEL[emp.role]}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${getRoleColor(emp.role, roles)}18`, color: getRoleColor(emp.role, roles) }}>{getRoleLabel(emp.role, roles)}</span>
                       {emp.status === "inactive" && <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#f3f4f6", color: "#6b7280" }}>Non-aktif</span>}
                     </div>
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -378,15 +384,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Jabatan</label>
                 <select
                   value={editing.role}
-                  onChange={e => setEditing(prev => prev ? { ...prev, role: e.target.value as Employee["role"] } : null)}
+                  onChange={e => setEditing(prev => prev ? { ...prev, role: e.target.value } : null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
                 >
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager Toko</option>
-                  <option value="manager_operasional">Manager Operasional</option>
-                  <option value="kasir">Kasir</option>
-                  <option value="staff">Staff</option>
+                  {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
               </div>
 

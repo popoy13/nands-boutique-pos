@@ -179,15 +179,21 @@ export const settingsFromDB = (rows: Record<string, unknown>[]): AppSettings => 
   for (const r of rows) if (r && r.key) obj[s(r.key)] = r.value;
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>;
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>;
+  const roles = (obj.roles ?? {}) as Partial<AppSettings["roles"]>;
+  const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>;
   return {
     ...defaultSettings,
     printer: { ...defaultSettings.printer, ...printer },
     brand: { ...defaultSettings.brand, ...brand },
+    roles: { ...defaultSettings.roles, ...(obj.roles ?? {}) } as AppSettings["roles"],
+    barcode: { ...defaultSettings.barcode, ...barcode },
   };
 };
 export const settingsToDB = (st: AppSettings) => [
   { key: "printer", value: st.printer },
   { key: "brand", value: st.brand },
+  { key: "roles", value: st.roles },
+  { key: "barcode", value: st.barcode },
 ];
 export async function saveSettingsRows(rows: Record<string, unknown>[]): Promise<void> {
   if (!rows.length) return;
@@ -205,10 +211,8 @@ export async function saveRows(table: string, rows: Record<string, unknown>[]): 
 
 /* ---------------- attendance (upsert-only + hapus per-id) ---------------- */
 
-const VALID_ROLES = ["admin", "manager", "manager_operasional", "kasir", "staff"];
-
 export async function writeAttendance(rows: Record<string, unknown>[]): Promise<void> {
-  const valid = rows.filter(r => r && typeof r.id === "string" && r.id && typeof r.employee_id === "string" && r.employee_id && VALID_ROLES.includes(String(r.role)));
+  const valid = rows.filter(r => r && typeof r.id === "string" && r.id && typeof r.employee_id === "string" && r.employee_id && typeof r.role === "string" && r.role);
   if (!valid.length) return;
   const { error } = await supabase.from("attendance_records").upsert(valid, { onConflict: "id" });
   if (error) throw error;

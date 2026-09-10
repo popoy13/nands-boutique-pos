@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { Product, ProductVariant, CartItem, Transaction, Size, Discount, Member } from "../data/types";
-import type { PrinterSettings } from "../data/settings";
+import type { PrinterSettings, BarcodeSettings } from "../data/settings";
 import { categories } from "../data/products";
 import { generateId } from "../data/transactions";
 import { POINTS_PER_10K, getTier, TIER_COLOR } from "../data/members";
+import { cleanBarcode, playScanFeedback } from "../lib/barcode";
 import PaymentModal from "./PaymentModal";
 import BarcodeScanModal from "./BarcodeScanModal";
 import type { ScanResult } from "./BarcodeScanModal";
@@ -23,13 +24,14 @@ interface Props {
   members: Member[];
   brandName: string;
   printer: PrinterSettings;
+  barcode: BarcodeSettings;
   onNewTransaction: (t: Transaction) => void;
   onUpdateMember: (m: Member) => void;
 }
 
 interface VariantPicker { product: Product }
 
-export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, onNewTransaction, onUpdateMember }: Props) {
+export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, onNewTransaction, onUpdateMember }: Props) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -97,7 +99,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
   const handleScanResult = (code: string): ScanResult => {
     const norm = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
-    const c = code.trim().toUpperCase();
+    const c = cleanBarcode(code, barcode).toUpperCase();
     const cn = norm(c);
     if (!cn) return { ok: false, message: "Kode kosong" };
     for (const p of products) {
@@ -124,6 +126,39 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     }
     return { ok: false, message: `Kode "${c}" tidak ditemukan` };
   };
+
+  const scanRef = useRef(handleScanResult);
+  useEffect(() => { scanRef.current = handleScanResult; });
+
+  useEffect(() => {
+    if (barcode.mode !== "keyboard") return;
+    let buf = "";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (e.key === "Enter") {
+        const code = cleanBarcode(buf, barcode);
+        buf = "";
+        clearTimeout(timer);
+        if (!code) return;
+        e.preventDefault();
+        const r = scanRef.current(code);
+        playScanFeedback(r.ok, barcode);
+        return;
+      }
+      if (e.key.length === 1) {
+        buf += e.key;
+        clearTimeout(timer);
+        timer = setTimeout(() => { buf = ""; }, 300);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      clearTimeout(timer);
+    };
+  }, [barcode.mode, barcode]);
 
   const updateQty = (sku: string, delta: number) => {
     setCart(prev => prev.map(i => i.variantSku === sku ? { ...i, quantity: i.quantity + delta, subtotal: (i.quantity + delta) * i.price } : i).filter(i => i.quantity > 0));
@@ -222,6 +257,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input type="text" placeholder="Cari produk, brand, atau kode..." value={search} onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { const r = handleScanResult(search); if (r.ok) setSearch(""); } }}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }} />
             </div>
             <button onClick={() => setShowScanner(true)} title="Scan Barcode"
@@ -497,7 +533,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
         />
       )}
     {showScanner && (
-        <BarcodeScanModal onClose={() => setShowScanner(false)} onResult={handleScanResult} />
+        <BarcodeScanModal barcode={barcode} onClose={() => setShowScanner(false)} onResult={handleScanResult} />
       )}
     </div>
   );

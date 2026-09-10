@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import type { AttendanceRecord, Employee, UserRole } from "../data/types";
+import type { AttendanceRecord, Employee } from "../data/types";
+import { getRoleLabel } from "../data/roles";
+import type { RoleConfig } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
 
 interface Props {
@@ -10,6 +12,7 @@ interface Props {
   currentUser: Employee;
   onClock: (record: AttendanceRecord) => void;
   onDelete?: (id: string) => void;
+  roles?: Record<string, RoleConfig>;
 }
 
 const fmtDate = (d: string) => {
@@ -25,9 +28,7 @@ const fmtTime = () => {
 
 const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "") > `${openHour || "08:00"}:00`;
 
-const CAN_VIEW_ALL: UserRole[] = ["admin", "manager", "manager_operasional"];
-
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager Toko", manager_operasional: "Manager Operasional", kasir: "Kasir", staff: "Staff" };
+const CAN_VIEW_ALL: string[] = ["admin", "manager", "manager_operasional"];
 
 function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: string) => void; onNeedFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -103,7 +104,7 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   );
 }
 
-export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete }: Props) {
+export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete, roles }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [usingFile, setUsingFile] = useState(false);
   const [note, setNote] = useState("");
@@ -189,7 +190,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
     const rows = filtered.map(r => ({
       "Tanggal": r.date,
       "Nama": r.employeeName,
-      "Jabatan": ROLE_LABEL[r.role],
+      "Jabatan": getRoleLabel(r.role, roles),
       "Toko": r.storeName,
       "Jam Masuk": r.clockIn,
       "Jam Pulang": r.clockOut ?? "",

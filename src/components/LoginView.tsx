@@ -1,18 +1,18 @@
 ﻿import { useState } from "react";
 import type { Employee } from "../data/types";
+import { getRoleLabel, getRoleColor } from "../data/roles";
+import type { RoleConfig } from "../data/roles";
 import Avatar from "./Avatar";
 
 interface Props {
   employees: Employee[];
   stores: { id: string; name: string }[];
   brand: { logo: string; name: string; tagline: string };
+  roles?: Record<string, RoleConfig>;
   onLogin: (employee: Employee) => void;
 }
 
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager Toko", manager_operasional: "Manager Operasional", kasir: "Kasir", staff: "Staff" };
-const ROLE_COLOR: Record<string, string> = { admin: "#7c3aed", manager: "#2563eb", manager_operasional: "#0d9488", kasir: "#7c3aed", staff: "#16a34a" };
-
-export default function LoginView({ employees, stores, brand, onLogin }: Props) {
+export default function LoginView({ employees, stores, brand, roles, onLogin }: Props) {
   const [step, setStep] = useState<"select" | "pin">("select");
   const [selected, setSelected] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
@@ -112,8 +112,8 @@ export default function LoginView({ employees, stores, brand, onLogin }: Props) 
                   <div className="text-sm font-semibold mb-0.5 truncate">{emp.name}</div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: `${ROLE_COLOR[emp.role]}18`, color: ROLE_COLOR[emp.role] }}>
-                      {ROLE_LABEL[emp.role]}
+                      style={{ background: `${getRoleColor(emp.role, roles)}18`, color: getRoleColor(emp.role, roles) }}>
+                      {getRoleLabel(emp.role, roles)}
                     </span>
                   </div>
                   <div className="text-xs mt-1 truncate" style={{ color: "var(--muted-foreground)" }}>
@@ -140,8 +140,8 @@ export default function LoginView({ employees, stores, brand, onLogin }: Props) 
                 <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{selected?.name}</div>
               </div>
               <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: `${ROLE_COLOR[selected?.role ?? "staff"]}18`, color: ROLE_COLOR[selected?.role ?? "staff"] }}>
-                {ROLE_LABEL[selected?.role ?? "staff"]}
+                style={{ background: `${getRoleColor(selected?.role ?? "staff", roles)}18`, color: getRoleColor(selected?.role ?? "staff", roles) }}>
+                {getRoleLabel(selected?.role ?? "staff", roles)}
               </span>
             </div>
 

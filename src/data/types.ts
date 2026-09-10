@@ -90,7 +90,7 @@ export interface Employee {
   id: string;
   name: string;
   photo?: string;
-  role: UserRole;
+  role: string;
   storeId: string;
   phone: string;
   email: string;
@@ -132,7 +132,7 @@ export interface AttendanceRecord {
   id: string;
   employeeId: string;
   employeeName: string;
-  role: UserRole;
+  role: string;
   storeId: string;
   storeName: string;
   date: string;

@@ -1,5 +1,5 @@
 ﻿import { useState, useMemo } from "react";
-import type { Transaction, UserRole } from "../data/types";
+import type { Transaction } from "../data/types";
 import type { PrinterSettings } from "../data/settings";
 
 const fmt = (n: number) =>
@@ -11,7 +11,7 @@ interface Props {
   transactions: Transaction[];
   stores: { id: string; name: string }[];
   activeStore: string;
-  userRole: UserRole;
+  userRole: string;
   onDelete?: (id: string, reason: string) => void;
   onUpdate?: (t: Transaction) => void;
   brandName?: string;

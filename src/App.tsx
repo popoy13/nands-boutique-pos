@@ -15,7 +15,7 @@ import SettingsView from "./components/SettingsView";
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
-import { ROLE_PERMISSIONS } from "./data/types";
+import { getAllowedMenus } from "./data/roles";
 
 export default function App() {
   const {
@@ -54,7 +54,7 @@ export default function App() {
     setCurrentUser(emp);
     try { localStorage.setItem("nands-current-user", JSON.stringify(emp)); } catch { /* ignore */ }
     // Default to first allowed tab
-    const allowed = ROLE_PERMISSIONS[emp.role];
+    const allowed = getAllowedMenus(emp.role, settings.roles);
     // Set active store to employee's store (for non-admin/manager)
     const nextStore = (emp.role !== "admin" && emp.role !== "manager" && emp.role !== "manager_operasional") ? emp.storeId : activeStore;
     setActiveStore(nextStore);
@@ -145,11 +145,11 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginView employees={employees} stores={stores} brand={settings.brand} onLogin={handleLogin} />;
+    return <LoginView employees={employees} stores={stores} brand={settings.brand} roles={settings.roles} onLogin={handleLogin} />;
   }
 
   const role = currentUser.role;
-  const allowed = ROLE_PERMISSIONS[role];
+  const allowed = getAllowedMenus(role, settings.roles).length > 0 ? getAllowedMenus(role, settings.roles) : ["pos"];
   const managerRole = (r: string) => r === "manager" || r === "manager_operasional";
   const canEditEmployees = role === "admin" || managerRole(role);
   const canEditStore = role === "admin";
@@ -173,6 +173,8 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         brand={settings.brand}
+        roles={settings.roles}
+        allowed={allowed}
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -189,6 +191,7 @@ export default function App() {
             onUpdateMember={handleUpdateMember}
             brandName={settings.brand.name}
             printer={settings.printer}
+            barcode={settings.barcode}
           />
         )}
         {safeTab === "history" && (
@@ -231,6 +234,7 @@ export default function App() {
             stores={stores}
             onSave={setEmployees}
             canEdit={canEditEmployees}
+            roles={settings.roles}
           />
         )}
         {safeTab === "store" && (
@@ -264,12 +268,14 @@ export default function App() {
             currentUser={currentUser}
             onClock={handleClock}
             onDelete={role === "admin" ? handleDeleteAttendance : undefined}
+            roles={settings.roles}
           />
         )}
         {safeTab === "settings" && (
           <SettingsView
             settings={settings}
             stores={stores}
+            employees={employees}
             onSaveSettings={setSettings}
             onSaveStores={setStores}
             canEdit={canEditSettings}

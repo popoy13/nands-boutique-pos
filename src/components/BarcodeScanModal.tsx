@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader, IScannerControls } from "@zxing/browser";
+import type { BarcodeSettings } from "../data/settings";
+import { defaultSettings } from "../data/settings";
+import { cleanBarcode, playScanFeedback } from "../lib/barcode";
 
 export interface ScanResult {
   ok: boolean;
@@ -9,6 +12,7 @@ export interface ScanResult {
 interface Props {
   onClose: () => void;
   onResult: (code: string) => ScanResult;
+  barcode?: BarcodeSettings;
 }
 
 function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string) => ScanResult; onDone: (r: ScanResult | null) => void; onRetry: () => void }) {
@@ -138,15 +142,22 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
   );
 }
 
-export default function BarcodeScanModal({ onClose, onResult }: Props) {
+export default function BarcodeScanModal({ onClose, onResult, barcode }: Props) {
+  const cfg = barcode ?? defaultSettings.barcode;
   const [success, setSuccess] = useState<ScanResult | null>(null);
   const [round, setRound] = useState(0);
   const [manualCode, setManualCode] = useState("");
   const [manualMsg, setManualMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  const process = (raw: string): ScanResult => {
+    const r = onResult(cleanBarcode(raw, cfg));
+    playScanFeedback(r.ok, cfg);
+    return r;
+  };
+
   const handleManual = () => {
     if (!manualCode.trim()) return;
-    const r = onResult(manualCode.trim());
+    const r = process(manualCode);
     if (r.ok) {
       setSuccess(r);
       setManualCode("");
@@ -191,7 +202,7 @@ export default function BarcodeScanModal({ onClose, onResult }: Props) {
             </div>
           ) : (
             <>
-              <CameraScanner key={round} onResult={onResult} onDone={r => setSuccess(r)} onRetry={() => setRound(r => r + 1)} />
+              <CameraScanner key={round} onResult={process} onDone={r => setSuccess(r)} onRetry={() => setRound(r => r + 1)} />
 
               <div className="mt-4 mb-1.5 flex items-center gap-2">
                 <div className="flex-1" style={{ height: 1, background: "var(--border)" }} />

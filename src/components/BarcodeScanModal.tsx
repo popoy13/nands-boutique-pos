@@ -14,6 +14,7 @@ interface Props {
 function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string) => ScanResult; onDone: (r: ScanResult | null) => void; onRetry: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<"starting" | "ready" | "error">("starting");
   const [flash, setFlash] = useState<string>("");
 
@@ -43,32 +44,55 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
         setFlash("Kamera tidak didukung. Gunakan input kode manual di bawah.");
         return;
       }
+
+      let stream: MediaStream | null = null;
       try {
-        const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-          videoRef.current!,
-          handleResult
-        );
-        controlsRef.current = controls;
-        if (!cancelled) setStatus("ready");
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       } catch {
-        if (cancelled) return;
         try {
-          const controls = await reader.decodeFromVideoElement(videoRef.current!, handleResult);
-          controlsRef.current = controls;
-          if (!cancelled) setStatus("ready");
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         } catch {
           if (!cancelled) {
             setStatus("error");
             onDone(null);
             setFlash("Tidak ada kamera / izin ditolak. Gunakan input kode manual di bawah.");
           }
+          return;
+        }
+      }
+
+      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+      video.srcObject = stream;
+
+      try {
+        await video.play();
+      } catch { /* some browsers block autoplay */ }
+
+      try {
+        const controls = await reader.decodeFromVideoElement(video, handleResult);
+        if (!cancelled) {
+          controlsRef.current = controls;
+          setStatus("ready");
+        }
+      } catch {
+        if (!cancelled) {
+          setStatus("error");
+          onDone(null);
+          setFlash("Gagal mengaktifkan scanner. Gunakan input kode manual di bawah.");
         }
       }
     };
 
     start();
-    return () => { cancelled = true; controlsRef.current?.stop(); };
+    return () => {
+      cancelled = true;
+      controlsRef.current?.stop();
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

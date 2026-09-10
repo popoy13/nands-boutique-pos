@@ -56,24 +56,23 @@ export function useSyncedStore(): SyncedStore {
 
   const propagate = (table: string, rows: unknown) => {
     pendingRef.current[table] = rows;
-    if (timersRef.current[table]) {
-      timersRef.current[table] = setTimeout(async () => {
-        timersRef.current[table] = null;
-        const payload = pendingRef.current[table];
-        pendingRef.current[table] = null;
-        if (payload === undefined) return;
-        try {
-          switch (table) {
-            case "products": await writeProducts(payload as Product[]); break;
-            case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
-            default: await saveRows(table, payload as Record<string, unknown>[]);
-          }
-        } catch (e) {
-          console.warn("[sync] tulis ke database gagal:", table, e);
+    if (timersRef.current[table]) return;
+    timersRef.current[table] = setTimeout(async () => {
+      timersRef.current[table] = null;
+      const payload = pendingRef.current[table];
+      pendingRef.current[table] = null;
+      if (payload === undefined) return;
+      try {
+        switch (table) {
+          case "products": await writeProducts(payload as Product[]); break;
+          case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
+          default: await saveRows(table, payload as Record<string, unknown>[]);
         }
-        try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
-      }, DEBOUNCE_MS);
-    }
+      } catch (e) {
+        console.warn("[sync] tulis ke database gagal:", table, e);
+      }
+      try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
+    }, DEBOUNCE_MS);
   };
 
   /* --- wrapped setters (value or functional updater) --- */

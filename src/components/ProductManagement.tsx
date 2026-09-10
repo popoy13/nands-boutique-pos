@@ -1,5 +1,7 @@
-﻿import { useState, useMemo } from "react";
+﻿import { useState, useMemo, useRef } from "react";
+import type { ChangeEvent } from "react";
 import type { Product, ProductVariant, Size } from "../data/types";
+import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -158,6 +160,42 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const handleExport = () => {
+    const csv = exportProductsCsv(products, stores.map(s => s.id));
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `produk-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("File CSV produk berhasil diunduh");
+  };
+
+  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const res = parseProductsCsv(text, stores.map(s => s.id), products);
+      if (res.added > 0 || res.updated > 0) {
+        onSave(res.products);
+        setEditing(null);
+        showToast(`Import: ${res.added} produk baru, ${res.updated} diperbarui${res.errors.length ? `, ${res.errors.length} baris dilewati` : ""}`);
+      } else if (res.errors.length) {
+        showToast(`Import gagal: ${res.errors[0]}`);
+      } else {
+        showToast("Tidak ada perubahan dari file");
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  };
 
   const catNames = useMemo(() => categories.length ? categories.map(c => c.name) : FALLBACK_CATEGORIES, [categories]);
   const filterCats = useMemo(() => ["Semua", ...catNames], [catNames]);
@@ -331,6 +369,19 @@ export default function ProductManagement({ products, stores, categories, onUpda
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Produk</div>
             {canEdit && (
               <div className="flex items-center gap-2">
+                <button onClick={handleExport}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
+                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+                  Export
+                </button>
+                <label
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+                  style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15V3m0 0l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+                  Import
+                  <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
+                </label>
                 <button onClick={() => setCatModal(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
                   style={{ background: "var(--secondary)", border: "1px solid var(--border)", color: "var(--secondary-foreground)" }}>

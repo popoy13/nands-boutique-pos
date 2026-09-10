@@ -54,10 +54,16 @@ export default function App() {
     try { localStorage.setItem("nands-current-user", JSON.stringify(emp)); } catch { /* ignore */ }
     // Default to first allowed tab
     const allowed = ROLE_PERMISSIONS[emp.role];
-    setActiveTab(allowed[0]);
     // Set active store to employee's store (for non-admin/manager)
-    if (emp.role !== "admin" && emp.role !== "manager" && emp.role !== "manager_operasional") {
-      setActiveStore(emp.storeId);
+    const nextStore = (emp.role !== "admin" && emp.role !== "manager" && emp.role !== "manager_operasional") ? emp.storeId : activeStore;
+    setActiveStore(nextStore);
+    // If user hasn't clocked in today, open Absensi first
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const clockedToday = attendance.some(r => r.employeeId === emp.id && r.date === todayStr && r.storeId === nextStore);
+    if (allowed.includes("attendance") && !clockedToday) {
+      setActiveTab("attendance");
+    } else {
+      setActiveTab(allowed[0]);
     }
   };
 

@@ -1,1 +1,0 @@
-import{r as e}from"./roles-BeCLDvX4.js";var t={printer:{printerName:`Printer Thermal`,paperWidth:80,copies:1,autoPrint:!1},brand:{logo:`logo.jpg`,name:`NAND'S BOUTIQUE`,tagline:`Point of Sale System`},roles:e,barcode:{mode:`camera`,beep:!0,vibrate:!1,stripPrefix:``,stripSuffix:``,enterEndsScan:!0}};export{t};

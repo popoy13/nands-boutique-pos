@@ -15,7 +15,8 @@ const AttendanceView = lazy(() => import("./components/AttendanceView"));
 const AttendanceHistoryView = lazy(() => import("./components/AttendanceHistoryView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
-import { deleteAttendance, deleteTransaction } from "./data/sync";
+import { deleteAttendance, deleteTransaction, deleteRows } from "./data/sync";
+import type { ResetResult } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
 import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
 import { MENU_PAGES } from "./data/menuPages";
@@ -268,6 +269,75 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     void deleteAttendance(id).catch(e => console.warn("[sync] hapus absensi gagal:", e));
   };
 
+  const runReset = async (fn: () => Promise<void>): Promise<ResetResult> => {
+    try { await fn(); return { ok: true }; }
+    catch (e) {
+      console.warn("[sync] reset data gagal:", e);
+      return { ok: false, msg: (e as Error)?.message || "Terjadi kesalahan" };
+    }
+  };
+
+  const handleResetTransactions = (ids: string[]): Promise<ResetResult> =>
+    runReset(async () => {
+      if (!ids.length) return;
+      await deleteRows("transactions", ids);
+      setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
+    });
+
+  const handleResetAttendance = (ids: string[]): Promise<ResetResult> =>
+    runReset(async () => {
+      if (!ids.length) return;
+      await deleteRows("attendance_records", ids);
+      setAttendance(prev => prev.filter(r => !ids.includes(r.id)));
+    });
+
+  const handleResetEmployees = (): Promise<ResetResult> =>
+    runReset(async () => {
+      if (!currentUser) return;
+      const targetIds = employees.filter(e => e.id !== currentUser.id).map(e => e.id);
+      if (!targetIds.length) return;
+      const trxBlock = transactions.filter(t => targetIds.includes(t.cashierId)).length;
+      if (trxBlock) throw new Error(`Masih ada ${trxBlock} transaksi yang tercatat oleh karyawan. Hapus transaksi terlebih dahulu.`);
+      const attIds = attendance.filter(r => targetIds.includes(r.employeeId)).map(r => r.id);
+      if (attIds.length) await deleteRows("attendance_records", attIds);
+      await deleteRows("employees", targetIds);
+      setAttendance(prev => prev.filter(r => !attIds.includes(r.id)));
+      setEmployees(prev => prev.filter(e => e.id === currentUser.id));
+    });
+
+  const handleResetMembers = (): Promise<ResetResult> =>
+    runReset(async () => {
+      if (!members.length) return;
+      const memberIds = members.map(m => m.id);
+      const trxBlock = transactions.filter(t => t.memberId && memberIds.includes(t.memberId)).length;
+      if (trxBlock) throw new Error(`Masih ada ${trxBlock} transaksi yang memakai member. Hapus transaksi terlebih dahulu.`);
+      await deleteRows("members", memberIds);
+      setMembers([]);
+    });
+
+  const handleResetStores = (): Promise<ResetResult> =>
+    runReset(async () => {
+      const storeIds = stores.map(s => s.id);
+      if (!storeIds.length) return;
+      const blockers: string[] = [];
+      if (employees.length) blockers.push(`${employees.length} karyawan`);
+      if (transactions.length) blockers.push(`${transactions.length} transaksi`);
+      if (attendance.length) blockers.push(`${attendance.length} riwayat absensi`);
+      const memRef = members.filter(m => m.storeId && storeIds.includes(m.storeId)).length;
+      if (memRef) blockers.push(`${memRef} member`);
+      if (blockers.length) throw new Error(`Masih ada data terkait: ${blockers.join(", ")}. Hapus data tersebut terlebih dahulu.`);
+      await deleteRows("stores", storeIds);
+      setStores([]);
+      setActiveStore("");
+      try { localStorage.removeItem("nands-active-store"); } catch { /* ignore */ }
+    });
+
+  const handleResetProducts = (): Promise<ResetResult> =>
+    runReset(async () => { if (products.length) setProducts([]); });
+
+  const handleResetDiscounts = (): Promise<ResetResult> =>
+    runReset(async () => { if (discounts.length) setDiscounts([]); });
+
   if (!ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
@@ -472,7 +542,20 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             onSaveSettings={setSettings}
             onSaveStores={setStores}
             canEdit={canEditSettings}
+            currentUser={currentUser}
             permissions={settingsPerms}
+            products={products}
+            members={members}
+            discounts={discounts}
+            transactions={transactions}
+            attendance={attendance}
+            onResetProducts={handleResetProducts}
+            onResetMembers={handleResetMembers}
+            onResetDiscounts={handleResetDiscounts}
+            onResetStores={handleResetStores}
+            onResetEmployees={handleResetEmployees}
+            onResetTransactions={handleResetTransactions}
+            onResetAttendance={handleResetAttendance}
           />
         )}
         </Suspense>

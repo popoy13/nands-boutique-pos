@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import type { Store, Employee } from "../data/types";
+import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
+import type { ResetResult } from "../data/sync";
 
 interface Props {
   settings: AppSettings;
@@ -12,10 +13,23 @@ interface Props {
   onSaveSettings: (s: AppSettings) => void;
   onSaveStores: (stores: Store[]) => void;
   canEdit: boolean;
+  currentUser?: Employee | null;
   permissions?: Record<string, string[]>;
+  products: Product[];
+  members: Member[];
+  discounts: Discount[];
+  transactions: Transaction[];
+  attendance: AttendanceRecord[];
+  onResetProducts: () => Promise<ResetResult>;
+  onResetMembers: () => Promise<ResetResult>;
+  onResetDiscounts: () => Promise<ResetResult>;
+  onResetStores: () => Promise<ResetResult>;
+  onResetEmployees: () => Promise<ResetResult>;
+  onResetTransactions: (ids: string[]) => Promise<ResetResult>;
+  onResetAttendance: (ids: string[]) => Promise<ResetResult>;
 }
 
-type Tab = "printer" | "attendance" | "brand" | "roles" | "barcode";
+type Tab = "printer" | "attendance" | "brand" | "roles" | "barcode" | "reset";
 
 const field = {
   background: "var(--background)",
@@ -24,33 +38,60 @@ const field = {
 
 const PALETTE = ["#7c3aed", "#2563eb", "#0d9488", "#16a34a", "#ea580c", "#db2777", "#ca8a04", "#4f46e5"];
 
-export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, permissions }: Props) {
+function ResetButton({ label, onReset }: { label: string; onReset: () => void }) {
+  const [armed, setArmed] = useState(false);
+  return (
+    <button onClick={() => {
+      if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 3000); return; }
+      setArmed(false);
+      void onReset();
+    }}
+      className="px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all shrink-0"
+      style={{ background: armed ? "#dc2626" : "#ef4444" }}>
+      {armed ? "Yakin? Tekan lagi" : label}
+    </button>
+  );
+}
+
+const isoDay = (dt: Date): string =>
+  `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+
+export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
   const loadingRef = useRef<HTMLInputElement>(null);
+  const isAdmin = currentUser?.role === "admin";
 
   const canOpenTab = (id: Tab): boolean => {
+    if (id === "reset") return isAdmin;
     const acts = permissions?.settings;
     return !acts || acts.includes(id);
   };
-  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "brand"];
+  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "brand", "reset"];
 
   useEffect(() => {
+    if (tab === "reset" && isAdmin) return;
     const acts = permissions?.settings;
     if (!acts) return;
     if (!acts.includes(tab)) {
-      const first = allTabs.find(t => acts.includes(t));
+      const first = allTabs.find(t => t !== "reset" && acts.includes(t));
       if (first) setTab(first);
     }
-  }, [permissions, tab]);
+  }, [permissions, tab, isAdmin]);
 
   const [draftPrinter, setDraftPrinter] = useState({ ...settings.printer });
   const [draftBrand, setDraftBrand] = useState({ ...settings.brand });
   const [draftStores, setDraftStores] = useState<Store[]>(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
   const [draftRoles, setDraftRoles] = useState(() => ensureRoles(settings.roles));
   const [draftBarcode, setDraftBarcode] = useState({ ...defaultSettings.barcode, ...settings.barcode });
+  const [resetTrxFrom, setResetTrxFrom] = useState("");
+  const [resetTrxTo, setResetTrxTo] = useState("");
+  const [resetAttFrom, setResetAttFrom] = useState("");
+  const [resetAttTo, setResetAttTo] = useState("");
+  const [resetAttEmp, setResetAttEmp] = useState("");
+  const [resetAttStore, setResetAttStore] = useState("");
 
   // Sinkronkan draft dengan data terbaru dari perangkat lain (realtime broadcast),
   // tanpa merusak nilai yang baru saja disimpan.
@@ -94,6 +135,43 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const saveBrand = () => { onSaveSettings({ ...settings, brand: draftBrand }); showToast("Menu utama diperbarui"); };
   const saveAttendance = () => { onSaveStores(draftStores); showToast("Jam operasional toko tersimpan"); };
   const saveBarcode = () => { onSaveSettings({ ...settings, barcode: draftBarcode }); showToast("Setelan perangkat barcode disimpan"); };
+
+  const finishReset = (res: ResetResult, okMsg: string) =>
+    showToast(res.ok ? okMsg : (res.msg || "Gagal menghapus data"), res.ok);
+
+  const resetTrxAll = () =>
+    void onResetTransactions(transactions.map(t => t.id))
+      .then(res => finishReset(res, `Semua transaksi (${transactions.length}) dihapus`));
+
+  const resetTrxRange = () => {
+    const from = resetTrxFrom.trim(), to = resetTrxTo.trim();
+    if (!from || !to) { showToast("Isi tanggal awal dan akhir terlebih dahulu", false); return; }
+    if (from > to) { showToast("Tanggal awal harus sebelum tanggal akhir", false); return; }
+    const ids = transactions.filter(t => { const k = isoDay(t.date); return k >= from && k <= to; }).map(t => t.id);
+    if (!ids.length) { showToast("Tidak ada transaksi pada rentang tanggal tersebut", false); return; }
+    void onResetTransactions(ids).then(res => finishReset(res, `Transaksi (${ids.length}) dihapus`));
+  };
+
+  const resetAttAll = () =>
+    void onResetAttendance(attendance.map(r => r.id))
+      .then(res => finishReset(res, `Semua riwayat absensi (${attendance.length}) dihapus`));
+
+  const resetAttRange = () => {
+    const from = resetAttFrom.trim(), to = resetAttTo.trim();
+    if (!from || !to) { showToast("Isi tanggal awal dan akhir terlebih dahulu", false); return; }
+    if (from > to) { showToast("Tanggal awal harus sebelum tanggal akhir", false); return; }
+    const ids = attendance.filter(r => {
+      if (r.date < from || r.date > to) return false;
+      if (resetAttEmp && r.employeeId !== resetAttEmp) return false;
+      if (resetAttStore && r.storeId !== resetAttStore) return false;
+      return true;
+    }).map(r => r.id);
+    if (!ids.length) { showToast("Tidak ada riwayat absensi sesuai filter", false); return; }
+    void onResetAttendance(ids).then(res => finishReset(res, `Riwayat absensi (${ids.length}) dihapus`));
+  };
+
+  const resetOne = (label: string, fn: () => Promise<ResetResult>) =>
+    void fn().then(res => finishReset(res, `${label} berhasil dihapus`));
 
   const commitRoles = (updated: AppSettings["roles"]) => {
     setDraftRoles(updated);
@@ -206,6 +284,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
           { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
           { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+          { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
         ] as { id: Tab; label: string; icon: React.ReactNode }[])
           .filter(t => canOpenTab(t.id))
           .map(t => (
@@ -640,6 +719,95 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           <button onClick={saveBrand} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
             Simpan Menu Utama
           </button>
+        </div>
+      )}
+
+      {/* RESET DATA (admin only) */}
+      {tab === "reset" && isAdmin && (
+        <div className="max-w-2xl rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+          <div className="p-5 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Reset Data</div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ background: "#dc2626" }}>HANYA ADMIN</span>
+            </div>
+            <div className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>
+              Hapus data secara permanen dari aplikasi dan database. Tindakan ini tidak dapat dibatalkan.
+            </div>
+          </div>
+
+          {/* TRANSACTIONS */}
+          <div className="px-5 pb-5" style={{ borderTop: "1.5px solid var(--border)", paddingTop: 16 }}>
+            <div className="text-sm font-semibold mb-1">Transaksi Penjualan</div>
+            <div className="text-[11px] mb-3" style={{ color: "var(--muted-foreground)" }}>{transactions.length} transaksi tersimpan</div>
+            <div className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <div className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>Hapus Semua Transaksi</div>
+              <ResetButton label="Hapus Semua" onReset={resetTrxAll} />
+            </div>
+            <div className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>Hapus Berdasarkan Rentang Tanggal</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input type="date" value={resetTrxFrom} onChange={e => setResetTrxFrom(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field} />
+                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>s.d.</span>
+                <input type="date" value={resetTrxTo} onChange={e => setResetTrxTo(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field} />
+                <ResetButton label="Hapus Rentang" onReset={resetTrxRange} />
+              </div>
+            </div>
+          </div>
+
+          {/* ATTENDANCE */}
+          <div className="px-5 pb-5" style={{ borderTop: "1.5px solid var(--border)", paddingTop: 16 }}>
+            <div className="text-sm font-semibold mb-1">Riwayat Absensi</div>
+            <div className="text-[11px] mb-3" style={{ color: "var(--muted-foreground)" }}>{attendance.length} riwayat tersimpan</div>
+            <div className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <div className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>Hapus Semua Riwayat Absensi</div>
+              <ResetButton label="Hapus Semua" onReset={resetAttAll} />
+            </div>
+            <div className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>Hapus Berdasarkan Rentang Tanggal</div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <input type="date" value={resetAttFrom} onChange={e => setResetAttFrom(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field} />
+                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>s.d.</span>
+                <input type="date" value={resetAttTo} onChange={e => setResetAttTo(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field} />
+                <ResetButton label="Hapus Rentang" onReset={resetAttRange} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select value={resetAttEmp} onChange={e => setResetAttEmp(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field}>
+                  <option value="">Semua Karyawan</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                <select value={resetAttStore} onChange={e => setResetAttStore(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field}>
+                  <option value="">Semua Toko</option>
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* OTHERS — each in one row */}
+          <div className="px-5 pb-5 flex flex-col gap-2" style={{ borderTop: "1.5px solid var(--border)", paddingTop: 16 }}>
+            {[
+              { label: "Karyawan", count: employees.length - 1, desc: "Akun Anda tetap aman", fn: () => resetOne("Semua karyawan", onResetEmployees), disabled: employees.length <= 1 },
+              { label: "Produk", count: products.length, desc: "Termasuk varian & stok", fn: () => resetOne("Semua produk", onResetProducts), disabled: products.length === 0 },
+              { label: "Member", count: members.length, desc: "Data pelanggan", fn: () => resetOne("Semua member", onResetMembers), disabled: members.length === 0 },
+              { label: "Diskon & Voucher", count: discounts.length, desc: "Semua promosi", fn: () => resetOne("Semua diskon", onResetDiscounts), disabled: discounts.length === 0 },
+              { label: "Toko", count: stores.length, desc: "Data cabang", fn: () => resetOne("Semua toko", onResetStores), disabled: stores.length === 0 },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: "var(--background)", opacity: item.disabled ? 0.4 : 1 }}>
+                <div>
+                  <div className="text-xs font-semibold">{item.label} <span style={{ color: "var(--muted-foreground)" }}>({item.count})</span></div>
+                  <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{item.desc}</div>
+                </div>
+                <button disabled={item.disabled} onClick={item.fn}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 shrink-0"
+                  style={{ background: "#ef4444" }}>
+                  Hapus
+                </button>
+              </div>
+            ))}
+            <div className="text-[10px] mt-1 mb-2" style={{ color: "var(--muted-foreground)" }}>
+              * Hapus data transaksi atau karyawan terlebih dahulu jika ingin menghapus data toko, karena data tersebut saling berkaitan.
+            </div>
+          </div>
         </div>
       )}
     </div>

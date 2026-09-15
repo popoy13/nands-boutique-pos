@@ -518,6 +518,11 @@ export async function deleteRows(table: string, ids: string[]): Promise<void> {
   if (error) throw error
 }
 
+export interface ResetResult {
+  ok: boolean
+  msg?: string
+}
+
 /* ---------------- load all ---------------- */
 
 export interface AllData {

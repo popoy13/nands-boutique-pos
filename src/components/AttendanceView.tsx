@@ -4,6 +4,8 @@ import type { AttendanceRecord, Employee } from "../data/types";
 import { getRoleLabel } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
+import { todayISO } from "../lib/dates";
+import Pagination from "./Pagination";
 
 interface Props {
   records: AttendanceRecord[];
@@ -13,6 +15,7 @@ interface Props {
   onClock: (record: AttendanceRecord) => void;
   onDelete?: (id: string) => void;
   roles?: Record<string, RoleConfig>;
+  canViewAll?: boolean;
 }
 
 const fmtDate = (d: string) => {
@@ -26,9 +29,7 @@ const fmtTime = () => {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
-const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "") > `${openHour || "08:00"}:00`;
-
-const CAN_VIEW_ALL: string[] = ["admin", "manager", "manager_operasional"];
+const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "").slice(0, 5) > (openHour || "08:00");
 
 function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: string) => void; onNeedFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -104,19 +105,23 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   );
 }
 
-export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete, roles }: Props) {
+export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete, roles, canViewAll }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [usingFile, setUsingFile] = useState(false);
   const [note, setNote] = useState("");
   const [toast, setToast] = useState("");
-  const [filterDate, setFilterDate] = useState("");
+  const [filterDate, setFilterDate] = useState(todayISO());
   const [filterStore, setFilterStore] = useState("all");
   const [filterEmp, setFilterEmp] = useState("all");
   const [attStore, setAttStore] = useState(currentUser.storeId);
   const [now, setNow] = useState(new Date());
   const [cameraKey, setCameraKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const resetPage = () => setPage(1);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -125,8 +130,9 @@ export default function AttendanceView({ records, stores, employees, currentUser
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  const viewAll = CAN_VIEW_ALL.includes(currentUser.role);
-  const clockStores = stores;
+  const viewAll = canViewAll === true;
+  const canAnyStore = currentUser.role === "admin" || currentUser.role === "manager" || currentUser.role === "manager_operasional";
+  const clockStores = canAnyStore ? stores : stores.filter(s => s.id === currentUser.storeId);
   const selStoreId = clockStores.some(s => s.id === attStore) ? attStore : clockStores[0]?.id ?? currentUser.storeId;
   const attStoreObj = clockStores.find(s => s.id === selStoreId);
   const attStoreName = attStoreObj?.name ?? "—";
@@ -134,7 +140,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const closeHour = attStoreObj?.closeHour ?? "21:00";
   const liveTime = now.toLocaleTimeString("en-GB", { hour12: false });
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayISO();
   const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,7 +206,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Absensi");
-    XLSX.writeFile(wb, `nostra-absensi-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `nands-boutique-absensi-${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast("File Excel laporan absensi berhasil diunduh");
   };
 
@@ -210,6 +216,10 @@ export default function AttendanceView({ records, stores, employees, currentUser
     .filter(r => filterStore === "all" || r.storeId === filterStore)
     .filter(r => filterEmp === "all" || r.employeeId === filterEmp)
     .sort((a, b) => (a.date + a.clockIn).localeCompare(b.date + b.clockIn) * -1);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const empOptions = employees.filter(e => e.status === "active");
 
@@ -302,7 +312,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
             )}
             <div className="text-xs mt-1.5 flex items-center justify-between flex-wrap gap-1">
               <span>Jam operasional: <b className="font-mono">{openHour} – {closeHour}</b></span>
-              <span style={{ color: isLateFor(liveTime + ":00", openHour) ? "#d97706" : "#16a34a" }}>{isLateFor(liveTime + ":00", openHour) ? "Terlambat" : "Tepat waktu"}</span>
+              <span style={{ color: isLateFor(liveTime, openHour) ? "#d97706" : "#16a34a" }}>{isLateFor(liveTime, openHour) ? "Terlambat" : "Tepat waktu"}</span>
             </div>
           </div>
 
@@ -369,20 +379,32 @@ export default function AttendanceView({ records, stores, employees, currentUser
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 Export
               </button>
-              <input
-                type="date"
-                value={filterDate}
-                onChange={e => setFilterDate(e.target.value)}
-                className="text-xs rounded-xl px-3 py-2 outline-none"
-                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
-              />
-              <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold leading-none" style={{ color: "var(--muted-foreground)" }}>TANGGAL</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={e => { setFilterDate(e.target.value); resetPage(); }}
+                    className="text-xs rounded-xl px-2.5 py-2 outline-none"
+                    style={{ background: "var(--card)", border: `1px solid ${filterDate ? "var(--accent)" : "var(--border)"}` }}
+                  />
+                  {filterDate && (
+                    <button onClick={() => { setFilterDate(""); resetPage(); }}
+                      className="px-2.5 py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                      Semua
+                    </button>
+                  )}
+                </div>
+              </label>
+              <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
                 className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <option value="all">Semua Toko</option>
                 {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
               </select>
               {viewAll && (
-                <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}
+                <select value={filterEmp} onChange={e => { setFilterEmp(e.target.value); resetPage(); }}
                   className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                   <option value="all">Semua Karyawan</option>
                   {empOptions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -397,7 +419,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada catatan absensi</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {filtered.map(r => {
+              {pageItems.map(r => {
                 const st = statusRec(r);
                 return (
                   <div key={r.id} className="p-4 rounded-xl flex items-center gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
@@ -436,6 +458,15 @@ export default function AttendanceView({ records, stores, employees, currentUser
             </div>
           )}
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="catatan"
+        />
       </div>
 
       {deleteTarget && (

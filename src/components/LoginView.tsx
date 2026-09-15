@@ -1,7 +1,8 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
+import { verifyPin, hashPin, isLocked, recordFailedAttempt, clearAttempts } from "../lib/auth";
 import Avatar from "./Avatar";
 
 interface Props {
@@ -19,6 +20,15 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
   const [error, setError] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [search, setSearch] = useState("");
+  const [lockTimer, setLockTimer] = useState(0);
+  const submittingRef = useRef(false);
+  const pinInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (lockTimer <= 0) return;
+    const id = setInterval(() => setLockTimer(t => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [lockTimer]);
 
   const activeEmployees = employees.filter(e =>
     e.status === "active" && (filterStore === "all" || e.storeId === filterStore)
@@ -29,29 +39,108 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
   );
 
   const handleSelect = (emp: Employee) => {
+    const lock = isLocked(emp.id);
+    if (lock.locked) {
+      setLockTimer(lock.secondsLeft);
+      setError(`Terlalu banyak percobaan. Coba lagi dalam ${lock.secondsLeft}s`);
+    }
     setSelected(emp);
     setPin("");
     setError("");
     setStep("pin");
   };
 
-  const handlePinInput = (digit: string) => {
-    if (pin.length >= 4) return;
-    const newPin = pin + digit;
-    setPin(newPin);
-    if (newPin.length === 4) {
-      setTimeout(() => {
-        if (newPin === selected?.pin) {
-          onLogin(selected);
+  const submitPin = async (pinToCheck: string) => {
+    if (!selected || submittingRef.current || pinToCheck.length !== 4) return;
+    submittingRef.current = true;
+    try {
+      const lock = isLocked(selected.id);
+      if (lock.locked) {
+        setLockTimer(lock.secondsLeft);
+        setError(`Terkunci. Coba lagi dalam ${lock.secondsLeft}s`);
+        setPin("");
+        return;
+      }
+      const isHashed = /^[a-f0-9]{64}$/i.test(selected.pin);
+      const ok = isHashed
+        ? await verifyPin(pinToCheck, selected.pin)
+        : pinToCheck === selected.pin;
+      if (ok) {
+        clearAttempts(selected.id);
+        onLogin(selected);
+      } else {
+        const result = recordFailedAttempt(selected.id);
+        if (result.locked) {
+          setLockTimer(result.secondsLeft);
+          setError(`Terkunci ${result.secondsLeft}s karena terlalu banyak salah PIN`);
         } else {
           setError("PIN salah. Coba lagi.");
-          setPin("");
         }
-      }, 200);
+        setPin("");
+      }
+    } finally {
+      submittingRef.current = false;
     }
   };
 
+  const handlePinInput = (digit: string) => {
+    if (!selected || lockTimer > 0) return;
+    setPin(prev => {
+      if (prev.length >= 4) return prev;
+      const next = prev + digit;
+      if (next.length === 4) setTimeout(() => { void submitPin(next); }, 200);
+      return next;
+    });
+  };
+
   const handleBackspace = () => { setPin(p => p.slice(0, -1)); setError(""); };
+
+  const handleHiddenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (lockTimer > 0) { e.target.value = ""; return; }
+    const clean = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if (clean.length >= pin.length) {
+      clean.slice(pin.length).split("").forEach(c => handlePinInput(c));
+    } else {
+      setPin(clean);
+    }
+    e.target.value = "";
+  };
+
+  const handleHiddenKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (lockTimer > 0) { e.preventDefault(); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (pin.length === 4) void submitPin(pin);
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      handleBackspace();
+    }
+  };
+
+  useEffect(() => {
+    if (step === "pin") pinInputRef.current?.focus();
+  }, [step, pin]);
+
+  useEffect(() => {
+    if (step !== "pin") return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.tagName === "INPUT") return;
+      if (lockTimer > 0) { e.preventDefault(); return; }
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handlePinInput(e.key);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (pin.length === 4) void submitPin(pin);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [step, pin, lockTimer]);
 
   return (
     <div className="h-full flex items-start justify-center overflow-y-auto" style={{ background: "var(--sidebar)" }}>
@@ -154,6 +243,19 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
                 ))}
               </div>
 
+              <input
+                ref={pinInputRef}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                autoFocus
+                aria-label="Ketik PIN"
+                defaultValue=""
+                onChange={handleHiddenChange}
+                onKeyDown={handleHiddenKeyDown}
+                className="sr-only"
+              />
+
               {error && (
                 <div className="text-center text-xs font-medium mb-4 px-3 py-2 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>
                   {error}
@@ -165,14 +267,15 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
                 {["1","2","3","4","5","6","7","8","9","",  "0","del"].map((d, i) => (
                   <button
                     key={i}
-                    onClick={() => d === "del" ? handleBackspace() : d ? handlePinInput(d) : null}
-                    disabled={!d && d !== "0"}
+                    onClick={() => { d === "del" ? handleBackspace() : d ? handlePinInput(d) : null; setTimeout(() => pinInputRef.current?.focus(), 0); }}
+                    disabled={(!d && d !== "0") || lockTimer > 0}
                     className="h-14 rounded-2xl text-lg font-semibold transition-all duration-100 active:scale-95"
                     style={{
                       background: d === "del" ? "#fef2f2" : d ? "var(--background)" : "transparent",
                       color: d === "del" ? "#ef4444" : "var(--foreground)",
                       border: d && d !== "del" ? "1.5px solid var(--border)" : "none",
                       fontFamily: "'JetBrains Mono', monospace",
+                      opacity: lockTimer > 0 && d !== "del" ? 0.4 : 1,
                     }}
                   >
                     {d === "del" ? (

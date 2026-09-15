@@ -1,11 +1,16 @@
 ﻿import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import type { Transaction, DeletedTransaction } from "../data/types";
+import DateRangeFilter from "./DateRangeFilter";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtDate = (d: Date) =>
   new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
+const fmtDateSafe = (d: unknown) => {
+  const dt = d instanceof Date ? d : new Date(String(d ?? ""));
+  return Number.isNaN(dt.getTime()) ? "—" : fmtDate(dt);
+};
 const fmtK = (n: number) => {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}jt`;
   if (n >= 1000) return `${(n / 1000).toFixed(0)}rb`;
@@ -53,30 +58,62 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     };
   }, [filtered]);
 
-  // Daily for chart
-  const rangeDays = useMemo(() => {
-    if (!dateFrom || !dateTo) return null;
-    const from = new Date(dateFrom);
-    const to = new Date(dateTo);
-    const diff = Math.round((to.getTime() - from.getTime()) / 86400000);
-    return Math.min(31, Math.max(1, diff + 1));
-  }, [dateFrom, dateTo]);
-
+  // Daily buckets for chart — align with selected period/custom range
+  // (daily bars for <= 31 days, weekly bars otherwise)
   const dailyData = useMemo(() => {
-    const days = period === "7d" ? 7 : period === "30d" ? 14 : (rangeDays ?? 14);
-    return Array.from({ length: days }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (days - 1 - i)); d.setHours(0, 0, 0, 0);
-      const next = new Date(d); next.setDate(next.getDate() + 1);
-      const dayTx = filtered.filter(t => t.date >= d && t.date < next);
-      return {
-        label: period === "7d"
-          ? d.toLocaleDateString("id-ID", { weekday: "short" })
-          : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
-        revenue: dayTx.reduce((s, t) => s + t.total, 0),
-        count: dayTx.length,
-      };
+    const dayMonth = (dt: Date) => dt.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    const weekday = (dt: Date) => dt.toLocaleDateString("id-ID", { weekday: "short" });
+
+    let start: Date;
+    let days: number;
+    let useWeekday = false;
+
+    if (customRange) {
+      const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
+      const toMs = dateTo ? new Date(`${dateTo}T00:00:00`).getTime() + 86400000 - 1 : Number.POSITIVE_INFINITY;
+      const times = filtered.map(t => t.date.getTime()).filter(ts => ts >= fromMs && ts <= toMs);
+      if (times.length === 0) { start = new Date(); start.setHours(0, 0, 0, 0); days = 1; }
+      else {
+        const min = Math.min(...times); const max = Math.max(...times);
+        start = new Date(min); start.setHours(0, 0, 0, 0);
+        days = Math.max(1, Math.round((max - min) / 86400000) + 1);
+      }
+    } else if (period === "7d") {
+      start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 6);
+      days = 7; useWeekday = true;
+    } else if (period === "30d") {
+      start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 29);
+      days = 30;
+    } else {
+      const spans = filtered.map(t => { const x = new Date(t.date); x.setHours(0, 0, 0, 0); return x.getTime(); });
+      if (spans.length === 0) { start = new Date(); start.setHours(0, 0, 0, 0); days = 1; }
+      else {
+        const min = Math.min(...spans); const max = Math.max(...spans);
+        start = new Date(min); start.setHours(0, 0, 0, 0);
+        days = Math.max(1, Math.round((max - min) / 86400000) + 1);
+      }
+    }
+
+    const buckets: { start: Date; end: Date; label: string }[] = [];
+    if (days <= 31) {
+      for (let i = 0; i < days; i++) {
+        const d = new Date(start); d.setTime(d.getTime() + i * 86400000); d.setHours(0, 0, 0, 0);
+        const n = new Date(d); n.setDate(n.getDate() + 1);
+        buckets.push({ start: d, end: n, label: useWeekday ? weekday(d) : dayMonth(d) });
+      }
+    } else {
+      const weeks = Math.ceil(days / 7);
+      for (let i = 0; i < weeks; i++) {
+        const d = new Date(start); d.setTime(d.getTime() + i * 7 * 86400000); d.setHours(0, 0, 0, 0);
+        const n = new Date(d); n.setDate(n.getDate() + 7);
+        buckets.push({ start: d, end: n, label: dayMonth(d) });
+      }
+    }
+    return buckets.map(b => {
+      const dayTx = filtered.filter(t => t.date >= b.start && t.date < b.end);
+      return { label: b.label, revenue: dayTx.reduce((s, t) => s + t.total, 0), count: dayTx.length };
     });
-  }, [filtered, period, rangeDays]);
+  }, [filtered, period, dateFrom, dateTo, customRange]);
 
   const maxRevenue = Math.max(...dailyData.map(d => d.revenue), 1);
 
@@ -99,9 +136,11 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     })).sort((a, b) => b.revenue - a.revenue),
   [filtered, stores]);
 
+  const storeBreakdownMax = storeBreakdown[0]?.revenue ?? 0;
+
   const paymentBreakdown = useMemo(() => {
     const map: Record<string, number> = { cash: 0, debit: 0, qris: 0 };
-    filtered.forEach(t => { map[t.paymentMethod] += t.total; });
+    filtered.forEach(t => { map[t.paymentMethod || "cash"] += t.total; });
     const total = Object.values(map).reduce((s, v) => s + v, 0) || 1;
     return [
       { method: "cash", label: "Tunai", value: map.cash, pct: Math.round((map.cash / total) * 100), color: "#7c3aed" },
@@ -115,7 +154,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     { label: "Hari Ini", value: fmt(stats.todayRevenue), sub: `${stats.todayCount} transaksi`, color: "#16a34a" },
     { label: "Rata-rata Transaksi", value: fmt(Math.round(stats.avg)), sub: "per transaksi", color: "#3b82f6" },
     { label: "Item Terjual", value: stats.itemsSold.toString(), sub: "pcs produk", color: "#7c3aed" },
-    { label: "Transaksi Dihapus", value: deletedTransactions.length.toString(), sub: `Nominal ${fmt(deletedTransactions.reduce((s, d) => s + d.transaction.total, 0))}`, color: "#ef4444" },
+    { label: "Transaksi Dihapus", value: deletedTransactions.length.toString(), sub: `Nominal ${fmt(deletedTransactions.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
   ];
 
   const paymentLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
@@ -160,21 +199,21 @@ export default function ReportView({ transactions, deletedTransactions, stores }
 
     if (deletedTransactions.length > 0) {
       const deletedRows = deletedTransactions.map(d => ({
-        "ID Transaksi": d.transaction.id,
-        "Tanggal Transaksi": d.transaction.date.toLocaleDateString("id-ID"),
-        "Toko": d.transaction.storeName,
-        "Kasir": d.transaction.cashierName,
-        "Total": d.transaction.total,
-        "Metode Bayar": paymentLabel[d.transaction.paymentMethod],
+        "ID Transaksi": d.transaction?.id ?? "—",
+        "Tanggal Transaksi": fmtDateSafe(d.transaction?.date),
+        "Toko": d.transaction?.storeName ?? "",
+        "Kasir": d.transaction?.cashierName ?? "",
+        "Total": d.transaction?.total ?? 0,
+        "Metode Bayar": paymentLabel[d.transaction?.paymentMethod as string] ?? "",
         "Dihapus Oleh": d.deletedBy,
-        "Waktu Hapus": d.deletedAt.toLocaleString("id-ID", { hour12: false }),
+        "Waktu Hapus": fmtDateSafe(d.deletedAt),
         "Alasan": d.reason,
       }));
       const wsDeleted = XLSX.utils.json_to_sheet(deletedRows);
       XLSX.utils.book_append_sheet(wb, wsDeleted, "Transaksi Dihapus");
     }
 
-    XLSX.writeFile(wb, `nostra-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `nands-boutique-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -197,19 +236,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1.5">
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="text-xs rounded-xl px-2.5 py-2 outline-none" style={{ background: "var(--card)", border: `1.5px solid ${customRange ? "var(--accent)" : "var(--border)"}` }} />
-            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>s/d</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="text-xs rounded-xl px-2.5 py-2 outline-none" style={{ background: "var(--card)", border: `1.5px solid ${customRange ? "var(--accent)" : "var(--border)"}` }} />
-            {customRange && (
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                className="ml-1 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Reset tanggal">
-                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            )}
-          </div>
+          <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} />
           <button onClick={handleExport}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
             style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
@@ -236,19 +263,26 @@ export default function ReportView({ transactions, deletedTransactions, stores }
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Grafik Pendapatan</div>
           <div className="flex items-end gap-1.5 h-36">
             {dailyData.map((d, i) => (
-              <div key={i} className="flex flex-col items-center gap-1 flex-1 group">
-                <div className="text-center" style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "'JetBrains Mono', monospace", minHeight: 12 }}>
-                  {d.revenue > 0 ? fmtK(d.revenue) : ""}
-                </div>
+              <div key={i} className="flex flex-col items-center gap-1 flex-1 group min-w-0">
+                {dailyData.length <= 14 && (
+                  <div className="text-center" style={{ fontSize: 9, color: "var(--muted-foreground)", fontFamily: "'JetBrains Mono', monospace", minHeight: 12 }}>
+                    {d.revenue > 0 ? fmtK(d.revenue) : ""}
+                  </div>
+                )}
                 <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{ height: `${Math.max(3, (d.revenue / maxRevenue) * 100)}px`, background: d.revenue > 0 ? "var(--accent)" : "var(--muted)", opacity: d.revenue > 0 ? 1 : 0.4 }}>
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" style={{ background: "var(--foreground)", fontSize: 10 }}>
                     {fmt(d.revenue)}<br />{d.count} trx
                   </div>
                 </div>
-                <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>{d.label}</div>
+                {dailyData.length <= 14 && (
+                  <div style={{ fontSize: 9, color: "var(--muted-foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{d.label}</div>
+                )}
               </div>
             ))}
           </div>
+          {dailyData.length > 14 && (
+            <div className="text-[10px] mt-2" style={{ color: "var(--muted-foreground)" }}>Arahkan ke bar untuk melihat rincian (periode panjang ditampilkan per minggu).</div>
+          )}
         </div>
 
         {/* Payment breakdown */}
@@ -298,6 +332,9 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         {/* Store breakdown */}
         <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Performa Toko</div>
+          {storeBreakdown.length === 0 ? (
+            <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada toko</div>
+          ) : (
           <div className="flex flex-col gap-3">
             {storeBreakdown.map((s, i) => (
               <div key={s.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
@@ -306,12 +343,13 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                   <div className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(s.revenue)}</div>
                 </div>
                 <div className="w-full h-1.5 rounded-full mb-1" style={{ background: "var(--muted)" }}>
-                  <div className="h-1.5 rounded-full" style={{ width: `${storeBreakdown[0].revenue > 0 ? (s.revenue / storeBreakdown[0].revenue) * 100 : 0}%`, background: i === 0 ? "#7c3aed" : i === 1 ? "#3b82f6" : "#7c3aed" }} />
+                  <div className="h-1.5 rounded-full" style={{ width: `${storeBreakdownMax > 0 ? (s.revenue / storeBreakdownMax) * 100 : 0}%`, background: i === 0 ? "#7c3aed" : i === 1 ? "#3b82f6" : "#7c3aed" }} />
                 </div>
                 <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{s.count} transaksi</div>
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 
@@ -322,7 +360,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
             <span>{deletedTransactions.length} catatan</span>
             <span className="font-mono font-semibold" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
-              Nominal {fmt(deletedTransactions.reduce((s, d) => s + d.transaction.total, 0))}
+              Nominal {fmt(deletedTransactions.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}
             </span>
           </div>
         </div>
@@ -335,11 +373,11 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }}>{d.transaction.id}</span>
+                      <span className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }}>{d.transaction?.id ?? "—"}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#fef2f2", color: "#ef4444" }}>Dihapus</span>
                     </div>
                     <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
-                      {fmtDate(d.transaction.date)} · {d.transaction.storeName.replace("NAND'S BOUTIQUE - ", "")} · {d.transaction.cashierName} · {paymentLabel[d.transaction.paymentMethod]}
+                      {fmtDateSafe(d.transaction?.date)} · {(d.transaction?.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")} · {d.transaction?.cashierName ?? "—"} · {paymentLabel[d.transaction?.paymentMethod as string] ?? "—"}
                     </div>
                     <div className="text-xs mt-1.5 flex items-start gap-1.5" style={{ color: "#b45309" }}>
                       <svg className="shrink-0 mt-0.5" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -347,9 +385,9 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }}>{fmt(d.transaction.total)}</div>
+                    <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }}>{fmt(d.transaction?.total ?? 0)}</div>
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>oleh {d.deletedBy}</div>
-                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{fmtDate(d.deletedAt)}</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{fmtDateSafe(d.deletedAt)}</div>
                   </div>
                 </div>
               </div>

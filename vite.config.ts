@@ -5,6 +5,21 @@ import path from 'node:path'
 
 import siteConfiguration from './.figma/make/site.json'
 
+export const MENU_PAGE_FILES: Record<string, string> = {
+  main: path.resolve(__dirname, 'index.html'),
+  kasir: path.resolve(__dirname, 'kasir.html'),
+  transaksi: path.resolve(__dirname, 'transaksi.html'),
+  laporan: path.resolve(__dirname, 'laporan.html'),
+  inventori: path.resolve(__dirname, 'inventori.html'),
+  produk: path.resolve(__dirname, 'produk.html'),
+  karyawan: path.resolve(__dirname, 'karyawan.html'),
+  toko: path.resolve(__dirname, 'toko.html'),
+  diskon: path.resolve(__dirname, 'diskon.html'),
+  member: path.resolve(__dirname, 'member.html'),
+  absensi: path.resolve(__dirname, 'absensi.html'),
+  setelan: path.resolve(__dirname, 'setelan.html'),
+}
+
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
@@ -15,6 +30,9 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
+      rollupOptions: {
+        input: MENU_PAGE_FILES,
+      },
     },
     plugins: [
       react(),

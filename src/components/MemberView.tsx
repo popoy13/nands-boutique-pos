@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
 import type { Member } from "../data/types";
 import { TIER_COLOR, getTier, generateMemberId } from "../data/members";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -37,6 +38,10 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const resetPage = () => setPage(1);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
@@ -45,6 +50,10 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
     (filterStore === "all" || m.storeId === filterStore) &&
     (m.name.toLowerCase().includes(search.toLowerCase()) || m.phone.includes(search))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSave = () => {
     if (!editing?.name.trim() || !editing.phone.trim()) return;
@@ -111,10 +120,10 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari nama atau no. HP..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari nama atau no. HP..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
                 className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
             </div>
-            <select value={filterTier} onChange={e => setFilterTier(e.target.value)}
+            <select value={filterTier} onChange={e => { setFilterTier(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Tier</option>
               <option value="bronze">Bronze</option>
@@ -122,7 +131,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
               <option value="gold">Gold</option>
               <option value="platinum">Platinum</option>
             </select>
-            <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
+            <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -135,7 +144,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada member</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {filtered.map(m => {
+              {pageItems.map(m => {
                 const tc = TIER_COLOR[m.tier];
                 return (
                   <div key={m.id} className="p-4 rounded-xl flex items-center gap-4 transition-all"
@@ -178,6 +187,15 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
             </div>
           )}
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="member"
+        />
       </div>
 
       {/* Edit Panel */}

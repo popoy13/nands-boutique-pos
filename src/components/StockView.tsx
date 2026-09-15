@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import type { Product } from "../data/types";
-import { categories } from "../data/products";
+import type { Category } from "../data/sync";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -9,12 +9,13 @@ const fmt = (n: number) =>
 interface Props {
   products: Product[];
   stores: { id: string; name: string }[];
+  categories?: Category[];
   activeStore: string;
   onUpdateStock: (productId: string, sku: string, storeId: string, qty: number) => void;
   canEdit?: boolean;
 }
 
-export default function StockView({ products, stores, activeStore, onUpdateStock, canEdit = true }: Props) {
+export default function StockView({ products, stores, categories, activeStore, onUpdateStock, canEdit = true }: Props) {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [filterStore, setFilterStore] = useState(activeStore);
@@ -27,6 +28,13 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
     setTimeout(() => setToast(""), 3000);
   };
 
+  const catOptions = useMemo(() => {
+    const names = new Set<string>();
+    (categories ?? []).forEach(c => { if (c.name) names.add(c.name); });
+    products.forEach(p => { if (p.category) names.add(p.category); });
+    return ["Semua", ...names];
+  }, [categories, products]);
+
   const filtered = useMemo(() =>
     products.filter(p =>
       (filterCat === "Semua" || p.category === filterCat) &&
@@ -35,7 +43,7 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
 
   const handleEditCommit = (productId: string, sku: string, storeId: string) => {
     const qty = parseInt(editVal);
-    if (!isNaN(qty) && qty >= 0) {
+    if (canEdit && !isNaN(qty) && qty >= 0) {
       onUpdateStock(productId, sku, storeId, qty);
       showToast("Stok berhasil diperbarui");
     }
@@ -68,7 +76,7 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stok Produk");
-    XLSX.writeFile(wb, `nostra-stok-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `nands-boutique-stok-${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast("File Excel berhasil diunduh");
   };
 
@@ -120,7 +128,7 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
           </div>
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
             className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            {categories.map(c => <option key={c}>{c}</option>)}
+            {catOptions.map(c => <option key={c}>{c}</option>)}
           </select>
           <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
             className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
@@ -190,7 +198,7 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
                           className="w-16 text-center text-xs font-mono font-bold rounded-lg px-2 py-1 outline-none"
                           style={{ background: "white", border: "2px solid var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}
                         />
-                      ) : (
+                      ) : canEdit ? (
                         <button
                           onClick={() => { setEditCell({ sku: variant.sku, storeId: filterStore }); setEditVal(String(storeQty)); }}
                           className="font-mono text-sm font-bold px-3 py-1 rounded-lg transition-all hover:bg-gray-100"
@@ -198,6 +206,11 @@ export default function StockView({ products, stores, activeStore, onUpdateStock
                         >
                           {storeQty}
                         </button>
+                      ) : (
+                        <span className="font-mono text-sm font-bold px-3 py-1"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: isOut ? "#ef4444" : isLow ? "#d97706" : "var(--foreground)" }}>
+                          {storeQty}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-center">

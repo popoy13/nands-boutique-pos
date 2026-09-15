@@ -49,11 +49,23 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const [draftStores, setDraftStores] = useState<Store[]>(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
   const [draftRoles, setDraftRoles] = useState(() => ensureRoles(settings.roles));
   const [draftBarcode, setDraftBarcode] = useState({ ...defaultSettings.barcode, ...settings.barcode });
+
+  // Sinkronkan draft dengan data terbaru dari perangkat lain (realtime broadcast),
+  // tanpa merusak nilai yang baru saja disimpan.
+  useEffect(() => { setDraftPrinter({ ...settings.printer }); }, [settings.printer]);
+  useEffect(() => { setDraftBrand({ ...settings.brand }); }, [settings.brand]);
+  useEffect(() => { setDraftBarcode({ ...defaultSettings.barcode, ...settings.barcode }); }, [settings.barcode]);
+  useEffect(() => {
+    setDraftStores(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
+  }, [stores]);
+  useEffect(() => { setDraftRoles(ensureRoles(settings.roles)); }, [settings.roles]);
   const [newRoleLabel, setNewRoleLabel] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   const showToast = (msg: string, ok = true) => {
     setToast(msg);
@@ -83,7 +95,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
   const commitRoles = (updated: AppSettings["roles"]) => {
     setDraftRoles(updated);
-    onSaveSettings({ ...settings, roles: updated });
+    onSaveSettings({ ...settingsRef.current, roles: updated });
   };
 
   const setStoreDraft = (id: string, key: keyof Store, val: string) => {

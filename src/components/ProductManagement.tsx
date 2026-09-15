@@ -3,6 +3,8 @@ import type { ChangeEvent } from "react";
 import type { Product, ProductVariant, Size } from "../data/types";
 import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
 import { compressImage } from "../lib/compressImage";
+import { verifyPin } from "../lib/auth";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -24,6 +26,7 @@ interface Props {
   canAdd?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  currentUser?: { id: string; pin: string } | null;
 }
 
 const SIZES: Size[] = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -148,7 +151,7 @@ function BulkActionModal({ action, stores, categories, count, onApply, onClose }
   );
 }
 
-export default function ProductManagement({ products, stores, categories, onUpdateCategories, onSave, canExport = true, canImport = true, canBulk = true, canCategory = true, canAdd = true, canEdit = true, canDelete = true }: Props) {
+export default function ProductManagement({ products, stores, categories, onUpdateCategories, onSave, canExport = true, canImport = true, canBulk = true, canCategory = true, canAdd = true, canEdit = true, canDelete = true, currentUser }: Props) {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -160,6 +163,9 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkModal, setBulkModal] = useState<null | "price" | "category" | "stock">(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkPinVerify, setBulkPinVerify] = useState(false);
+  const [bulkPinInput, setBulkPinInput] = useState("");
+  const [bulkPinError, setBulkPinError] = useState("");
   const [catModal, setCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -167,6 +173,10 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [photoBusy, setPhotoBusy] = useState(false);
   const [editingCatVal, setEditingCatVal] = useState("");
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const resetPage = () => setPage(1);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -214,6 +224,10 @@ export default function ProductManagement({ products, stores, categories, onUpda
       (filterCat === "Semua" || p.category === filterCat) &&
       (p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()) || p.variants.some(v => v.sku.toLowerCase().includes(search.toLowerCase())))
     ), [products, search, filterCat]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(() => filtered.slice((safePage - 1) * pageSize, safePage * pageSize), [filtered, safePage, pageSize]);
 
   const handleSave = () => {
     if (!editing?.name.trim() || editing.basePrice <= 0) return;
@@ -299,11 +313,11 @@ export default function ProductManagement({ products, stores, categories, onUpda
   };
 
   const toggleSelectAll = () => {
-    const allSelected = filtered.length > 0 && filtered.every(p => selected.has(p.id));
+    const allSelected = pageItems.length > 0 && pageItems.every(p => selected.has(p.id));
     setSelected(prev => {
       const next = new Set(prev);
-      if (allSelected) filtered.forEach(p => next.delete(p.id));
-      else filtered.forEach(p => next.add(p.id));
+      if (allSelected) pageItems.forEach(p => next.delete(p.id));
+      else pageItems.forEach(p => next.add(p.id));
       return next;
     });
   };
@@ -341,10 +355,36 @@ export default function ProductManagement({ products, stores, categories, onUpda
   };
 
   const handleBulkDelete = () => {
-    onSave(products.filter(p => !selected.has(p.id)));
-    showToast(`${selected.size} produk dihapus`);
-    setConfirmBulkDelete(false);
-    exitBulk();
+    if (!currentUser) {
+      onSave(products.filter(p => !selected.has(p.id)));
+      showToast(`${selected.size} produk dihapus`);
+      setConfirmBulkDelete(false);
+      exitBulk();
+      setBulkPinVerify(false);
+      setBulkPinInput("");
+      return;
+    }
+    setBulkPinError("");
+    setBulkPinInput("");
+    setBulkPinVerify(true);
+  };
+
+  const submitBulkPinDelete = async () => {
+    if (!confirmBulkDelete || !bulkPinInput || !currentUser) return;
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+      ? await verifyPin(bulkPinInput, currentUser.pin)
+      : bulkPinInput === currentUser.pin;
+    if (pinOk) {
+      onSave(products.filter(p => !selected.has(p.id)));
+      showToast(`${selected.size} produk dihapus`);
+      setConfirmBulkDelete(false);
+      setBulkPinVerify(false);
+      setBulkPinInput("");
+      exitBulk();
+    } else {
+      setBulkPinError("PIN Anda salah");
+      setBulkPinInput("");
+    }
   };
 
   const addCategory = () => {
@@ -444,10 +484,10 @@ export default function ProductManagement({ products, stores, categories, onUpda
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1" style={{ minWidth: 180 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari produk / kode..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari produk / kode..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
                 className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
             </div>
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+            <select value={filterCat} onChange={e => { setFilterCat(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               {filterCats.map(c => <option key={c}>{c}</option>)}
             </select>
@@ -460,7 +500,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
               <tr style={{ background: "var(--background)", position: "sticky", top: 0, zIndex: 5 }}>
                 {bulkMode && (
                   <th key="sel" className="w-10 px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                    <input type="checkbox" checked={filtered.length > 0 && filtered.every(p => selected.has(p.id))} onChange={toggleSelectAll} />
+                    <input type="checkbox" checked={pageItems.length > 0 && pageItems.every(p => selected.has(p.id))} onChange={toggleSelectAll} />
                   </th>
                 )}
                 {["Produk", "Kategori", "Harga", "Varian", "Total Stok", ""].map(h => (
@@ -469,7 +509,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {pageItems.map(p => (
                 <tr key={p.id} onClick={bulkMode ? () => toggleSelect(p.id) : undefined}
                   className={"transition-colors hover:bg-gray-50" + (bulkMode ? " cursor-pointer select-none" : "")}
                   style={{ borderBottom: "1px solid var(--border)", background: selected.has(p.id) ? "rgba(124,58,237,0.07)" : editing?.id === p.id ? "rgba(124,58,237,0.03)" : "var(--card)" }}>
@@ -523,6 +563,15 @@ export default function ProductManagement({ products, stores, categories, onUpda
           {filtered.length === 0 && <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada produk</div>}
         </div>
 
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="produk"
+        />
+
         {bulkMode && selected.size > 0 && (
           <div className="px-4 py-3 border-t shrink-0 flex items-center gap-2 flex-wrap" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
             <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>{selected.size} produk dipilih</span>
@@ -544,14 +593,39 @@ export default function ProductManagement({ products, stores, categories, onUpda
           onClose={() => setBulkModal(null)} />
       )}
 
-      {confirmBulkDelete && selected.size > 0 && (
+      {confirmBulkDelete && !bulkPinVerify && selected.size > 0 && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus {selected.size} Produk?</div>
-            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Anda akan menghapus {selected.size} produk beserta seluruh variannya.</div>
+            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Anda akan menghapus {selected.size} produk beserta seluruh variannya. Konfirmasi PIN Anda untuk melanjutkan.</div>
             <div className="flex gap-2">
               <button onClick={() => setConfirmBulkDelete(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
               <button onClick={handleBulkDelete} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkPinVerify && confirmBulkDelete && selected.size > 0 && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Konfirmasi PIN</div>
+            <div className="text-sm mb-4" style={{ color: "var(--muted-foreground)" }}>Masukkan PIN Anda untuk menghapus {selected.size} produk.</div>
+            {bulkPinError && <div className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>{bulkPinError}</div>}
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={bulkPinInput}
+              onChange={e => { setBulkPinInput(e.target.value.replace(/\D/g, "")); setBulkPinError(""); }}
+              onKeyDown={e => { if (e.key === "Enter" && bulkPinInput.length === 4) void submitBulkPinDelete(); }}
+              autoFocus
+              className="w-full text-center text-xl px-3 py-3 rounded-xl mb-4 outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setBulkPinVerify(false); setBulkPinInput(""); setBulkPinError(""); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
+              <button onClick={() => void submitBulkPinDelete()} disabled={bulkPinInput.length !== 4} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: bulkPinInput.length === 4 ? "#ef4444" : "#d1d5db" }}>Hapus</button>
             </div>
           </div>
         </div>

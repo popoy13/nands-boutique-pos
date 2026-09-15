@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import type { Product, ProductVariant, CartItem, Transaction, Size, Discount, Member } from "../data/types";
 import type { PrinterSettings, BarcodeSettings } from "../data/settings";
-import { categories } from "../data/products";
 import { generateId } from "../data/transactions";
 import { POINTS_PER_10K, getTier, TIER_COLOR } from "../data/members";
 import { cleanBarcode, playScanFeedback } from "../lib/barcode";
+import { todayISO } from "../lib/dates";
 import PaymentModal from "./PaymentModal";
 import BarcodeScanModal from "./BarcodeScanModal";
 import type { ScanResult } from "./BarcodeScanModal";
@@ -27,11 +27,12 @@ interface Props {
   barcode: BarcodeSettings;
   onNewTransaction: (t: Transaction) => void;
   onUpdateMember: (m: Member) => void;
+  onUseVoucher: (id: string) => void;
 }
 
 interface VariantPicker { product: Product }
 
-export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, onNewTransaction, onUpdateMember }: Props) {
+export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -40,6 +41,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const [discountLabel, setDiscountLabel] = useState("");
   const [showPicker, setShowPicker] = useState<VariantPicker | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [pendingTxId, setPendingTxId] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [pickerColor, setPickerColor] = useState("");
   const [pickerSize, setPickerSize] = useState<Size | "">("");
@@ -54,6 +56,12 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       (activeCategory === "Semua" || p.category === activeCategory) &&
       (p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()) || p.variants.some(v => v.sku.toLowerCase().includes(search.toLowerCase())))
     ), [products, search, activeCategory]);
+
+  const categoryChips = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => { if (p.category) set.add(p.category); });
+    return ["Semua", ...set];
+  }, [products]);
 
   const memberSuggestions = useMemo(() =>
     memberSearch.length >= 2
@@ -71,6 +79,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const addVariantToCart = (product: Product, variant: ProductVariant) => {
     const storeStock = variant.stocks.find(s => s.storeId === activeStore);
     if (!storeStock || storeStock.quantity === 0) return false;
+    const inCart = cart.find(i => i.variantSku === variant.sku)?.quantity ?? 0;
+    if (inCart >= storeStock.quantity) return false;
     setCart(prev => {
       const existing = prev.find(i => i.variantSku === variant.sku);
       if (existing) return prev.map(i => i.variantSku === variant.sku ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.price } : i);
@@ -98,8 +108,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   };
 
   const handleScanResult = (code: string): ScanResult => {
-    const norm = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
     const c = cleanBarcode(code, barcode).toUpperCase();
+    const norm = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
     const cn = norm(c);
     if (!cn) return { ok: false, message: "Kode kosong" };
     for (const p of products) {
@@ -131,14 +141,14 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   useEffect(() => { scanRef.current = handleScanResult; });
 
   useEffect(() => {
-    if (barcode.mode !== "keyboard") return;
+    if (barcode.mode !== "keyboard" || showPayment) return;
     let buf = "";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onKeyDown = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
       if (e.key === "Enter") {
-        const code = cleanBarcode(buf, barcode);
+        const code = buf;
         buf = "";
         clearTimeout(timer);
         if (!code) return;
@@ -158,22 +168,31 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       window.removeEventListener("keydown", onKeyDown);
       clearTimeout(timer);
     };
-  }, [barcode.mode, barcode]);
+  }, [barcode.mode, barcode, showPayment]);
 
   const updateQty = (sku: string, delta: number) => {
-    setCart(prev => prev.map(i => i.variantSku === sku ? { ...i, quantity: i.quantity + delta, subtotal: (i.quantity + delta) * i.price } : i).filter(i => i.quantity > 0));
+    setCart(prev => prev.map(i => {
+      if (i.variantSku !== sku) return i;
+      const newQty = i.quantity + delta;
+      const product = products.find(p => p.variants.some(v => v.sku === sku));
+      const variant = product?.variants.find(v => v.sku === sku);
+      const maxQty = variant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
+      const cappedQty = Math.min(newQty, maxQty);
+      return { ...i, quantity: cappedQty, subtotal: cappedQty * i.price };
+    }).filter(i => i.quantity > 0));
   };
 
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
-  const discountAmt = discountType === "percent" ? Math.round(subtotal * discount / 100) : discount;
-  const tax = Math.round((subtotal - discountAmt) * 0.1);
+  const rawDiscAmt = discountType === "percent" ? Math.round(subtotal * discount / 100) : discount;
+  const discountAmt = Math.min(rawDiscAmt, subtotal);
+  const tax = Math.max(0, Math.round((subtotal - discountAmt) * 0.1));
   const total = subtotal - discountAmt + tax;
   const pointsToEarn = Math.floor(total / 10000) * POINTS_PER_10K;
 
   const applyVoucher = () => {
     const code = voucherCode.trim().toUpperCase();
     if (!code) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const v = discounts.find(d =>
       d.type === "voucher" &&
       d.code?.toUpperCase() === code &&
@@ -200,7 +219,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
   const handlePay = (payment: number, method: "cash" | "debit" | "qris") => {
     const t: Transaction = {
-      id: generateId(activeStore),
+      id: pendingTxId || generateId(activeStore),
       date: new Date(),
       storeId: activeStore,
       storeName,
@@ -232,6 +251,11 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       onUpdateMember(updated);
     }
 
+    if (discountLabel && voucherCode) {
+      const v = discounts.find(d => d.type === "voucher" && d.code?.toUpperCase() === voucherCode.trim().toUpperCase());
+      if (v) onUseVoucher(v.id);
+    }
+
     onNewTransaction(t);
     setCart([]);
     setDiscount(0);
@@ -240,6 +264,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     setVoucherCode("");
     setVoucherMsg(null);
     setSelectedMember(null);
+    setPendingTxId("");
     setShowPayment(false);
   };
 
@@ -257,7 +282,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input type="text" placeholder="Cari produk, brand, atau kode..." value={search} onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { const r = handleScanResult(search); if (r.ok) setSearch(""); } }}
+                onKeyDown={e => { if (e.key === "Enter") { const r = handleScanResult(search); if (r.ok) setSearch(""); playScanFeedback(r.ok, barcode); } }}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }} />
             </div>
             <button onClick={() => setShowScanner(true)} title="Scan Barcode"
@@ -270,7 +295,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             </div>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-0.5">
-            {categories.map(cat => (
+            {categoryChips.map(cat => (
               <button key={cat} onClick={() => setActiveCategory(cat)}
                 className="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 shrink-0"
                 style={{ background: activeCategory === cat ? "var(--foreground)" : "var(--card)", color: activeCategory === cat ? "white" : "var(--muted-foreground)", border: `1.5px solid ${activeCategory === cat ? "var(--foreground)" : "var(--border)"}` }}>
@@ -447,7 +472,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             </div>
           </div>
 
-          <button disabled={cart.length === 0} onClick={() => setShowPayment(true)}
+          <button disabled={cart.length === 0} onClick={() => { setPendingTxId(generateId(activeStore)); setShowPayment(true); }}
             className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
             style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: cart.length > 0 ? "var(--foreground)" : "var(--muted)", color: cart.length > 0 ? "white" : "var(--muted-foreground)" }}>
             Lanjut Pembayaran
@@ -516,6 +541,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
       {showPayment && (
         <PaymentModal
+          txId={pendingTxId}
           cart={cart}
           subtotal={subtotal}
           discountAmt={discountAmt}

@@ -54,7 +54,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
   store: ["add", "edit", "delete"],
   discount: ["add", "edit", "delete"],
   member: ["add", "edit", "delete"],
-  attendance: ["delete"],
+  attendance: ["view_all", "delete"],
   settings: ["printer", "attendance", "roles", "barcode", "brand"],
 };
 
@@ -73,7 +73,7 @@ export const ACTION_LABELS: Record<string, Record<string, string>> = {
   store: { add: "Tambah toko", edit: "Edit toko", delete: "Hapus toko" },
   discount: { add: "Tambah diskon", edit: "Edit diskon", delete: "Hapus diskon" },
   member: { add: "Tambah member", edit: "Edit member", delete: "Hapus member" },
-  attendance: { delete: "Hapus absensi" },
+  attendance: { view_all: "Lihat riwayat semua karyawan", delete: "Hapus absensi" },
   settings: {
     printer: "Tab Printer",
     attendance: "Tab Jam Operasional",
@@ -95,12 +95,12 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: allActionsFor(MENU_ITEMS.map(m => m.id)),
   manager: {
     ...allActionsFor(["history", "product", "employee", "settings"]),
-    store: [], discount: [], member: [], attendance: [],
+    store: [], discount: [], member: [], attendance: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   manager_operasional: {
     ...allActionsFor(["history", "product", "employee", "settings"]),
-    store: [], discount: [], member: [], attendance: [],
+    store: [], discount: [], member: [], attendance: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   kasir: {
@@ -134,16 +134,27 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     out[key] = { ...DEFAULT_ROLES[key], permissions: { ...DEFAULT_ROLES[key].permissions } };
   }
   for (const [k, v] of Object.entries(roles ?? {})) {
-    out[k] = { ...v, permissions: v.permissions ?? DEFAULT_ROLES[k]?.permissions ?? {} };
+    let perms: Record<string, string[]> = { ...(v.permissions ?? {}) };
+    // Migrasi: role bawaan yang seharusnya bisa melihat absensi semua karyawan
+    // tetap mendapat aksi ini meski tersimpan di DB sebelum aksi tersebut ada.
+    if (k in DEFAULT_ROLES && DEFAULT_ROLES[k].permissions?.attendance?.includes("view_all")) {
+      perms.attendance = [...new Set([...(perms.attendance ?? []), "view_all"])];
+    }
+    // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
+    // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).
+    if (!(k in DEFAULT_ROLES) && Array.isArray(v.menus)) {
+      perms = { ...defaultPermissionsForMenus(v.menus), ...perms };
+    }
+    out[k] = { ...v, permissions: perms };
   }
   return out;
 };
 
 export const hasAction = (role: string, roles?: Record<string, RoleConfig>, menu?: string, action?: string): boolean => {
   const perms = roles?.[role]?.permissions;
-  if (!perms) return true;
-  const acts = menu ? perms[menu] : undefined;
-  if (!acts) return true;
+  if (!perms || !menu) return false;
+  const acts = perms[menu];
+  if (!acts) return false;
   return !action || acts.includes(action);
 };
 

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Discount } from "../data/types";
+import { todayISO } from "../lib/dates";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -13,20 +15,26 @@ interface Props {
   canDelete?: boolean;
 }
 
-const empty = (): Discount => ({
-  id: `d-${Date.now()}`,
-  name: "",
-  type: "percent",
-  value: 10,
-  minPurchase: 0,
-  code: "",
-  startDate: new Date().toISOString().slice(0, 10),
-  endDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-  storeId: "all",
-  usageLimit: 0,
-  usedCount: 0,
-  active: true,
-});
+const empty = (): Discount => {
+  const t = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const start = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`;
+  const end = new Date(t.getTime() + 30 * 86400000);
+  return {
+    id: `d-${Date.now()}`,
+    name: "",
+    type: "percent",
+    value: 10,
+    minPurchase: 0,
+    code: "",
+    startDate: start,
+    endDate: `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`,
+    storeId: "all",
+    usageLimit: 0,
+    usedCount: 0,
+    active: true,
+  };
+};
 
 const TYPE_LABEL = { percent: "Persen (%)", amount: "Nominal (Rp)", voucher: "Voucher Kode" };
 const TYPE_COLOR: Record<string, { bg: string; text: string }> = {
@@ -41,10 +49,18 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
   const [filterType, setFilterType] = useState("all");
   const [toast, setToast] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const resetPage = () => setPage(1);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const filtered = discounts.filter(d => filterType === "all" || d.type === filterType);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSave = () => {
     if (!editing?.name.trim()) return;
@@ -65,7 +81,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
     onSave(discounts.map(d => d.id === id ? { ...d, active: !d.active } : d));
   };
 
-  const isExpired = (d: Discount) => new Date(d.endDate) < new Date();
+  const isExpired = (d: Discount) => d.endDate < todayISO();
   const isLimitReached = (d: Discount) => d.usageLimit > 0 && d.usedCount >= d.usageLimit;
 
   return (
@@ -102,7 +118,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
           </div>
           <div className="flex gap-2">
             {["all", "percent", "amount", "voucher"].map(t => (
-              <button key={t} onClick={() => setFilterType(t)}
+              <button key={t} onClick={() => { setFilterType(t); resetPage(); }}
                 className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                 style={{ background: filterType === t ? "var(--foreground)" : "var(--card)", color: filterType === t ? "white" : "var(--muted-foreground)", border: `1px solid ${filterType === t ? "var(--foreground)" : "var(--border)"}` }}>
                 {t === "all" ? "Semua" : TYPE_LABEL[t as keyof typeof TYPE_LABEL]}
@@ -113,7 +129,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
 
         <div className="lg:flex-1 lg:overflow-y-auto p-5">
           <div className="flex flex-col gap-3">
-            {filtered.map(d => {
+            {pageItems.map(d => {
               const expired = isExpired(d);
               const limitReached = isLimitReached(d);
               const inactive = !d.active || expired || limitReached;
@@ -186,6 +202,15 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
             )}
           </div>
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="diskon"
+        />
       </div>
 
       {/* Edit Panel */}

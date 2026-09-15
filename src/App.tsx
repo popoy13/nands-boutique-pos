@@ -1,23 +1,41 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
-import POSView from "./components/POSView";
-import HistoryView from "./components/HistoryView";
-import ReportView from "./components/ReportView";
-import StockView from "./components/StockView";
-import EmployeeView from "./components/EmployeeView";
-import StoreManagement from "./components/StoreManagement";
-import DiscountView from "./components/DiscountView";
-import ProductManagement from "./components/ProductManagement";
-import MemberView from "./components/MemberView";
-import AttendanceView from "./components/AttendanceView";
-import SettingsView from "./components/SettingsView";
+
+const POSView = lazy(() => import("./components/POSView"));
+const HistoryView = lazy(() => import("./components/HistoryView"));
+const ReportView = lazy(() => import("./components/ReportView"));
+const StockView = lazy(() => import("./components/StockView"));
+const EmployeeView = lazy(() => import("./components/EmployeeView"));
+const StoreManagement = lazy(() => import("./components/StoreManagement"));
+const DiscountView = lazy(() => import("./components/DiscountView"));
+const ProductManagement = lazy(() => import("./components/ProductManagement"));
+const MemberView = lazy(() => import("./components/MemberView"));
+const AttendanceView = lazy(() => import("./components/AttendanceView"));
+const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
-import { deleteAttendance } from "./data/sync";
+import { deleteAttendance, deleteTransaction } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
 import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
+import { MENU_PAGES } from "./data/menuPages";
+import { todayISO } from "./lib/dates";
 
-export default function App() {
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
+
+const SESSION_KEY = "nands-current-user-id";
+const SESSION_EXPIRY_KEY = "nands-session-expiry";
+
+function MenuLoading() {
+  return (
+    <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
+      <div className="w-10 h-10 rounded-full animate-spin shrink-0" style={{ border: "3px solid var(--muted)", borderTopColor: "var(--accent)" }} />
+      <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>Memuat...</div>
+    </div>
+  );
+}
+
+export default function App({ menu = "index" }: { menu?: string } = {}) {
   const {
     ready,
     products, setProducts,
@@ -30,48 +48,121 @@ export default function App() {
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    flush,
   } = useSyncedStore();
-  const [currentUser, setCurrentUser] = useState<Employee | null>(() => {
-    try {
-      const raw = localStorage.getItem("nands-current-user");
-      if (raw) return JSON.parse(raw) as Employee;
-    } catch { /* ignore */ }
-    return null;
+  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  const page = menu;
+  const [activeStore, setActiveStore] = useState(() => {
+    try { return localStorage.getItem("nands-active-store") || "s1"; } catch { return "s1"; }
   });
-  const [activeTab, setActiveTab] = useState("pos");
-  const [activeStore, setActiveStore] = useState("s1");
 
   useEffect(() => {
-    if (ready && currentUser && !employees.some(e => e.id === currentUser.id)) {
-      setCurrentUser(null);
-      try { localStorage.removeItem("nands-current-user"); } catch { /* ignore */ }
+    try { localStorage.setItem("nands-active-store", activeStore); } catch { /* ignore */ }
+  }, [activeStore]);
+
+  // Restore session dari {id} saja (tanpa PIN tersimpan),
+  // validasi terhadap data karyawan terkini + batas sesi.
+  useEffect(() => {
+    if (!ready) return;
+    const storedId = (() => {
+      try { return localStorage.getItem(SESSION_KEY); } catch { return null; }
+    })();
+    if (!storedId) return;
+    const expiry = (() => {
+      try { return Number(localStorage.getItem(SESSION_EXPIRY_KEY)) || 0; } catch { return 0; }
+    })();
+    if (expiry > 0 && Date.now() > expiry) {
+      try {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_EXPIRY_KEY);
+      } catch { /* ignore */ }
+      return;
     }
+    const fresh = employees.find(e => e.id === storedId);
+    if (!fresh) return;
+    setCurrentUser(fresh);
   }, [ready, employees]);
+
+  // Idle timeout: logout otomatis setelah 30 menit tanpa aktivitas.
+  useEffect(() => {
+    if (!currentUser) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        setCurrentUser(null);
+        try {
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(SESSION_EXPIRY_KEY);
+        } catch { /* ignore */ }
+      }, IDLE_TIMEOUT_MS);
+    };
+    IDLE_EVENTS.forEach(ev => window.addEventListener(ev, reset, { passive: true }));
+    reset();
+    return () => {
+      IDLE_EVENTS.forEach(ev => window.removeEventListener(ev, reset));
+      if (timer) clearTimeout(timer);
+    };
+  }, [currentUser, ready]);
+
+  useEffect(() => {
+    if (!ready || !currentUser) return;
+    const a = getAllowedMenus(currentUser.role, settings.roles);
+    const first = a.length ? a[0] : "pos";
+    if (page === "index") {
+      const todayStr = todayISO();
+      const clockedToday = attendance.some(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === activeStore);
+      const target = a.includes("attendance") && !clockedToday ? "attendance" : first;
+      location.href = MENU_PAGES[target] ?? "kasir.html";
+      return;
+    }
+    if (!a.includes(page)) {
+      location.href = MENU_PAGES[first] ?? "kasir.html";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, currentUser, page, activeStore, attendance, settings]);
+
+  useEffect(() => {
+    if (!ready || !currentUser) return;
+    const fresh = employees.find(e => e.id === currentUser.id);
+    if (!fresh || fresh.status !== "active") {
+      setCurrentUser(null);
+      try {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_EXPIRY_KEY);
+      } catch { /* ignore */ }
+      return;
+    }
+    if (fresh.role !== currentUser.role || fresh.name !== currentUser.name || fresh.storeId !== currentUser.storeId) {
+      setCurrentUser(fresh);
+    }
+  }, [ready, employees, currentUser]);
 
   const storeName = stores.find(s => s.id === activeStore)?.name ?? "";
 
   const handleLogin = (emp: Employee) => {
     setCurrentUser(emp);
-    try { localStorage.setItem("nands-current-user", JSON.stringify(emp)); } catch { /* ignore */ }
-    // Default to first allowed tab
+    try {
+      localStorage.setItem(SESSION_KEY, emp.id);
+      localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + IDLE_TIMEOUT_MS));
+    } catch { /* ignore */ }
     const allowed = getAllowedMenus(emp.role, settings.roles);
-    // Set active store to employee's store (for non-admin/manager)
     const nextStore = (emp.role !== "admin" && emp.role !== "manager" && emp.role !== "manager_operasional") ? emp.storeId : activeStore;
     setActiveStore(nextStore);
-    // If user hasn't clocked in today, open Absensi first
-    const todayStr = new Date().toISOString().slice(0, 10);
+    try { localStorage.setItem("nands-active-store", nextStore); } catch { /* ignore */ }
+    const todayStr = todayISO();
     const clockedToday = attendance.some(r => r.employeeId === emp.id && r.date === todayStr && r.storeId === nextStore);
-    if (allowed.includes("attendance") && !clockedToday) {
-      setActiveTab("attendance");
-    } else {
-      setActiveTab(allowed[0]);
-    }
+    const target = allowed.includes("attendance") && !clockedToday ? "attendance" : (allowed[0] ?? "pos");
+    location.href = MENU_PAGES[target] ?? "kasir.html";
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setActiveTab("pos");
-    try { localStorage.removeItem("nands-current-user"); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_EXPIRY_KEY);
+    } catch { /* ignore */ }
+    void flush().then(() => { location.href = "index.html"; });
   };
 
   const handleNewTransaction = (t: Transaction) => {
@@ -87,7 +178,7 @@ export default function App() {
         }),
       })),
     })));
-    setActiveTab("history");
+    setTimeout(() => { void flush().then(() => { location.href = MENU_PAGES.history; }); }, 120);
   };
 
   const handleUpdateStock = (productId: string, sku: string, storeId: string, qty: number) => {
@@ -113,6 +204,23 @@ export default function App() {
       reason,
     }]);
     setTransactions(prev => prev.filter(t => t.id !== id));
+    setProducts(prev => prev.map(p => ({
+      ...p,
+      variants: p.variants.map(v => {
+        const sold = target.items.find(i => i.variantSku === v.sku);
+        return sold
+          ? { ...v, stocks: v.stocks.map(st => st.storeId === target.storeId ? { ...st, quantity: st.quantity + sold.quantity } : st) }
+          : v;
+      }),
+    })));
+    if (target.memberId && target.pointsEarned) {
+      setMembers(prev => prev.map(m => m.id === target.memberId ? { ...m, points: Math.max(0, m.points - (target.pointsEarned ?? 0)) } : m));
+    }
+    void flush().then(() => deleteTransaction(id)).catch(e => console.warn("[sync] hapus transaksi gagal:", e));
+  };
+
+  const handleUseVoucher = (id: string) => {
+    setDiscounts(prev => prev.map(d => d.id === id && d.type === "voucher" ? { ...d, usedCount: d.usedCount + 1 } : d));
   };
 
   const handleUpdateTransaction = (t: Transaction) => {
@@ -135,9 +243,7 @@ export default function App() {
   if (!ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(124,58,237,0.12)" }}>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 20, color: "var(--accent)" }}>{(settings.brand?.name || "N").charAt(0)}</span>
-        </div>
+        <img src={settings.brand?.logo} alt={settings.brand?.name ?? "Logo"} className="w-14 h-14 rounded-2xl object-cover shrink-0" loading="eager" style={{ background: "rgba(124,58,237,0.12)" }} />
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>
         <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>sabar guys loading dulu</div>
       </div>
@@ -179,16 +285,16 @@ export default function App() {
   const canMemEdit = has("member", "edit");
   const canMemDelete = has("member", "delete");
   const canDeleteAttendance = has("attendance", "delete");
+  const canViewAttendanceAll = has("attendance", "view_all");
   const settingsPerms = permRoles[role]?.permissions;
 
-  // Guard: if current tab not allowed, redirect
-  const safeTab = allowed.includes(activeTab) ? activeTab : allowed[0];
+  // Guard: if current page not allowed, redirect
+  const safeTab = allowed.includes(page) ? page : allowed[0];
 
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden" style={{ background: "var(--background)" }}>
       <Sidebar
         activeTab={safeTab}
-        setActiveTab={tab => { if (allowed.includes(tab)) setActiveTab(tab); }}
         activeStore={activeStore}
         setActiveStore={setActiveStore}
         stores={stores}
@@ -200,6 +306,7 @@ export default function App() {
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
+        <Suspense fallback={<MenuLoading />}>
         {safeTab === "pos" && (
           <POSView
             activeStore={activeStore}
@@ -211,6 +318,7 @@ export default function App() {
             members={members}
             onNewTransaction={handleNewTransaction}
             onUpdateMember={handleUpdateMember}
+            onUseVoucher={handleUseVoucher}
             brandName={settings.brand.name}
             printer={settings.printer}
             barcode={settings.barcode}
@@ -227,6 +335,7 @@ export default function App() {
             onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
             brandName={settings.brand.name}
             printer={settings.printer}
+            currentUser={currentUser}
           />
         )}
         {safeTab === "report" && (
@@ -236,6 +345,7 @@ export default function App() {
           <StockView
             products={products}
             stores={stores}
+            categories={categories}
             activeStore={activeStore}
             onUpdateStock={canEditStock ? handleUpdateStock : () => {}}
             canEdit={canEditStock}
@@ -255,6 +365,7 @@ export default function App() {
             canAdd={canProductAdd}
             canEdit={canProductEdit}
             canDelete={canProductDelete}
+            currentUser={currentUser}
           />
         )}
         {safeTab === "employee" && (
@@ -267,6 +378,7 @@ export default function App() {
             canExport={canEmpExport}
             canAdd={canEmpAdd}
             roles={settings.roles}
+            currentUser={currentUser}
           />
         )}
         {safeTab === "store" && (
@@ -306,6 +418,7 @@ export default function App() {
             currentUser={currentUser}
             onClock={handleClock}
             onDelete={canDeleteAttendance ? handleDeleteAttendance : undefined}
+            canViewAll={canViewAttendanceAll}
             roles={settings.roles}
           />
         )}
@@ -320,12 +433,12 @@ export default function App() {
             permissions={settingsPerms}
           />
         )}
+        </Suspense>
       </div>
 
       <MobileBottomNav
         allowed={allowed}
         activeTab={safeTab}
-        onSelect={tab => { if (allowed.includes(tab)) setActiveTab(tab); }}
       />
     </div>
   );

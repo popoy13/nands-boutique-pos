@@ -1,11 +1,14 @@
 ﻿import { useState } from "react";
 import type { CartItem } from "../data/types";
 import type { PrinterSettings } from "../data/settings";
+import { escapeHtml } from "../lib/sanitize";
 
+const fmtNum = (n: number) => new Intl.NumberFormat("id-ID").format(n);
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
 interface Props {
+  txId: string;
   cart: CartItem[];
   subtotal: number;
   discountAmt: number;
@@ -64,11 +67,10 @@ const QrisIcon = ({ size = 26 }: { size?: number }) => (
   </svg>
 );
 
-export default function PaymentModal({ cart, subtotal, discountAmt, tax, total, storeName, cashierName, brandName, printer, memberName, pointsEarned, onPay, onClose }: Props) {
+export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, total, storeName, cashierName, brandName, printer, memberName, pointsEarned, onPay, onClose }: Props) {
   const [method, setMethod] = useState<Method>("cash");
   const [payment, setPayment] = useState(total);
   const [success, setSuccess] = useState(false);
-  const [txId, setTxId] = useState("");
   const [txDate] = useState(new Date());
 
   const change = Math.max(0, payment - total);
@@ -76,8 +78,6 @@ export default function PaymentModal({ cart, subtotal, discountAmt, tax, total, 
 
   const handleConfirm = () => {
     if (!isValid) return;
-    const id = `TRX-${Date.now().toString(36).toUpperCase()}`;
-    setTxId(id);
     setSuccess(true);
     const actualPayment = method !== "cash" ? total : payment;
     if (printer.autoPrint) {
@@ -92,19 +92,19 @@ export default function PaymentModal({ cart, subtotal, discountAmt, tax, total, 
     const width = printer.paperWidth || 80;
     const font = width <= 58 ? 8 : width === 72 ? 10 : 11;
     const body = `
-    <div class="center"><b>${brandName}</b><br>${storeName.replace("NAND'S BOUTIQUE - ", "")}<br></div>
+    <div class="center"><b>${escapeHtml(brandName)}</b><br>${escapeHtml((storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
     <hr>
-    <div>No: ${txId}</div><div>Tgl: ${txDate.toLocaleString("id-ID")}</div><div>Kasir: ${cashierName}</div>
-    ${memberName ? `<div>Member: ${memberName}${pointsEarned ? ` (+${pointsEarned} pts)` : ""}</div>` : ""}
+    <div>No: ${escapeHtml(txId)}</div><div>Tgl: ${txDate.toLocaleString("id-ID")}</div><div>Kasir: ${escapeHtml(cashierName)}</div>
+    ${memberName ? `<div>Member: ${escapeHtml(memberName)}${pointsEarned ? ` (+${pointsEarned} pts)` : ""}</div>` : ""}
     <hr>
-    ${cart.map(i => `<div>${i.name} (${i.color}/${i.size})</div><div class="row"><span>${i.quantity} x ${new Intl.NumberFormat("id-ID").format(i.price)}</span><span>${new Intl.NumberFormat("id-ID").format(i.subtotal)}</span></div>`).join("")}
+    ${cart.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
-    <div class="row"><span>Subtotal</span><span>${new Intl.NumberFormat("id-ID").format(subtotal)}</span></div>
-    ${discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${new Intl.NumberFormat("id-ID").format(discountAmt)}</span></div>` : ""}
-    <div class="row"><span>Pajak 10%</span><span>${new Intl.NumberFormat("id-ID").format(tax)}</span></div>
-    <div class="row"><b><span>TOTAL</span><span>${new Intl.NumberFormat("id-ID").format(total)}</span></b></div>
-    <div class="row"><span>Bayar (${method === "cash" ? "Tunai" : method === "debit" ? "Debit" : "QRIS"})</span><span>${new Intl.NumberFormat("id-ID").format(method === "cash" ? payment : total)}</span></div>
-    ${method === "cash" && change > 0 ? `<div class="row"><span>Kembalian</span><span>${new Intl.NumberFormat("id-ID").format(change)}</span></div>` : ""}
+    <div class="row"><span>Subtotal</span><span>${fmtNum(subtotal)}</span></div>
+    ${discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(discountAmt)}</span></div>` : ""}
+    <div class="row"><span>Pajak 10%</span><span>${fmtNum(tax)}</span></div>
+    <div class="row"><b><span>TOTAL</span><span>${fmtNum(total)}</span></b></div>
+    <div class="row"><span>Bayar (${method === "cash" ? "Tunai" : method === "debit" ? "Debit" : "QRIS"})</span><span>${fmtNum(method === "cash" ? payment : total)}</span></div>
+    ${method === "cash" && change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(change)}</span></div>` : ""}
     <hr><div class="center">Terima kasih telah berbelanja!<br>www.nandsboutique.id</div>`;
     const copies = Math.max(1, printer.copies || 1);
     const pages = Array.from({ length: copies }, () => `<div style="page-break-after:always;">${body}</div>`).join("");

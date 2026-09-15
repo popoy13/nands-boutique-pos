@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
+import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -26,6 +27,7 @@ interface Props {
   canExport?: boolean;
   canAdd?: boolean;
   roles?: Record<string, RoleConfig>;
+  currentUser?: Employee | null;
 }
 
 const emptyEmployee = (): Employee => ({
@@ -38,24 +40,29 @@ const emptyEmployee = (): Employee => ({
   joinDate: new Date().toISOString().slice(0, 10),
   salary: 0,
   status: "active",
-  pin: "1234",
+  pin: "",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser }: Props) {
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
   const [editing, setEditing] = useState<Employee | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
+  const [toastOk, setToastOk] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState("");
+  const [pinVerify, setPinVerify] = useState(false);
+  const [pinVerifyInput, setPinVerifyInput] = useState("");
+  const [pinVerifyError, setPinVerifyError] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   const roleConfigs = ensureRoles(roles);
   const roleOptions = Object.entries(roleConfigs);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+  const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,15 +83,31 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     (e.name.toLowerCase().includes(search.toLowerCase()) || e.email.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const handleSaveEmployee = () => {
+  const handleSaveEmployee = async () => {
     if (!editing || !editing.name.trim()) return;
+    const pinNew = pinInput.trim();
+    if (isNew && !pinNew) {
+      showToast("PIN login wajib diisi untuk karyawan baru", false);
+      return;
+    }
+    if (pinNew && !/^\d{4}$/.test(pinNew)) {
+      showToast("PIN login harus tepat 4 digit angka", false);
+      return;
+    }
+    if (pinNew && isWeakPin(pinNew)) {
+      showToast("PIN terlalu lemah. Gunakan kombinasi yang sulit ditebak (contoh: 7361)", false);
+      return;
+    }
+    const pinHashed = pinNew ? await hashPin(pinNew) : editing.pin;
+    const toSave: Employee = { ...editing, pin: pinHashed };
     if (isNew) {
-      onSave([...employees, editing]);
+      onSave([...employees, toSave]);
     } else {
-      onSave(employees.map(e => e.id === editing.id ? editing : e));
+      onSave(employees.map(e => e.id === toSave.id ? toSave : e));
     }
     setEditing(null);
     setIsNew(false);
+    setPinInput("");
     showToast("Data karyawan disimpan");
   };
 
@@ -92,6 +115,29 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     onSave(employees.filter(e => e.id !== id));
     if (editing?.id === id) setEditing(null);
     showToast("Karyawan dihapus");
+  };
+
+  const confirmPinDelete = () => {
+    if (!confirmDelete) return;
+    setPinVerifyError("");
+    setPinVerifyInput("");
+    setPinVerify(true);
+  };
+
+  const submitPinDelete = async () => {
+    if (!confirmDelete || !pinVerifyInput || !currentUser) return;
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+      ? await verifyPin(pinVerifyInput, currentUser.pin)
+      : pinVerifyInput === currentUser.pin;
+    if (pinOk) {
+      handleDelete(confirmDelete);
+      setPinVerify(false);
+      setPinVerifyInput("");
+      setConfirmDelete(null);
+    } else {
+      setPinVerifyError("PIN Anda salah");
+      setPinVerifyInput("");
+    }
   };
 
   const handleToggleStatus = (id: string) => {
@@ -114,7 +160,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Karyawan");
-    XLSX.writeFile(wb, `nostra-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `nands-boutique-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast("File Excel berhasil diunduh");
   };
 
@@ -145,19 +191,27 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             joinDate: row["Tanggal Bergabung"] || "",
             salary: Number(row["Gaji"]) || 0,
             status: row["Status"] === "Aktif" ? "active" : "inactive",
-            pin: row["PIN"] || "1234",
+            pin: /^\d{4}$/.test(String(row["PIN"] ?? "").trim()) ? String(row["PIN"]).trim() : "",
           };
         });
 
-        // Merge: update existing by ID, add new
-        const merged = [...employees];
-        imported.forEach(imp => {
-          const idx = merged.findIndex(e => e.id === imp.id);
-          if (idx >= 0) merged[idx] = imp;
-          else merged.push(imp);
-        });
-        onSave(merged);
-        showToast(`${rows.length} karyawan berhasil diimpor`);
+        void (async () => {
+          const merged = [...employees];
+          for (const imp of imported) {
+            if (imp.pin) {
+              const pinHashed = await hashPin(imp.pin);
+              const idx = merged.findIndex(e => e.id === imp.id);
+              if (idx >= 0) merged[idx] = { ...imp, pin: pinHashed };
+              else merged.push({ ...imp, pin: pinHashed });
+            } else {
+              const idx = merged.findIndex(e => e.id === imp.id);
+              if (idx >= 0) merged[idx] = { ...imp, pin: merged[idx].pin };
+              else merged.push(imp);
+            }
+          }
+          onSave(merged);
+          showToast(`${rows.length} karyawan berhasil diimpor`);
+        })();
       } catch {
         showToast("Gagal membaca file Excel");
       }
@@ -172,19 +226,44 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
           {toast}
         </div>
       )}
 
-      {confirmDelete && (
+      {confirmDelete && !pinVerify && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Karyawan?</div>
-            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Tindakan ini tidak dapat dibatalkan.</div>
+            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Konfirmasi PIN Anda untuk melanjutkan.</div>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
-              <button onClick={() => { handleDelete(confirmDelete); setConfirmDelete(null); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya</button>
+              <button onClick={confirmPinDelete} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinVerify && confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Konfirmasi PIN</div>
+            <div className="text-sm mb-4" style={{ color: "var(--muted-foreground)" }}>Masukkan PIN Anda untuk menghapus karyawan ini.</div>
+            {pinVerifyError && <div className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>{pinVerifyError}</div>}
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pinVerifyInput}
+              onChange={e => { setPinVerifyInput(e.target.value.replace(/\D/g, "")); setPinVerifyError(""); }}
+              onKeyDown={e => { if (e.key === "Enter" && pinVerifyInput.length === 4) submitPinDelete(); }}
+              autoFocus
+              className="w-full text-center text-xl font-mono tracking-[0.5em] px-3 py-3 rounded-xl mb-4 outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setPinVerify(false); setPinVerifyInput(""); setPinVerifyError(""); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
+              <button onClick={submitPinDelete} disabled={pinVerifyInput.length !== 4} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: pinVerifyInput.length === 4 ? "#ef4444" : "#d1d5db" }}>Hapus</button>
             </div>
           </div>
         </div>
@@ -218,7 +297,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
               )}
               {canAdd && (
                 <button
-                  onClick={() => { setEditing(emptyEmployee()); setIsNew(true); }}
+                  onClick={() => { setEditing(emptyEmployee()); setIsNew(true); setPinInput(""); setPinVerify(false); setPinVerifyInput(""); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
                   style={{ background: "var(--foreground)" }}>
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -307,7 +386,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                       </svg>
                     </button>
                     <button
-                      onClick={() => { setEditing({ ...emp }); setIsNew(false); }}
+                      onClick={() => { setEditing({ ...emp }); setIsNew(false); setPinInput(""); setPinVerify(false); setPinVerifyInput(""); }}
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                       style={{ background: "var(--secondary)" }}
                     >
@@ -375,7 +454,6 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                 { label: "Email", key: "email", type: "email" },
                 { label: "Tanggal Bergabung", key: "joinDate", type: "date" },
                 { label: "Gaji (Rp)", key: "salary", type: "number" },
-                { label: "PIN Login (4 digit)", key: "pin", type: "text" },
               ].map(field => (
                 <div key={field.key}>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{field.label}</label>
@@ -388,6 +466,21 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                   />
                 </div>
               ))}
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>PIN Login (4 digit){isNew ? "" : " · kosongkan jika tidak diubah"}</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pinInput}
+                  placeholder={isNew ? "Contoh: 7361" : "••••"}
+                  onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+                />
+                <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>Disimpan sebagai hash — tidak tersimpan sebagai teks biasa.</div>
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Jabatan</label>

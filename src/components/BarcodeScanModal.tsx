@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader, IScannerControls } from "@zxing/browser";
 import type { BarcodeSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
-import { cleanBarcode, playScanFeedback } from "../lib/barcode";
+import { playScanFeedback } from "../lib/barcode";
 
 export interface ScanResult {
   ok: boolean;
@@ -150,7 +150,7 @@ export default function BarcodeScanModal({ onClose, onResult, barcode }: Props) 
   const [manualMsg, setManualMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const process = (raw: string): ScanResult => {
-    const r = onResult(cleanBarcode(raw, cfg));
+    const r = onResult(raw);
     playScanFeedback(r.ok, cfg);
     return r;
   };

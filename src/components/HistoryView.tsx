@@ -1,11 +1,16 @@
 ﻿import { useState, useMemo } from "react";
 import type { Transaction } from "../data/types";
 import type { PrinterSettings } from "../data/settings";
+import DateRangeFilter, { todayISO } from "./DateRangeFilter";
+import { escapeHtml } from "../lib/sanitize";
+import { verifyPin } from "../lib/auth";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtDate = (d: Date) =>
   new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
+const fmtNum = (n: number) => new Intl.NumberFormat("id-ID").format(n);
 
 interface Props {
   transactions: Transaction[];
@@ -17,6 +22,7 @@ interface Props {
   onUpdate?: (t: Transaction) => void;
   brandName?: string;
   printer?: PrinterSettings;
+  currentUser?: { id: string; pin: string } | null;
 }
 
 const methodLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
@@ -26,17 +32,49 @@ const methodColor: Record<string, { bg: string; text: string }> = {
   qris:  { bg: "#faf5ff", text: "#7c3aed" },
 };
 
-export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer }: Props) {
+export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer, currentUser }: Props) {
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterMethod, setFilterMethod] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(todayISO());
+  const [dateTo, setDateTo] = useState(todayISO());
   const [editNote, setEditNote] = useState("");
   const [editingNote, setEditingNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [pinVerify, setPinVerify] = useState(false);
+  const [pinVerifyInput, setPinVerifyInput] = useState("");
+  const [pinVerifyError, setPinVerifyError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const resetPage = () => setPage(1);
+
+  const submitDeleteWithPin = async () => {
+    if (!confirmDelete || !deleteReason.trim()) return;
+    if (!currentUser) {
+      onDelete?.(confirmDelete, deleteReason.trim());
+      setConfirmDelete(null);
+      setSelected(null);
+      return;
+    }
+    if (!pinVerify) { setPinVerifyError(""); setPinVerifyInput(""); setPinVerify(true); return; }
+    if (!pinVerifyInput) return;
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+      ? await verifyPin(pinVerifyInput, currentUser.pin)
+      : pinVerifyInput === currentUser.pin;
+    if (pinOk) {
+      onDelete?.(confirmDelete, deleteReason.trim());
+      setConfirmDelete(null);
+      setPinVerify(false);
+      setPinVerifyInput("");
+      setSelected(null);
+    } else {
+      setPinVerifyError("PIN Anda salah");
+      setPinVerifyInput("");
+    }
+  };
 
   const filtered = useMemo(() => {
     return [...transactions].reverse().filter(t => {
@@ -49,6 +87,10 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     });
   }, [transactions, filterStore, filterMethod, search, dateFrom, dateTo]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(() => filtered.slice((safePage - 1) * pageSize, safePage * pageSize), [filtered, safePage, pageSize]);
+
   const totalShown = filtered.reduce((s, t) => s + t.total, 0);
 
   const handlePrint = (t: Transaction) => {
@@ -56,21 +98,21 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     if (!w) return;
     const width = printer?.paperWidth ?? 72;
     const font = width <= 58 ? 8 : width === 72 ? 10 : 11;
-    w.document.write(`<html><head><title>Struk - ${t.id}</title>
+    w.document.write(`<html><head><title>Struk - ${escapeHtml(t.id)}</title>
     <style>body{font-family:'Courier New',monospace;font-size:${font}px;padding:8mm;width:${width}mm;} .row{display:flex;justify-content:space-between;} hr{border:none;border-top:1px dashed #000;margin:5px 0;} .center{text-align:center;} @page{size:${width}mm auto;margin:0;}</style>
     </head><body>
-    <div class="center"><b>${brandName ?? "NAND'S BOUTIQUE"}</b><br>${t.storeName.replace("NAND'S BOUTIQUE - ","")}<br></div>
-    <hr><div>No: ${t.id}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${t.cashierName}</div>
-    ${t.memberName ? `<div>Member: ${t.memberName}</div>` : ""}
+    <div class="center"><b>${escapeHtml(brandName ?? "NAND'S BOUTIQUE")}</b><br>${escapeHtml((t.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
+    <hr><div>No: ${escapeHtml(t.id)}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${escapeHtml(t.cashierName)}</div>
+    ${t.memberName ? `<div>Member: ${escapeHtml(t.memberName)}</div>` : ""}
     <hr>
-    ${t.items.map(i => `<div>${i.name} (${i.color}/${i.size})</div><div class="row"><span>${i.quantity}x${new Intl.NumberFormat("id-ID").format(i.price)}</span><span>${new Intl.NumberFormat("id-ID").format(i.subtotal)}</span></div>`).join("")}
+    ${t.items.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
-    <div class="row"><span>Subtotal</span><span>${new Intl.NumberFormat("id-ID").format(t.subtotal)}</span></div>
-    ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${new Intl.NumberFormat("id-ID").format(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
-    <div class="row"><span>Pajak 10%</span><span>${new Intl.NumberFormat("id-ID").format(t.tax)}</span></div>
-    <div class="row"><b><span>TOTAL</span><span>${new Intl.NumberFormat("id-ID").format(t.total)}</span></b></div>
-    <div class="row"><span>Bayar (${methodLabel[t.paymentMethod]})</span><span>${new Intl.NumberFormat("id-ID").format(t.payment)}</span></div>
-    ${t.change > 0 ? `<div class="row"><span>Kembalian</span><span>${new Intl.NumberFormat("id-ID").format(t.change)}</span></div>` : ""}
+    <div class="row"><span>Subtotal</span><span>${fmtNum(t.subtotal)}</span></div>
+    ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
+    <div class="row"><span>Pajak 10%</span><span>${fmtNum(t.tax)}</span></div>
+    <div class="row"><b><span>TOTAL</span><span>${fmtNum(t.total)}</span></b></div>
+    <div class="row"><span>Bayar (${methodLabel[t.paymentMethod]})</span><span>${fmtNum(t.payment)}</span></div>
+    ${t.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
     <hr><div class="center">Terima kasih!<br>www.nandsboutique.id</div>
     </body></html>`);
     w.document.close();
@@ -89,11 +131,36 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
               <button disabled={!deleteReason.trim()}
-                onClick={() => { onDelete?.(confirmDelete, deleteReason.trim()); setConfirmDelete(null); setSelected(null); }}
+                onClick={() => { setPinVerify(false); void submitDeleteWithPin(); }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={{ background: deleteReason.trim() ? "#ef4444" : "var(--muted)", color: deleteReason.trim() ? "white" : "var(--muted-foreground)" }}>
                 Ya, Hapus
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinVerify && confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Konfirmasi PIN</div>
+            <div className="text-sm mb-4" style={{ color: "var(--muted-foreground)" }}>Masukkan PIN Anda untuk menghapus transaksi.</div>
+            {pinVerifyError && <div className="text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>{pinVerifyError}</div>}
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pinVerifyInput}
+              onChange={e => { setPinVerifyInput(e.target.value.replace(/\D/g, "")); setPinVerifyError(""); }}
+              onKeyDown={e => { if (e.key === "Enter" && pinVerifyInput.length === 4) void submitDeleteWithPin(); }}
+              autoFocus
+              className="w-full text-center text-xl px-3 py-3 rounded-xl mb-4 outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setPinVerify(false); setPinVerifyInput(""); setPinVerifyError(""); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
+              <button onClick={() => void submitDeleteWithPin()} disabled={pinVerifyInput.length !== 4} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: pinVerifyInput.length === 4 ? "#ef4444" : "#d1d5db" }}>Hapus</button>
             </div>
           </div>
         </div>
@@ -106,21 +173,20 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari ID atau kasir..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari ID atau kasir..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
                 className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
             </div>
-            <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ","")}</option>)}
             </select>
-            <select value={filterMethod} onChange={e => setFilterMethod(e.target.value)} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <select value={filterMethod} onChange={e => { setFilterMethod(e.target.value); resetPage(); }} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Metode</option>
               <option value="cash">Tunai</option>
               <option value="debit">Debit</option>
               <option value="qris">QRIS</option>
             </select>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+            <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={v => { setDateFrom(v); resetPage(); }} onChangeTo={v => { setDateTo(v); resetPage(); }} />
           </div>
           <div className="flex items-center gap-4 mt-2.5">
             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{filtered.length} transaksi</span>
@@ -129,11 +195,11 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
         </div>
 
         <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
-          {filtered.length === 0 ? (
+          {pageItems.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada transaksi</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {filtered.map(t => (
+              {pageItems.map(t => (
                 <button key={t.id} onClick={() => setSelected(t)}
                   className="w-full text-left p-4 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
                   style={{ background: selected?.id === t.id ? "rgba(124,58,237,0.05)" : "var(--card)", border: `1.5px solid ${selected?.id === t.id ? "var(--accent)" : "var(--border)"}` }}>
@@ -156,6 +222,15 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
             </div>
           )}
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="transaksi"
+        />
       </div>
 
       {/* Detail */}

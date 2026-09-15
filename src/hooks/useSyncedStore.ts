@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { supabase } from "../lib/supabase";
 import {
-  loadAll, saveRows, saveSettingsRows, writeProducts, writeAttendance, setCategoriesCache,
+  loadAll, saveRows, saveSettingsRows, writeProducts, writeAttendance, setCategoriesCache, deleteRows,
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB,
@@ -33,6 +33,7 @@ export interface SyncedStore {
   deletedTransactions: DeletedTransaction[]; setDeletedTransactions: Dispatch<SetStateAction<DeletedTransaction[]>>;
   settings: AppSettings; setSettings: Dispatch<SetStateAction<AppSettings>>;
   categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
+  flush: () => Promise<void>;
 }
 
 export function useSyncedStore(): SyncedStore {
@@ -53,10 +54,17 @@ export function useSyncedStore(): SyncedStore {
   const validEmpIdsRef = useRef<Set<string>>(new Set());
 
   const pendingRef = useRef<Record<string, unknown>>({});
+  const removedRef = useRef<Record<string, string[]>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const appliedRef = useRef<(payload: { table: string; rows: unknown[] }) => void>(() => {});
   const lastStatusRef = useRef("");
+
+  const trackRemoved = (table: string, prevArr: { id: string }[], nextArr: { id: string }[]) => {
+    const gone = prevArr.filter(p => !nextArr.some(n => n.id === p.id)).map(p => p.id);
+    if (!gone.length) return;
+    removedRef.current[table] = [...new Set([...(removedRef.current[table] ?? []), ...gone])];
+  };
 
 const propagate = (table: string, rows: unknown) => {
   pendingRef.current[table] = rows;
@@ -65,7 +73,7 @@ const propagate = (table: string, rows: unknown) => {
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
-    void writeTable(table, payload);
+    void writeTable(table, payload, (again) => { pendingRef.current["attendance_records"] = again; });
     return;
   }
   if (timersRef.current[table]) return;
@@ -78,7 +86,7 @@ const propagate = (table: string, rows: unknown) => {
   }, DEBOUNCE_MS);
 };
 
-async function writeTable(table: string, payload: unknown) {
+async function writeTable(table: string, payload: unknown, onFail?: (payload: unknown) => void) {
   if (payload === undefined) return;
   try {
     switch (table) {
@@ -88,8 +96,14 @@ async function writeTable(table: string, payload: unknown) {
       default: await saveRows(table, payload as Record<string, unknown>[]);
     }
     try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
+    const removedIds = removedRef.current[table];
+    removedRef.current[table] = [];
+    if (removedIds?.length) {
+      try { await deleteRows(table, removedIds); } catch (e) { console.warn("[sync] hapus baris gagal:", table, e); }
+    }
   } catch (e) {
     console.warn("[sync] tulis ke database gagal:", table, e);
+    onFail?.(payload);
   }
 }
 
@@ -101,25 +115,35 @@ async function writeTable(table: string, payload: unknown) {
   });
   const setStores: Dispatch<SetStateAction<Store[]>> = (upd) => setStoresState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Store[]) => Store[])(prev) : upd;
-    if (next !== prev) propagate("stores", next.map(storeToDB));
+    if (next !== prev) {
+      trackRemoved("stores", prev, next);
+      propagate("stores", next.map(storeToDB));
+    }
     return next;
   });
   const setEmployees: Dispatch<SetStateAction<Employee[]>> = (upd) => setEmployeesState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Employee[]) => Employee[])(prev) : upd;
     if (next !== prev) {
       validEmpIdsRef.current = new Set(next.map(e => e.id));
+      trackRemoved("employees", prev, next);
       propagate("employees", next.map(empToDB));
     }
     return next;
   });
   const setMembers: Dispatch<SetStateAction<Member[]>> = (upd) => setMembersState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Member[]) => Member[])(prev) : upd;
-    if (next !== prev) propagate("members", next.map(memToDB));
+    if (next !== prev) {
+      trackRemoved("members", prev, next);
+      propagate("members", next.map(memToDB));
+    }
     return next;
   });
   const setDiscounts: Dispatch<SetStateAction<Discount[]>> = (upd) => setDiscountsState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Discount[]) => Discount[])(prev) : upd;
-    if (next !== prev) propagate("discounts", next.map(discToDB));
+    if (next !== prev) {
+      trackRemoved("discounts", prev, next);
+      propagate("discounts", next.map(discToDB));
+    }
     return next;
   });
   const setAttendance: Dispatch<SetStateAction<AttendanceRecord[]>> = (upd) => setAttendanceState(prev => {
@@ -150,10 +174,27 @@ async function writeTable(table: string, payload: unknown) {
     const next = typeof upd === "function" ? (upd as (p: Category[]) => Category[])(prev) : upd;
     if (next !== prev) {
       setCategoriesCache(new Map(next.map(c => [c.id, c.name])));
+      trackRemoved("categories", prev, next);
       propagate("categories", next);
     }
     return next;
   });
+
+  const flush = async () => {
+    const tasks: Promise<unknown>[] = [];
+    for (const table of Object.keys(timersRef.current)) {
+      const timer = timersRef.current[table];
+      if (timer) { clearTimeout(timer); timersRef.current[table] = null; }
+    }
+    for (const table of Object.keys(pendingRef.current)) {
+      const payload = pendingRef.current[table];
+      if (payload !== undefined && payload !== null) {
+        pendingRef.current[table] = null;
+        tasks.push(writeTable(table, payload));
+      }
+    }
+    await Promise.all(tasks);
+  };
 
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
     if (!payload || !Array.isArray(payload.rows)) return;
@@ -250,5 +291,6 @@ async function writeTable(table: string, payload: unknown) {
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    flush,
   };
 }

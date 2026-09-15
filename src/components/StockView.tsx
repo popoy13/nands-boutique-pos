@@ -42,7 +42,7 @@ export default function StockView({ products, stores, categories, activeStore, o
     ), [products, search, filterCat]);
 
   const handleEditCommit = (productId: string, sku: string, storeId: string) => {
-    const qty = parseInt(editVal);
+    const qty = parseInt(editVal, 10);
     if (canEdit && !isNaN(qty) && qty >= 0) {
       onUpdateStock(productId, sku, storeId, qty);
       showToast("Stok berhasil diperbarui");

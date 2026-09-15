@@ -158,6 +158,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [isNew, setIsNew] = useState(false);
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
   const [toast, setToast] = useState("");
+  const [toastOk, setToastOk] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -178,7 +179,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
 
   const resetPage = () => setPage(1);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+  const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3000); };
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const handleExport = () => {
@@ -231,6 +232,10 @@ export default function ProductManagement({ products, stores, categories, onUpda
 
   const handleSave = () => {
     if (!editing?.name.trim() || editing.basePrice <= 0) return;
+    const existingSkus = new Set<string>();
+    products.forEach(p => { if (p.id !== editing.id) p.variants.forEach(v => existingSkus.add(v.sku)); });
+    const dup = editing.variants.find(v => existingSkus.has(v.sku));
+    if (dup) { showToast(`SKU "${dup.sku}" sudah digunakan produk lain`, false); return; }
     const updated = isNew ? [...products, editing] : products.map(p => p.id === editing!.id ? editing! : p);
     onSave(updated);
     setEditing(null);
@@ -416,7 +421,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
 
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
-      {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>{toast}</div>}
+      {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>{toast}</div>}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>

@@ -19,7 +19,9 @@ interface Props {
 }
 
 const fmtDate = (d: string) => {
-  const [y, m, day] = d.split("-");
+  const clean = String(d ?? "").slice(0, 10);
+  const [y, m, day] = clean.split("-");
+  if (!y || !m || !day) return "—";
   return `${day}-${m}-${y}`;
 };
 
@@ -188,6 +190,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const statusRec = (r: AttendanceRecord) => {
     const oh = openHourFor(r.storeId);
     if (r.clockOut) return { label: isLateFor(r.clockIn, oh) ? "Telat" : "Hadir", bg: isLateFor(r.clockIn, oh) ? "#fef3c7" : "#f0fdf4", text: isLateFor(r.clockIn, oh) ? "#d97706" : "#16a34a" };
+    if (r.date < todayISO()) return { label: "Tidak Catat Pulang", bg: "#fef2f2", text: "#ef4444" };
     return { label: "Menunggu Pulang", bg: "#fff7ed", text: "#ea580c" };
   };
 
@@ -200,7 +203,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
       "Toko": r.storeName,
       "Jam Masuk": r.clockIn,
       "Jam Pulang": r.clockOut ?? "",
-      "Status": isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : r.clockOut ? "Hadir" : "Menunggu Pulang",
+      "Status": r.clockOut ? (isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : "Hadir") : r.date < todayISO() ? "Tidak Catat Pulang" : "Menunggu Pulang",
       "Catatan": r.note ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);

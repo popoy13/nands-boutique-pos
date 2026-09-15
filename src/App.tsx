@@ -165,7 +165,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(SESSION_EXPIRY_KEY);
     } catch { /* ignore */ }
-    void flush().then(() => { location.href = "index.html"; });
+    void flush().finally(() => { location.href = "index.html"; });
   };
 
   const handleNewTransaction = (t: Transaction) => {
@@ -181,7 +181,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
         }),
       })),
     })));
-    setTimeout(() => { void flush().then(() => { location.href = MENU_PAGES.history; }); }, 120);
+    setTimeout(() => { void flush().finally(() => { location.href = MENU_PAGES.history; }); }, 120);
   };
 
   const handleUpdateStock = (productId: string, sku: string, storeId: string, qty: number) => {

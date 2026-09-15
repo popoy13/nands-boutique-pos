@@ -41,7 +41,7 @@ const ALIASES: Record<string, string> = {
   sku: "sku", kode: "sku", "kode sku": "sku",
 };
 
-function splitLine(line: string): string[] {
+function splitLine(line: string, delim: string): string[] {
   const out: string[] = [];
   let cur = "", inQ = false;
   for (let i = 0; i < line.length; i++) {
@@ -51,10 +51,27 @@ function splitLine(line: string): string[] {
         if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
       } else cur += ch;
     } else if (ch === '"') inQ = true;
-    else if (ch === ",") { out.push(cur); cur = ""; }
+    else if (ch === delim) { out.push(cur); cur = ""; }
     else cur += ch;
   }
   out.push(cur);
+  return out;
+}
+
+function splitRecords(text: string, delim: string): string[] {
+  const out: string[] = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { cur += '""'; i++; } else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') { cur += '"'; inQ = true; }
+    else if (ch === "\n") { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  if (cur.length || out.length) { out.push(cur.replace(/\r$/, "")); }
   return out;
 }
 
@@ -66,11 +83,13 @@ function parseNumber(v: string): number {
 
 export function parseProductsCsv(raw: string, storeIds: string[], existing: Product[]): ImportResult {
   const text = raw.replace(/^\uFEFF/, "");
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const firstLine = (text.slice(0, text.indexOf("\n") === -1 ? text.length : text.indexOf("\n"))).trim();
+  const delim = (firstLine.match(/;/g) ?? []).length > (firstLine.match(/,/g) ?? []).length ? ";" : ",";
+  const lines = splitRecords(text, delim).map(l => l.trim()).filter(l => l.length > 0);
   const errors: string[] = [];
   if (lines.length < 2) return { products: existing, rows: 0, added: 0, updated: 0, errors: ["File kosong atau tidak ada baris data."] };
 
-  const header = splitLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g, "").trim());
+  const header = splitLine(lines[0], delim).map(h => h.toLowerCase().replace(/^"|"$/g, "").trim());
   const colOf = (canon: string) => header.indexOf(canon);
 
   const stockCols = new Map<string, number>();
@@ -88,7 +107,7 @@ export function parseProductsCsv(raw: string, storeIds: string[], existing: Prod
   let rows = 0, added = 0, updated = 0;
 
   for (let li = 1; li < lines.length; li++) {
-    const cells = splitLine(lines[li]);
+    const cells = splitLine(lines[li], delim);
     if (cells.every(c => c.trim() === "")) continue;
     rows++;
 

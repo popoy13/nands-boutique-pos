@@ -64,7 +64,11 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
 
   const handleSave = () => {
     if (!editing?.name.trim()) return;
-    const updated = isNew ? [...discounts, editing] : discounts.map(d => d.id === editing!.id ? editing! : d);
+    const value = editing.type === "percent" || (editing.type === "voucher" && editing.value <= 100)
+      ? Math.min(100, Math.max(0, editing.value))
+      : Math.max(0, editing.value);
+    const clean = { ...editing, value, minPurchase: Math.max(0, editing.minPurchase), usageLimit: Math.max(0, editing.usageLimit) };
+    const updated = isNew ? [...discounts, clean] : discounts.map(d => d.id === editing!.id ? clean : d);
     onSave(updated);
     setEditing(null);
     setIsNew(false);
@@ -146,11 +150,11 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-semibold">{d.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: TYPE_COLOR[d.type].bg, color: TYPE_COLOR[d.type].text }}>{TYPE_LABEL[d.type]}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: TYPE_COLOR[d.type]?.bg ?? "#f3f4f6", color: TYPE_COLOR[d.type]?.text ?? "#6b7280" }}>{TYPE_LABEL[d.type]}</span>
                           {d.code && <span className="font-mono text-xs px-2 py-0.5 rounded-lg font-bold" style={{ background: "#f3f4f6", fontFamily: "'JetBrains Mono', monospace" }}>{d.code}</span>}
                         </div>
                         <div className="text-xs font-bold mb-1" style={{ color: "var(--accent)" }}>
-                          {d.type === "percent" ? `${d.value}% off` : fmt(d.value) + " off"}
+                          {d.type === "percent" || (d.type === "voucher" && d.value <= 100) ? `${d.value}% off` : fmt(d.value) + " off"}
                           {d.minPurchase > 0 && <span className="font-normal ml-1" style={{ color: "var(--muted-foreground)" }}>· min. {fmt(d.minPurchase)}</span>}
                         </div>
                         <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>

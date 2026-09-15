@@ -79,7 +79,6 @@ export const recordFailedAttempt = (empId: string): { locked: boolean; secondsLe
     rec.count = 0;
   } else if (rec.count >= 5) {
     rec.lockedUntil = now + 5 * 60 * 1000;
-    rec.count = 0;
   }
   saveAttempt(empId, rec);
   if (rec.lockedUntil > now) {

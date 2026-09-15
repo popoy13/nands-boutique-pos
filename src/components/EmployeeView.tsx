@@ -99,7 +99,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       showToast("PIN terlalu lemah. Gunakan kombinasi yang sulit ditebak (contoh: 7361)", false);
       return;
     }
-    const pinHashed = pinNew ? await hashPin(pinNew) : editing.pin;
+    const pinHashed = pinNew
+      ? await hashPin(pinNew)
+      : /^\d{4}$/.test(editing.pin)
+        ? await hashPin(editing.pin)
+        : editing.pin;
     const toSave: Employee = { ...editing, pin: pinHashed };
     if (isNew) {
       onSave([...employees, toSave]);

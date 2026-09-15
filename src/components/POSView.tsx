@@ -83,6 +83,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     if (inCart >= storeStock.quantity) return false;
     setCart(prev => {
       const existing = prev.find(i => i.variantSku === variant.sku);
+      const inPrev = existing?.quantity ?? 0;
+      if (inPrev >= storeStock.quantity) return prev;
       if (existing) return prev.map(i => i.variantSku === variant.sku ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.price } : i);
       return [...prev, {
         productId: product.id,
@@ -121,13 +123,15 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       }
     }
     const baseMatches = products.filter(p => p.variants.some(v => {
-      const base = v.sku.slice(0, v.sku.lastIndexOf("-"));
+      const idx = Math.max(v.sku.lastIndexOf("-"), v.sku.lastIndexOf("_"));
+      const base = idx > 0 ? v.sku.slice(0, idx) : v.sku;
       return base.toUpperCase() === c || norm(base) === cn;
     }));
     if (baseMatches.length === 1) {
       const p = baseMatches[0];
       const color = p.variants.find(v => {
-        const base = v.sku.slice(0, v.sku.lastIndexOf("-"));
+        const idx = Math.max(v.sku.lastIndexOf("-"), v.sku.lastIndexOf("_"));
+        const base = idx > 0 ? v.sku.slice(0, idx) : v.sku;
         return base.toUpperCase() === c || norm(base) === cn;
       })?.color;
       setShowScanner(false);
@@ -252,7 +256,16 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     }
 
     if (discountLabel && voucherCode) {
-      const v = discounts.find(d => d.type === "voucher" && d.code?.toUpperCase() === voucherCode.trim().toUpperCase());
+      const today = todayISO();
+      const v = discounts.find(d =>
+        d.type === "voucher" &&
+        d.code?.toUpperCase() === voucherCode.trim().toUpperCase() &&
+        d.active &&
+        d.startDate <= today &&
+        d.endDate >= today &&
+        (d.usageLimit === 0 || d.usedCount < d.usageLimit) &&
+        (d.storeId === "all" || d.storeId === activeStore)
+      );
       if (v) onUseVoucher(v.id);
     }
 
@@ -321,7 +334,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                   <div className="p-2.5">
                     <div className="text-xs text-gray-400 mb-0.5 flex items-center justify-between gap-1" style={{ fontSize: 10 }}>
                       <span>{product.brand}</span>
-                      <span className="font-mono truncate" style={{ fontSize: 9, color: "var(--muted-foreground)" }}>{product.variants[0].sku.slice(0, product.variants[0].sku.lastIndexOf("-"))}</span>
+                      <span className="font-mono truncate" style={{ fontSize: 9, color: "var(--muted-foreground)" }}>{(() => { const s = product.variants[0]?.sku ?? ""; const i = Math.max(s.lastIndexOf("-"), s.lastIndexOf("_")); return i > 0 ? s.slice(0, i) : s; })()}</span>
                     </div>
                     <div className="text-xs font-semibold leading-tight mb-1.5 line-clamp-2">{product.name}</div>
                     <div className="text-xs font-bold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</div>
@@ -444,7 +457,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                     <option value="amount">Rp</option>
                     <option value="percent">%</option>
                   </select>
-                  <input type="number" value={discount || ""} onChange={e => setDiscount(Math.max(0, Number(e.target.value)))}
+                  <input type="number" value={discount || ""} onChange={e => setDiscount(Number.isFinite(Number(e.target.value)) ? Math.max(0, Number(e.target.value)) : 0)}
                     placeholder="0" className="w-20 text-right text-xs font-mono outline-none px-2 py-1 rounded-lg"
                     style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }} />
                 </div>

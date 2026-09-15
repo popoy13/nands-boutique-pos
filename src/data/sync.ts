@@ -295,7 +295,7 @@ export function productsFromDB(
   }))
 }
 
-const stableVariantId = (productId: string, sku: string): string => {
+export const stableVariantId = (productId: string, sku: string): string => {
   let h = 0x811c9dc5
   for (let i = 0; i < sku.length; i++) {
     h ^= sku.charCodeAt(i)
@@ -340,7 +340,10 @@ export function productsToDB(
   return { products, variants, stocks }
 }
 
-export async function writeProducts(ps: Product[]): Promise<void> {
+export async function writeProducts(
+  ps: Product[],
+  removed?: { products: string[]; variants: string[] },
+): Promise<void> {
   const { products, variants, stocks } = productsToDB(ps, categoriesCache)
 
   const seen = new Set<string>()
@@ -349,9 +352,6 @@ export async function writeProducts(ps: Product[]): Promise<void> {
       throw new Error(`SKU ganda: ${String(v.sku)}`)
     if (v.sku) seen.add(String(v.sku))
   }
-
-  const productIds = products.map((p) => String(p.id))
-  const variantIds = variants.map((v) => String(v.id))
 
   if (products.length) {
     const e1 = await supabase
@@ -372,36 +372,25 @@ export async function writeProducts(ps: Product[]): Promise<void> {
     if (e3.error) throw e3.error
   }
 
-  if (!productIds.length) {
-    const e4 = await supabase.from("products").delete().neq("id", "")
-    if (e4.error) throw e4.error
-  } else {
-    const e5 = await supabase
+  const removedProducts = new Set(removed?.products ?? [])
+  const removedVariants = new Set(removed?.variants ?? [])
+
+  if (removedProducts.size) {
+    const e4 = await supabase
       .from("products")
       .delete()
-      .not("id", "in", `(${productIds.join(",")})`)
-    if (e5.error) throw e5.error
+      .in("id", [...removedProducts])
+    if (e4.error) throw e4.error
+    // product_variants & store_stocks terhapus otomatis via ON DELETE CASCADE.
   }
 
-  if (!variantIds.length) {
-    const e6 = await supabase.from("product_variants").delete().neq("id", "")
-    const e7 = await supabase
-      .from("store_stocks")
-      .delete()
-      .neq("variant_id", "")
-    if (e6.error) throw e6.error
-    if (e7.error) throw e7.error
-  } else {
+  if (removedVariants.size) {
     const e8 = await supabase
       .from("product_variants")
       .delete()
-      .not("id", "in", `(${variantIds.join(",")})`)
+      .in("id", [...removedVariants])
     if (e8.error) throw e8.error
-    const e9 = await supabase
-      .from("store_stocks")
-      .delete()
-      .not("variant_id", "in", `(${variantIds.join(",")})`)
-    if (e9.error) throw e9.error
+    // store_stocks varian tsb terhapus otomatis via ON DELETE CASCADE.
   }
 }
 

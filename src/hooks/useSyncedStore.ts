@@ -5,7 +5,7 @@ import {
   loadAll, saveRows, saveSettingsRows, writeProducts, writeAttendance, setCategoriesCache, deleteRows,
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
-  delFromDB, delToDB, settingsFromDB, settingsToDB,
+  delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
 } from "../data/sync";
 import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord } from "../data/types";
 import type { Category } from "../data/sync";
@@ -59,6 +59,7 @@ export function useSyncedStore(): SyncedStore {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const appliedRef = useRef<(payload: { table: string; rows: unknown[] }) => void>(() => {});
   const lastStatusRef = useRef("");
+  const productsRemovedRef = useRef<{ products: string[]; variants: string[] }>({ products: [], variants: [] });
 
   const trackRemoved = (table: string, prevArr: { id: string }[], nextArr: { id: string }[]) => {
     const gone = prevArr.filter(p => !nextArr.some(n => n.id === p.id)).map(p => p.id);
@@ -73,7 +74,9 @@ const propagate = (table: string, rows: unknown) => {
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
-    void writeTable(table, payload, (again) => { pendingRef.current["attendance_records"] = again; });
+    void writeTable(table, payload, (again) => {
+      if (pendingRef.current["attendance_records"] == null) pendingRef.current["attendance_records"] = again;
+    });
     return;
   }
   if (timersRef.current[table]) return;
@@ -90,7 +93,12 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   if (payload === undefined) return;
   try {
     switch (table) {
-      case "products": await writeProducts(payload as Product[]); break;
+      case "products": {
+        const removed = productsRemovedRef.current;
+        productsRemovedRef.current = { products: [], variants: [] };
+        await writeProducts(payload as Product[], removed);
+        break;
+      }
       case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
       default: await saveRows(table, payload as Record<string, unknown>[]);
@@ -110,7 +118,25 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   /* --- wrapped setters (value or functional updater) --- */
   const setProducts: Dispatch<SetStateAction<Product[]>> = (upd) => setProductsState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Product[]) => Product[])(prev) : upd;
-    if (next !== prev) propagate("products", next);
+    if (next !== prev) {
+      const goneProducts = prev.filter(p => !next.some(n => n.id === p.id)).map(p => p.id);
+      const goneVariants: string[] = [];
+      for (const p of prev) {
+        const np = next.find(n => n.id === p.id);
+        if (!np) continue;
+        for (const v of p.variants) {
+          if (!np.variants.some(v2 => v2.sku === v.sku && v2.size === v.size && v2.color === v.color)) {
+            goneVariants.push(stableVariantId(p.id, v.sku));
+          }
+        }
+      }
+      if (goneProducts.length || goneVariants.length) {
+        const pr = productsRemovedRef.current;
+        pr.products = [...new Set([...pr.products, ...goneProducts])];
+        pr.variants = [...new Set([...pr.variants, ...goneVariants])];
+      }
+      propagate("products", next);
+    }
     return next;
   });
   const setStores: Dispatch<SetStateAction<Store[]>> = (upd) => setStoresState(prev => {
@@ -196,6 +222,12 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     await Promise.all(tasks);
   };
 
+  useEffect(() => {
+    const onPageHide = () => { void flush(); };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, []);
+
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
     if (!payload || !Array.isArray(payload.rows)) return;
     const rows = payload.rows as Record<string, unknown>[];
@@ -257,6 +289,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED" && lastStatusRef.current !== "SUBSCRIBED" && readyRef.current) {
+          if (Object.values(pendingRef.current).some(v => v !== undefined && v !== null)) return;
           const res = await loadAll();
           if (res.ok && res.data) {
             const d = res.data;

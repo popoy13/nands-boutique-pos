@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from "react";
+﻿import { useState, useMemo, useRef } from "react";
 import type { Transaction } from "../data/types";
 import type { PrinterSettings } from "../data/settings";
 import DateRangeFilter, { todayISO } from "./DateRangeFilter";
@@ -31,6 +31,8 @@ const methodColor: Record<string, { bg: string; text: string }> = {
   debit: { bg: "#eff6ff", text: "#2563eb" },
   qris:  { bg: "#faf5ff", text: "#7c3aed" },
 };
+const labelOf = (m: string) => methodLabel[m] ?? methodLabel.cash;
+const colorOf = (m: string) => methodColor[m] ?? methodColor.cash;
 
 export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer, currentUser }: Props) {
   const [selected, setSelected] = useState<Transaction | null>(null);
@@ -51,16 +53,24 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
 
   const resetPage = () => setPage(1);
 
+  const deletingRef = useRef(false);
+
   const submitDeleteWithPin = async () => {
     if (!confirmDelete || !deleteReason.trim()) return;
+    if (deletingRef.current) return;
     if (!currentUser) {
+      deletingRef.current = true;
+      try {
       onDelete?.(confirmDelete, deleteReason.trim());
       setConfirmDelete(null);
       setSelected(null);
+      } finally { deletingRef.current = false; }
       return;
     }
     if (!pinVerify) { setPinVerifyError(""); setPinVerifyInput(""); setPinVerify(true); return; }
     if (!pinVerifyInput) return;
+    deletingRef.current = true;
+    try {
     const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
       ? await verifyPin(pinVerifyInput, currentUser.pin)
       : pinVerifyInput === currentUser.pin;
@@ -74,6 +84,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       setPinVerifyError("PIN Anda salah");
       setPinVerifyInput("");
     }
+    } finally { deletingRef.current = false; }
   };
 
   const filtered = useMemo(() => {
@@ -111,7 +122,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
     <div class="row"><span>Pajak 10%</span><span>${fmtNum(t.tax)}</span></div>
     <div class="row"><b><span>TOTAL</span><span>${fmtNum(t.total)}</span></b></div>
-    <div class="row"><span>Bayar (${methodLabel[t.paymentMethod]})</span><span>${fmtNum(t.payment)}</span></div>
+    <div class="row"><span>Bayar (${labelOf(t.paymentMethod)})</span><span>${fmtNum(t.payment)}</span></div>
     ${t.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
     <hr><div class="center">Terima kasih!<br>www.nandsboutique.id</div>
     </body></html>`);
@@ -214,7 +225,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.total)}</div>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: methodColor[t.paymentMethod].bg, color: methodColor[t.paymentMethod].text }}>{methodLabel[t.paymentMethod]}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: colorOf(t.paymentMethod).bg, color: colorOf(t.paymentMethod).text }}>{labelOf(t.paymentMethod)}</span>
                     </div>
                   </div>
                 </button>
@@ -293,7 +304,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                 <span>Total</span>
                 <span className="font-mono" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.total)}</span>
               </div>
-              <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({methodLabel[selected.paymentMethod]})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.payment)}</span></div>
+              <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({labelOf(selected.paymentMethod)})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.payment)}</span></div>
               {selected.change > 0 && <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Kembalian</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.change)}</span></div>}
             </div>
 

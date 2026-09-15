@@ -45,6 +45,21 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     });
   }, [transactions, filterStore, period, dateFrom, dateTo, customRange]);
 
+  const filteredDeleted = useMemo(() => {
+    const now = new Date();
+    const cutoff = period === "7d" ? new Date(now.getTime() - 7 * 86400000)
+      : period === "30d" ? new Date(now.getTime() - 30 * 86400000)
+      : new Date(0);
+    return deletedTransactions.filter(d => {
+      if (filterStore !== "all" && d.transaction?.storeId !== filterStore) return false;
+      const dt = d.deletedAt;
+      if (!customRange && dt < cutoff) return false;
+      if (dateFrom) { const from = new Date(dateFrom); from.setHours(0, 0, 0, 0); if (dt < from) return false; }
+      if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); if (dt > to) return false; }
+      return true;
+    });
+  }, [deletedTransactions, filterStore, period, dateFrom, dateTo, customRange]);
+
   const stats = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const todayTx = filtered.filter(t => t.date >= today);
@@ -154,7 +169,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     { label: "Hari Ini", value: fmt(stats.todayRevenue), sub: `${stats.todayCount} transaksi`, color: "#16a34a" },
     { label: "Rata-rata Transaksi", value: fmt(Math.round(stats.avg)), sub: "per transaksi", color: "#3b82f6" },
     { label: "Item Terjual", value: stats.itemsSold.toString(), sub: "pcs produk", color: "#7c3aed" },
-    { label: "Transaksi Dihapus", value: deletedTransactions.length.toString(), sub: `Nominal ${fmt(deletedTransactions.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
+    { label: "Transaksi Dihapus", value: filteredDeleted.length.toString(), sub: `Nominal ${fmt(filteredDeleted.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
   ];
 
   const paymentLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
@@ -197,8 +212,8 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     XLSX.utils.book_append_sheet(wb, wsTx, "Transaksi");
     XLSX.utils.book_append_sheet(wb, wsProducts, "Produk Terlaris");
 
-    if (deletedTransactions.length > 0) {
-      const deletedRows = deletedTransactions.map(d => ({
+    if (filteredDeleted.length > 0) {
+      const deletedRows = filteredDeleted.map(d => ({
         "ID Transaksi": d.transaction?.id ?? "—",
         "Tanggal Transaksi": fmtDateSafe(d.transaction?.date),
         "Toko": d.transaction?.storeName ?? "",
@@ -269,7 +284,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                     {d.revenue > 0 ? fmtK(d.revenue) : ""}
                   </div>
                 )}
-                <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{ height: `${Math.max(3, (d.revenue / maxRevenue) * 100)}px`, background: d.revenue > 0 ? "var(--accent)" : "var(--muted)", opacity: d.revenue > 0 ? 1 : 0.4 }}>
+                <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{ height: d.revenue > 0 ? `${Math.max(3, (d.revenue / maxRevenue) * 100)}px` : "2px", background: d.revenue > 0 ? "var(--accent)" : "var(--muted)", opacity: d.revenue > 0 ? 1 : 0.35 }}>
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" style={{ background: "var(--foreground)", fontSize: 10 }}>
                     {fmt(d.revenue)}<br />{d.count} trx
                   </div>
@@ -358,17 +373,17 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Transaksi Dihapus</div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
-            <span>{deletedTransactions.length} catatan</span>
+            <span>{filteredDeleted.length} catatan</span>
             <span className="font-mono font-semibold" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
-              Nominal {fmt(deletedTransactions.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}
+              Nominal {fmt(filteredDeleted.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}
             </span>
           </div>
         </div>
-        {deletedTransactions.length === 0 ? (
+        {filteredDeleted.length === 0 ? (
           <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada transaksi yang dihapus</div>
         ) : (
           <div className="flex flex-col gap-2">
-            {[...deletedTransactions].reverse().map(d => (
+            {[...filteredDeleted].reverse().map(d => (
               <div key={d.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">

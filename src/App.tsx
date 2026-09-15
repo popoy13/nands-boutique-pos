@@ -21,21 +21,32 @@ import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
 import { MENU_PAGES } from "./data/menuPages";
 import { todayISO } from "./lib/dates";
 import { getTier } from "./data/members";
+import { defaultSettings } from "./data/settings";
+import type { BrandSettings } from "./data/settings";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
 
 const SESSION_KEY = "nands-current-user-id";
 const SESSION_EXPIRY_KEY = "nands-session-expiry";
+const BRAND_CACHE_KEY = "nands-brand-cache";
 
-function MenuLoading({ logo, name }: { logo: string; name: string }) {
+function loadBrandCache(): BrandSettings {
+  try {
+    const raw = localStorage.getItem(BRAND_CACHE_KEY);
+    if (raw) return { ...defaultSettings.brand, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return defaultSettings.brand;
+}
+
+function MenuLoading({ image, name, description }: { image: string; name: string; description: string }) {
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
       <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "var(--secondary)" }}>
-        <img src={logo} alt={name} className="w-16 h-16 object-cover" />
+        <img src={image} alt={name} className="w-16 h-16 object-cover" />
         <div className="swipe-sweep" />
       </div>
-      <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>Memuat...</div>
+      <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>{description}</div>
     </div>
   );
 }
@@ -56,6 +67,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  const [brandCache] = useState(loadBrandCache);
   const page = menu;
   const [activeStore, setActiveStore] = useState(() => {
     try { return localStorage.getItem("nands-active-store") || "s1"; } catch { return "s1"; }
@@ -64,6 +76,11 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   useEffect(() => {
     try { localStorage.setItem("nands-active-store", activeStore); } catch { /* ignore */ }
   }, [activeStore]);
+
+  useEffect(() => {
+    if (!ready) return;
+    try { localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(settings.brand)); } catch { /* ignore */ }
+  }, [ready, settings.brand]);
 
   // Restore session dari {id} saja (tanpa PIN tersimpan),
   // validasi terhadap data karyawan terkini + batas sesi.
@@ -255,11 +272,11 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
         <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
-          <img src="/loadingscreen.png" alt={settings.brand?.name ?? "NAND'S BOUTIQUE"} className="w-16 h-16 object-cover" />
+          <img src={brandCache.loadingImage} alt={brandCache.name} className="w-16 h-16 object-cover" />
           <div className="swipe-sweep" />
         </div>
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>
-        <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>sabar guys loading dulu</div>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{brandCache.name}</div>
+        <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>{brandCache.loadingDescription}</div>
       </div>
     );
   }
@@ -322,7 +339,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
-        <Suspense fallback={<MenuLoading logo={settings.brand.logo} name={settings.brand.name} />}>
+        <Suspense fallback={<MenuLoading image={settings.brand.loadingImage} name={settings.brand.name} description={settings.brand.loadingDescription} />}>
         {safeTab === "pos" && (
           <POSView
             key={activeStore}

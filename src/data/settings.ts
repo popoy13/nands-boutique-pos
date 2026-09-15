@@ -12,6 +12,8 @@ export interface BrandSettings {
   logo: string;
   name: string;
   tagline: string;
+  loadingImage: string;
+  loadingDescription: string;
 }
 
 export interface BarcodeSettings {
@@ -32,7 +34,7 @@ export interface AppSettings {
 
 export const defaultSettings: AppSettings = {
   printer: { printerName: "Printer Thermal", paperWidth: 80, copies: 1, autoPrint: false },
-  brand: { logo: "logo.jpg", name: "NANDS BOUTIQUE", tagline: "Point of Sale System" },
+  brand: { logo: "logo.jpg", name: "NANDS BOUTIQUE", tagline: "Point of Sale System", loadingImage: "loadingscreen.png", loadingDescription: "sabar guys loading dulu" },
   roles: DEFAULT_ROLES,
   barcode: { mode: "camera", beep: true, vibrate: false, stripPrefix: "", stripSuffix: "", enterEndsScan: true },
 };

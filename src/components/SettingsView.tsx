@@ -29,6 +29,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
+  const loadingRef = useRef<HTMLInputElement>(null);
 
   const canOpenTab = (id: Tab): boolean => {
     const acts = permissions?.settings;
@@ -559,7 +560,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
       {tab === "brand" && (
         <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Menu Utama</div>
-          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Ubah logo, nama, dan deskripsi aplikasi.</div>
+          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Ubah logo, nama, deskripsi aplikasi, dan loading screen.</div>
 
           <div className="mb-4">
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO</label>
@@ -599,6 +600,41 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>DESKRIPSI / TAGLINE</label>
             <input type="text" value={draftBrand.tagline} onChange={e => setDraftBrand(b => ({ ...b, tagline: e.target.value }))}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
+          </div>
+
+          <div className="mb-4" style={{ paddingTop: 14, borderTop: "1.5px solid var(--border)" }}>
+            <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>GAMBAR LOADING SCREEN</label>
+            <div className="flex items-center gap-4">
+              <img src={draftBrand.loadingImage} alt="Loading screen" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
+              <div className="flex flex-col gap-2">
+                <input ref={loadingRef} type="file" accept="image/*" className="hidden"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const dataUrl = await compressImage(file, 1024, 0.85);
+                      setDraftBrand(b => ({ ...b, loadingImage: dataUrl }));
+                    } catch {
+                      showToast("Gagal membaca gambar", false);
+                    }
+                    e.target.value = "";
+                  }} />
+                <button onClick={() => loadingRef.current?.click()} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                  Unggah Gambar
+                </button>
+                <button onClick={() => setDraftBrand(b => ({ ...b, loadingImage: defaultSettings.brand.loadingImage }))}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--secondary)" }}>
+                  Reset Gambar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>DESKRIPSI LOADING SCREEN</label>
+            <input type="text" value={draftBrand.loadingDescription} onChange={e => setDraftBrand(b => ({ ...b, loadingDescription: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
+            <div className="text-[10px] mt-1" style={{ color: "var(--muted-foreground)" }}>Teks yang tampil di bawah logo saat aplikasi sedang memuat</div>
           </div>
 
           <button onClick={saveBrand} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>

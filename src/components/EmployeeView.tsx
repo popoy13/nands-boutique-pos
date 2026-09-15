@@ -302,13 +302,26 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>PIN Login (4 digit){isNew ? "" : " · kosongkan jika tidak diubah"}</label>
+            {!isNew && editing.pin && !/^\d{4}$/.test(editing.pin) && (
+              <div className="flex items-center gap-1.5 mb-2 px-3 py-2 rounded-xl" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                <span className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>PIN sudah diatur dan terenkripsi</span>
+              </div>
+            )}
+            {!isNew && /^\d{4}$/.test(editing.pin) && (
+              <div className="flex items-center gap-1.5 mb-2 px-3 py-2 rounded-xl" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                <span className="text-[11px] font-semibold" style={{ color: "#d97706" }}>PIN belum terenkripsi — akan di-hash saat disimpan</span>
+              </div>
+            )}
             <div className="relative">
               <input
+                key={editing?.id}
                 type={showPin ? "text" : "password"}
                 inputMode="numeric"
                 maxLength={4}
                 value={pinInput}
-                placeholder={isNew ? "Contoh: 7361" : "••••"}
+                placeholder={isNew ? "Contoh: 7361" : (!isNew && editing.pin && !/^\d{4}$/.test(editing.pin) ? "Kosongkan = tidak diubah" : "Contoh: 7361")}
                 onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
                 className="w-full px-3 py-2.5 pr-11 rounded-xl text-sm outline-none"
                 style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
@@ -329,10 +342,12 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             </div>
             <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
               {isNew
-                ? "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."
+                ? "PIN disimpan sebagai hash — tidak dapat dilihat kembali setelah disimpan."
                 : /^\d{4}$/.test(editing.pin)
-                  ? "PIN saat ini terbaca sebagai teks biasa (legacy). Saat disimpan, PIN akan di-hash."
-                  : "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."}
+                  ? "PIN masih teks biasa. Saat disimpan, PIN akan di-hash otomatis."
+                  : pinInput
+                    ? "PIN baru akan mengganti yang sudah ada."
+                    : "Kosongkan kolom ini jika tidak ingin mengubah PIN."}
             </div>
           </div>
 

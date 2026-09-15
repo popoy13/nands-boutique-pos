@@ -26,10 +26,10 @@ const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as
 const SESSION_KEY = "nands-current-user-id";
 const SESSION_EXPIRY_KEY = "nands-session-expiry";
 
-function MenuLoading() {
+function MenuLoading({ logo, name }: { logo: string; name: string }) {
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
-      <div className="w-10 h-10 rounded-full animate-spin shrink-0" style={{ border: "3px solid var(--muted)", borderTopColor: "var(--accent)" }} />
+      <img src={logo} alt={name} className="w-12 h-12 rounded-2xl object-cover shrink-0 animate-pulse" style={{ background: "var(--secondary)" }} />
       <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>Memuat...</div>
     </div>
   );
@@ -306,7 +306,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
-        <Suspense fallback={<MenuLoading />}>
+        <Suspense fallback={<MenuLoading logo={settings.brand.logo} name={settings.brand.name} />}>
         {safeTab === "pos" && (
           <POSView
             activeStore={activeStore}

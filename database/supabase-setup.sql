@@ -355,7 +355,7 @@ INSERT INTO attendance_records (id, employee_id, employee_name, role, store_id, 
 -- ----------------------------------------------------------------------------
 INSERT INTO app_settings (key, value) VALUES
     ('printer', '{"printerName":"Printer Thermal","paperWidth":80,"copies":1,"autoPrint":false}'),
-    ('brand',   '{"logo":"logo.jpg","name":"NAND''S BOUTIQUE","tagline":"Point of Sale System"}');
+    ('brand',   '{"logo":"logo.webp","name":"NAND''S BOUTIQUE","tagline":"Point of Sale System"}');
 
 -- ============================================================================
 -- NAND'S BOUTIQUE - SUPABASE EXTRAS

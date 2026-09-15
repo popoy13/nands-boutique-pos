@@ -29,7 +29,10 @@ const SESSION_EXPIRY_KEY = "nands-session-expiry";
 function MenuLoading({ logo, name }: { logo: string; name: string }) {
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
-      <img src={logo} alt={name} className="w-12 h-12 rounded-2xl object-cover shrink-0 animate-pulse" style={{ background: "var(--secondary)" }} />
+      <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "var(--secondary)" }}>
+        <img src={logo} alt={name} className="w-16 h-16 object-cover" />
+        <div className="swipe-sweep" />
+      </div>
       <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>Memuat...</div>
     </div>
   );
@@ -243,7 +246,10 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   if (!ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
-        <img src={settings.brand?.logo} alt={settings.brand?.name ?? "Logo"} className="w-14 h-14 rounded-2xl object-cover shrink-0" loading="eager" style={{ background: "rgba(124,58,237,0.12)" }} />
+        <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
+        <img src={settings.brand?.logo} alt={settings.brand?.name ?? "Logo"} className="w-16 h-16 object-cover" loading="eager" />
+        <div className="swipe-sweep" />
+      </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>
         <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>sabar guys loading dulu</div>
       </div>

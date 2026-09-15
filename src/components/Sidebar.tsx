@@ -59,6 +59,9 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
               <option key={s.id} value={s.id} style={{ background: "#1a1d26" }}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>
             ))}
           </select>
+          <div className="mt-2 text-center" style={{ fontSize: 9, color: "rgba(255,255,255,0.2)" }}>
+            by MUCHAMAD ALFA SYAHPUTRA · v2.0
+          </div>
         </div>
       </div>
 
@@ -104,6 +107,16 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
           );
         })}
       </nav>
+
+      {/* About Us - fixed, not editable from settings */}
+      <div className="px-4 py-3 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        <div className="text-center" style={{ color: "rgba(255,255,255,0.25)", lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.05em", marginBottom: 2 }}>{brand.name} POS</div>
+          <div style={{ fontSize: 9 }}>Sistem Kasir & Manajemen Toko Baju</div>
+          <div style={{ fontSize: 10, marginTop: 2 }}>by MUCHAMAD ALFA SYAHPUTRA</div>
+          <div style={{ fontSize: 9, marginTop: 2, color: "rgba(255,255,255,0.18)" }}>v2.0 · Lisensi MIT</div>
+        </div>
+      </div>
 
       {/* User footer */}
       <div className="px-4 py-4 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>

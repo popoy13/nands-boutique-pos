@@ -22,7 +22,6 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
   const [search, setSearch] = useState("");
   const [lockTimer, setLockTimer] = useState(0);
   const submittingRef = useRef(false);
-  const pinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (lockTimer <= 0) return;
@@ -95,52 +94,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
 
   const handleBackspace = () => { setPin(p => p.slice(0, -1)); setError(""); };
 
-  const handleHiddenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (lockTimer > 0) { e.target.value = ""; return; }
-    const clean = e.target.value.replace(/\D/g, "").slice(0, 4);
-    if (clean.length >= pin.length) {
-      clean.slice(pin.length).split("").forEach(c => handlePinInput(c));
-    } else {
-      setPin(clean);
-    }
-    e.target.value = "";
-  };
-
-  const handleHiddenKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (lockTimer > 0) { e.preventDefault(); return; }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (pin.length === 4) void submitPin(pin);
-    } else if (e.key === "Backspace") {
-      e.preventDefault();
-      handleBackspace();
-    }
-  };
-
-  useEffect(() => {
-    if (step === "pin") pinInputRef.current?.focus();
-  }, [step, pin]);
-
-  useEffect(() => {
-    if (step !== "pin") return;
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && target.tagName === "INPUT") return;
-      if (lockTimer > 0) { e.preventDefault(); return; }
-      if (/^[0-9]$/.test(e.key)) {
-        e.preventDefault();
-        handlePinInput(e.key);
-      } else if (e.key === "Backspace") {
-        e.preventDefault();
-        handleBackspace();
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (pin.length === 4) void submitPin(pin);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [step, pin, lockTimer]);
+  
 
   return (
     <div className="h-full flex items-start justify-center overflow-y-auto" style={{ background: "var(--sidebar)" }}>
@@ -243,19 +197,6 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
                 ))}
               </div>
 
-              <input
-                ref={pinInputRef}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                autoFocus
-                aria-label="Ketik PIN"
-                defaultValue=""
-                onChange={handleHiddenChange}
-                onKeyDown={handleHiddenKeyDown}
-                className="sr-only"
-              />
-
               {error && (
                 <div className="text-center text-xs font-medium mb-4 px-3 py-2 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>
                   {error}
@@ -267,7 +208,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
                 {["1","2","3","4","5","6","7","8","9","",  "0","del"].map((d, i) => (
                   <button
                     key={i}
-                    onClick={() => { d === "del" ? handleBackspace() : d ? handlePinInput(d) : null; setTimeout(() => pinInputRef.current?.focus(), 0); }}
+                    onClick={() => { d === "del" ? handleBackspace() : d ? handlePinInput(d) : null; }}
                     disabled={(!d && d !== "0") || lockTimer > 0}
                     className="h-14 rounded-2xl text-lg font-semibold transition-all duration-100 active:scale-95"
                     style={{

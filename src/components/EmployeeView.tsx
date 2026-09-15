@@ -56,6 +56,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [pinVerify, setPinVerify] = useState(false);
   const [pinVerifyInput, setPinVerifyInput] = useState("");
   const [pinVerifyError, setPinVerifyError] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
@@ -297,7 +298,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
               )}
               {canAdd && (
                 <button
-                  onClick={() => { setEditing(emptyEmployee()); setIsNew(true); setPinInput(""); setPinVerify(false); setPinVerifyInput(""); }}
+                  onClick={() => { setEditing(emptyEmployee()); setIsNew(true); setPinInput(""); setShowPin(false); setPinVerify(false); setPinVerifyInput(""); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
                   style={{ background: "var(--foreground)" }}>
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -386,7 +387,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                       </svg>
                     </button>
                     <button
-                      onClick={() => { setEditing({ ...emp }); setIsNew(false); setPinInput(""); setPinVerify(false); setPinVerifyInput(""); }}
+                      onClick={() => { setEditing({ ...emp }); setIsNew(false); setPinInput(/^\d{4}$/.test(emp.pin) ? emp.pin : ""); setShowPin(false); setPinVerify(false); setPinVerifyInput(""); }}
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                       style={{ background: "var(--secondary)" }}
                     >
@@ -469,17 +470,38 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>PIN Login (4 digit){isNew ? "" : " · kosongkan jika tidak diubah"}</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={pinInput}
-                  placeholder={isNew ? "Contoh: 7361" : "••••"}
-                  onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-                />
-                <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>Disimpan sebagai hash — tidak tersimpan sebagai teks biasa.</div>
+                <div className="relative">
+                  <input
+                    type={showPin ? "text" : "password"}
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={pinInput}
+                    placeholder={isNew ? "Contoh: 7361" : "••••"}
+                    onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
+                    className="w-full px-3 py-2.5 pr-11 rounded-xl text-sm outline-none"
+                    style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(v => !v)}
+                    aria-label={showPin ? "Sembunyikan PIN" : "Lihat PIN"}
+                    className="absolute top-1/2 -translate-y-1/2 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                    style={{ color: "var(--muted-foreground)" }}
+                  >
+                    {showPin ? (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 104.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 000 12s3 7 10 7a9.74 9.74 0 005.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
+                    ) : (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                    )}
+                  </button>
+                </div>
+                <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
+                  {isNew
+                    ? "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."
+                    : /^\d{4}$/.test(editing.pin)
+                      ? "PIN saat ini terbaca sebagai teks biasa (legacy). Saat disimpan, PIN akan di-hash."
+                      : "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."}
+                </div>
               </div>
 
               <div>

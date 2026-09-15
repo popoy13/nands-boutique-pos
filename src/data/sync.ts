@@ -432,6 +432,8 @@ export const settingsFromDB = (
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
+  // Migrasi branding lama "NET R" -> default baru (NANDS BOUTIQUE)
+  if (brand.name === "NET R") brand.name = defaultSettings.brand.name
   return {
     ...defaultSettings,
     printer: { ...defaultSettings.printer, ...printer },

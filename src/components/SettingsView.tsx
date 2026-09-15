@@ -3,6 +3,7 @@ import type { Store, Employee } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
+import { compressImage } from "../lib/compressImage";
 
 interface Props {
   settings: AppSettings;
@@ -566,12 +567,15 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               <img src={draftBrand.logo} alt="Logo" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
               <div className="flex flex-col gap-2">
                 <input ref={logoRef} type="file" accept="image/*" className="hidden"
-                  onChange={e => {
+                  onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => { setDraftBrand(b => ({ ...b, logo: ev.target?.result as string })); };
-                    reader.readAsDataURL(file);
+                    try {
+                      const dataUrl = await compressImage(file, 512, 0.82);
+                      setDraftBrand(b => ({ ...b, logo: dataUrl }));
+                    } catch {
+                      showToast("Gagal membaca gambar", false);
+                    }
                     e.target.value = "";
                   }} />
                 <button onClick={() => logoRef.current?.click()} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>

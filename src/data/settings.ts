@@ -32,7 +32,7 @@ export interface AppSettings {
 
 export const defaultSettings: AppSettings = {
   printer: { printerName: "Printer Thermal", paperWidth: 80, copies: 1, autoPrint: false },
-  brand: { logo: "logo.webp", name: "NAND'S BOUTIQUE", tagline: "Point of Sale System" },
+  brand: { logo: "logo.jpg", name: "NANDS BOUTIQUE", tagline: "Point of Sale System" },
   roles: DEFAULT_ROLES,
   barcode: { mode: "camera", beep: true, vibrate: false, stripPrefix: "", stripSuffix: "", enterEndsScan: true },
 };

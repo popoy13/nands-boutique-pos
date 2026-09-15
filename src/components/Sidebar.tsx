@@ -4,7 +4,6 @@ import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { MENU_PAGES } from "../data/menuPages";
 import Avatar from "./Avatar";
-import NetRLogo from "./NetRLogo";
 
 interface Props {
   activeTab: string;
@@ -42,7 +41,9 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       {/* Mobile header */}
       <div className="md:hidden flex flex-col shrink-0" style={{ background: "var(--sidebar)", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-2.5 px-4 pt-3 pb-2.5">
-          <NetRLogo size={32} className="rounded-lg shrink-0" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+        </div>
           <div className="flex-1 min-w-0">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
@@ -72,7 +73,9 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       {/* Brand */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-1">
-          <NetRLogo size={36} className="rounded-xl shrink-0" />
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+        </div>
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>

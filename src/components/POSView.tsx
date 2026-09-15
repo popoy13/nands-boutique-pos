@@ -44,7 +44,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const [showPayment, setShowPayment] = useState(false);
   const [pendingTxId, setPendingTxId] = useState("");
   const [showScanner, setShowScanner] = useState(false);
-  const cartRef = useRef<HTMLDivElement | null>(null);
+  const [showCartOverlay, setShowCartOverlay] = useState(false);
   const [pickerColor, setPickerColor] = useState("");
   const [pickerSize, setPickerSize] = useState<Size | "">("");
   const [voucherCode, setVoucherCode] = useState("");
@@ -195,7 +195,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const total = subtotal - discountAmt + tax;
   const pointsToEarn = Math.floor(total / 10000) * POINTS_PER_10K;
 
-  const scrollToCart = () => cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  useEffect(() => { if (cart.length === 0) setShowCartOverlay(false); }, [cart.length]);
 
   const applyVoucher = () => {
     const code = voucherCode.trim().toUpperCase();
@@ -295,6 +295,151 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const selectedVariant = showPicker ? showPicker.product.variants.find(v => v.color === pickerColor && v.size === pickerSize) : null;
   const storeStockQty = selectedVariant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
 
+  const cartPanel = (
+    <>
+      <div className="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Keranjang Belanja</div>
+        <button onClick={() => setCart([])} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
+      </div>
+
+      {/* Member section */}
+      <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        {selectedMember ? (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: TIER_COLOR[selectedMember.tier].bg }}>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: TIER_COLOR[selectedMember.tier].border, color: "white" }}>
+              {selectedMember.name.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold truncate" style={{ color: TIER_COLOR[selectedMember.tier].text }}>{selectedMember.name}</div>
+              <div className="text-xs" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.7 }}>{selectedMember.points} pts · {selectedMember.tier}</div>
+            </div>
+            <button onClick={() => setSelectedMember(null)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.6 }}>✕</button>
+          </div>
+        ) : (
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+            <input type="text" placeholder="Cari member (nama / HP)..." value={memberSearch}
+              onChange={e => { setMemberSearch(e.target.value); setShowMemberSearch(true); }}
+              onFocus={() => setShowMemberSearch(true)}
+              className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none"
+              style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
+            {showMemberSearch && memberSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-lg z-20" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                {memberSuggestions.map(m => (
+                  <button key={m.id} onClick={() => { setSelectedMember(m); setMemberSearch(""); setShowMemberSearch(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: TIER_COLOR[m.tier].bg, color: TIER_COLOR[m.tier].text }}>
+                      {m.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold truncate">{m.name}</div>
+                      <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{m.phone} · {m.points} pts</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Items */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <div className="flex flex-col gap-2">
+          {cart.map(item => (
+            <div key={item.variantSku} className="flex gap-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <img src={item.image} alt={item.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold truncate">{item.name}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{item.color} / {item.size}</div>
+                <div className="text-xs font-mono font-bold mt-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
+              </div>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button onClick={() => updateQty(item.variantSku, -1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--muted)" }}>−</button>
+                <span className="text-xs font-mono font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.quantity}</span>
+                <button onClick={() => updateQty(item.variantSku, 1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--foreground)", color: "white" }}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary & actions */}
+      <div className="border-t px-4 py-4 shrink-0" style={{ borderColor: "var(--border)" }}>
+        {/* Voucher input */}
+        <div className="mb-3">
+          {discountLabel ? (
+            <div className="flex items-center justify-between p-2.5 rounded-xl" style={{ background: "#f0fdf4" }}>
+              <span className="text-xs font-medium" style={{ color: "#16a34a" }}>🎫 {discountLabel}</span>
+              <button onClick={clearDiscount} className="text-xs" style={{ color: "#ef4444" }}>Hapus</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input type="text" placeholder="Kode voucher..." value={voucherCode}
+                onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMsg(null); }}
+                onKeyDown={e => e.key === "Enter" && applyVoucher()}
+                className="flex-1 px-3 py-2 rounded-xl text-xs outline-none font-mono"
+                style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+              <button onClick={applyVoucher} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white" }}>Pakai</button>
+            </div>
+          )}
+          {voucherMsg && !discountLabel && (
+            <div className="text-xs mt-1.5 px-2" style={{ color: voucherMsg.ok ? "#16a34a" : "#ef4444" }}>{voucherMsg.text}</div>
+          )}
+        </div>
+
+        {/* Discount manual */}
+        <div className="flex flex-col gap-1.5 mb-3">
+          <div className="flex justify-between text-sm">
+            <span style={{ color: "var(--muted-foreground)" }}>Subtotal</span>
+            <span className="font-mono font-medium" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(subtotal)}</span>
+          </div>
+          {!discountLabel && (
+            <div className="flex items-center justify-between text-sm gap-2">
+              <span style={{ color: "var(--muted-foreground)" }}>Diskon</span>
+              <div className="flex items-center gap-1.5">
+                <select value={discountType} onChange={e => setDiscountType(e.target.value as "amount" | "percent")}
+                  className="text-xs rounded-lg px-2 py-1 outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+                  <option value="amount">Rp</option>
+                  <option value="percent">%</option>
+                </select>
+                <input type="number" value={discount || ""} onChange={e => { const v = Number.isFinite(Number(e.target.value)) ? Math.max(0, Number(e.target.value)) : 0; setDiscount(discountType === "percent" ? Math.min(100, v) : v); }}
+                  placeholder="0" className="w-20 text-right text-xs font-mono outline-none px-2 py-1 rounded-lg"
+                  style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }} />
+              </div>
+            </div>
+          )}
+          {discountLabel && discountAmt > 0 && (
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "#16a34a" }}>Diskon ({discountLabel})</span>
+              <span className="font-mono" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>-{fmt(discountAmt)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm">
+            <span style={{ color: "var(--muted-foreground)" }}>Pajak (10%)</span>
+            <span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(tax)}</span>
+          </div>
+          {selectedMember && pointsToEarn > 0 && (
+            <div className="flex justify-between text-xs" style={{ color: "#16a34a" }}>
+              <span>+Poin member</span>
+              <span className="font-mono font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>+{pointsToEarn} pts</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold pt-2 border-t mt-1" style={{ borderColor: "var(--border)" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15 }}>Total</span>
+            <span className="font-mono text-base" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</span>
+          </div>
+        </div>
+
+        <button disabled={cart.length === 0} onClick={() => { setShowCartOverlay(false); setPendingTxId(generateId(activeStore)); setShowPayment(true); }}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
+          style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: cart.length > 0 ? "var(--foreground)" : "var(--muted)", color: cart.length > 0 ? "white" : "var(--muted-foreground)" }}>
+          Lanjut Pembayaran
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
       {/* Catalog */}
@@ -357,150 +502,21 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
         </div>
       </div>
 
-      {/* Cart */}
+      {/* Cart (desktop sidebar) */}
       {cart.length > 0 && (
-      <div ref={cartRef} className="flex flex-col shrink-0 w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-        <div className="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Keranjang Belanja</div>
-          <button onClick={() => setCart([])} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
+        <div className="hidden lg:flex flex-col shrink-0 w-[340px] h-full overflow-hidden" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          {cartPanel}
         </div>
+      )}
 
-        {/* Member section */}
-        <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
-          {selectedMember ? (
-            <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: TIER_COLOR[selectedMember.tier].bg }}>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: TIER_COLOR[selectedMember.tier].border, color: "white" }}>
-                {selectedMember.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold truncate" style={{ color: TIER_COLOR[selectedMember.tier].text }}>{selectedMember.name}</div>
-                <div className="text-xs" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.7 }}>{selectedMember.points} pts · {selectedMember.tier}</div>
-              </div>
-              <button onClick={() => setSelectedMember(null)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.6 }}>✕</button>
-            </div>
-          ) : (
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              <input type="text" placeholder="Cari member (nama / HP)..." value={memberSearch}
-                onChange={e => { setMemberSearch(e.target.value); setShowMemberSearch(true); }}
-                onFocus={() => setShowMemberSearch(true)}
-                className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none"
-                style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
-              {showMemberSearch && memberSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-lg z-20" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                  {memberSuggestions.map(m => (
-                    <button key={m.id} onClick={() => { setSelectedMember(m); setMemberSearch(""); setShowMemberSearch(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: TIER_COLOR[m.tier].bg, color: TIER_COLOR[m.tier].text }}>
-                        {m.name.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold truncate">{m.name}</div>
-                        <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{m.phone} · {m.points} pts</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Items */}
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
-          <div className="flex flex-col gap-2">
-            {cart.map(item => (
-              <div key={item.variantSku} className="flex gap-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
-                <img src={item.image} alt={item.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold truncate">{item.name}</div>
-                  <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{item.color} / {item.size}</div>
-                  <div className="text-xs font-mono font-bold mt-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <button onClick={() => updateQty(item.variantSku, -1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--muted)" }}>−</button>
-                  <span className="text-xs font-mono font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.quantity}</span>
-                  <button onClick={() => updateQty(item.variantSku, 1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--foreground)", color: "white" }}>+</button>
-                </div>
-              </div>
-            ))}
+      {/* Cart (mobile floating overlay) */}
+      {showCartOverlay && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setShowCartOverlay(false)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 mb-1 shrink-0" style={{ background: "var(--border)" }} />
+            {cartPanel}
           </div>
-        </div>
-
-        {/* Summary & actions */}
-        <div className="border-t px-4 py-4 shrink-0" style={{ borderColor: "var(--border)" }}>
-          {/* Voucher input */}
-          <div className="mb-3">
-            {discountLabel ? (
-              <div className="flex items-center justify-between p-2.5 rounded-xl" style={{ background: "#f0fdf4" }}>
-                <span className="text-xs font-medium" style={{ color: "#16a34a" }}>🎫 {discountLabel}</span>
-                <button onClick={clearDiscount} className="text-xs" style={{ color: "#ef4444" }}>Hapus</button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input type="text" placeholder="Kode voucher..." value={voucherCode}
-                  onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMsg(null); }}
-                  onKeyDown={e => e.key === "Enter" && applyVoucher()}
-                  className="flex-1 px-3 py-2 rounded-xl text-xs outline-none font-mono"
-                  style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-                <button onClick={applyVoucher} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white" }}>Pakai</button>
-              </div>
-            )}
-            {voucherMsg && !discountLabel && (
-              <div className="text-xs mt-1.5 px-2" style={{ color: voucherMsg.ok ? "#16a34a" : "#ef4444" }}>{voucherMsg.text}</div>
-            )}
           </div>
-
-          {/* Discount manual */}
-          <div className="flex flex-col gap-1.5 mb-3">
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "var(--muted-foreground)" }}>Subtotal</span>
-              <span className="font-mono font-medium" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(subtotal)}</span>
-            </div>
-            {!discountLabel && (
-              <div className="flex items-center justify-between text-sm gap-2">
-                <span style={{ color: "var(--muted-foreground)" }}>Diskon</span>
-                <div className="flex items-center gap-1.5">
-                  <select value={discountType} onChange={e => setDiscountType(e.target.value as "amount" | "percent")}
-                    className="text-xs rounded-lg px-2 py-1 outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
-                    <option value="amount">Rp</option>
-                    <option value="percent">%</option>
-                  </select>
-                  <input type="number" value={discount || ""} onChange={e => { const v = Number.isFinite(Number(e.target.value)) ? Math.max(0, Number(e.target.value)) : 0; setDiscount(discountType === "percent" ? Math.min(100, v) : v); }}
-                    placeholder="0" className="w-20 text-right text-xs font-mono outline-none px-2 py-1 rounded-lg"
-                    style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }} />
-                </div>
-              </div>
-            )}
-            {discountLabel && discountAmt > 0 && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: "#16a34a" }}>Diskon ({discountLabel})</span>
-                <span className="font-mono" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>-{fmt(discountAmt)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "var(--muted-foreground)" }}>Pajak (10%)</span>
-              <span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(tax)}</span>
-            </div>
-            {selectedMember && pointsToEarn > 0 && (
-              <div className="flex justify-between text-xs" style={{ color: "#16a34a" }}>
-                <span>+Poin member</span>
-                <span className="font-mono font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>+{pointsToEarn} pts</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold pt-2 border-t mt-1" style={{ borderColor: "var(--border)" }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15 }}>Total</span>
-              <span className="font-mono text-base" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</span>
-            </div>
-          </div>
-
-          <button disabled={cart.length === 0} onClick={() => { setPendingTxId(generateId(activeStore)); setShowPayment(true); }}
-            className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
-            style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: cart.length > 0 ? "var(--foreground)" : "var(--muted)", color: cart.length > 0 ? "white" : "var(--muted-foreground)" }}>
-            Lanjut Pembayaran
-          </button>
-        </div>
-      </div>
       )}
 
       {/* Variant Picker */}
@@ -592,9 +608,9 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
               <div className="text-[11px] font-medium" style={{ color: "var(--muted-foreground)" }}>{cart.reduce((s, i) => s + i.quantity, 0)} item</div>
               <div className="text-sm font-mono font-bold truncate" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</div>
             </div>
-            <button onClick={scrollToCart} className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
+            <button onClick={() => setShowCartOverlay(true)} className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
               style={{ background: "var(--foreground)", fontFamily: "'Outfit', sans-serif" }}>
-              Lanjut ke Keranjang
+              Lihat Keranjang
             </button>
           </div>
         </div>

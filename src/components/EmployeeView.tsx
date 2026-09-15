@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
@@ -48,6 +48,13 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
   const [editing, setEditing] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editing]);
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);

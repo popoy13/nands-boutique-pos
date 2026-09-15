@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef } from "react";
+﻿import { useState, useMemo, useRef, useEffect } from "react";
 import type { ChangeEvent } from "react";
 import type { Product, ProductVariant, Size } from "../data/types";
 import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
@@ -155,6 +155,13 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [editing, setEditing] = useState<Product | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editing]);
   const [isNew, setIsNew] = useState(false);
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
   const [toast, setToast] = useState("");

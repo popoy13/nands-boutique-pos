@@ -173,6 +173,32 @@ export const attToDB = (a: AttendanceRecord) => ({
 
 /* ---------------- transactions ---------------- */
 
+const sanitizeItems = (raw: unknown): Transaction["items"] => {
+  if (!Array.isArray(raw)) return []
+  const out: Transaction["items"] = []
+  for (const it of raw) {
+    if (!it || typeof it !== "object") continue
+    const row = it as Record<string, unknown>
+    const quantity = Number(row.quantity ?? 1)
+    const price = Number(row.price ?? 0)
+    const subtotal = Number.isFinite(Number(row.subtotal)) ? Number(row.subtotal) : quantity * price
+    const item: Transaction["items"][number] = {
+      productId: s(row.productId) || s(row.product_id),
+      variantSku: s(row.variantSku) || s(row.variant_sku),
+      name: s(row.name),
+      brand: s(row.brand),
+      size: (s(row.size) || "M") as Transaction["items"][number]["size"],
+      color: s(row.color) || "Standar",
+      price,
+      quantity,
+      subtotal,
+      image: row.image === undefined || row.image === null ? "" : String(row.image),
+    }
+    if (item.variantSku && item.name) out.push(item)
+  }
+  return out
+}
+
 export const trxFromDB = (r: Record<string, unknown>): Transaction => ({
   id: s(r.id),
   date: d(r.transaction_date) ?? new Date(),
@@ -180,7 +206,7 @@ export const trxFromDB = (r: Record<string, unknown>): Transaction => ({
   storeName: s(r.store_name),
   cashierId: s(r.cashier_id),
   cashierName: s(r.cashier_name),
-  items: Array.isArray(r.items) ? r.items as Transaction["items"] : [],
+  items: sanitizeItems(r.items),
   subtotal: n(r.subtotal),
   discount: n(r.discount),
   discountType: (s(r.discount_type) || "amount") as Transaction["discountType"],

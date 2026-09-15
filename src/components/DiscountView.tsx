@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Discount } from "../data/types";
 import { todayISO } from "../lib/dates";
 import Pagination from "./Pagination";
@@ -45,6 +45,13 @@ const TYPE_COLOR: Record<string, { bg: string; text: string }> = {
 
 export default function DiscountView({ discounts, stores, onSave, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [editing, setEditing] = useState<Discount | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editing]);
   const [isNew, setIsNew] = useState(false);
   const [filterType, setFilterType] = useState("all");
   const [toast, setToast] = useState("");

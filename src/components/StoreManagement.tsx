@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import type { Store } from "../data/types";
 
 interface Props {
@@ -13,6 +13,13 @@ const empty = (): Store => ({ id: `s-${Date.now()}`, name: "NAND'S BOUTIQUE - ",
 
 export default function StoreManagement({ stores, onSave, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [editing, setEditing] = useState<Store | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editing]);
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);

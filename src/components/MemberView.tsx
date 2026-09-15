@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import type { Member } from "../data/types";
 import { TIER_COLOR, getTier, generateMemberId } from "../data/members";
 import Pagination from "./Pagination";
@@ -35,6 +35,13 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
   const [filterTier, setFilterTier] = useState("all");
   const [filterStore, setFilterStore] = useState("all");
   const [editing, setEditing] = useState<Member | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [editing]);
   const [isNew, setIsNew] = useState(false);
   const [toast, setToast] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);

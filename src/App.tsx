@@ -182,7 +182,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
         }),
       })),
     })));
-    setTimeout(() => { void flush().finally(() => { location.href = MENU_PAGES.history; }); }, 120);
+    setTimeout(() => { void flush().catch(e => console.warn("[sync] flush transaksi gagal:", e)); }, 200);
   };
 
   const handleUpdateStock = (productId: string, sku: string, storeId: string, qty: number) => {

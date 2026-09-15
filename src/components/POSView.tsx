@@ -5,6 +5,7 @@ import { generateId } from "../data/transactions";
 import { POINTS_PER_10K, getTier, TIER_COLOR } from "../data/members";
 import { cleanBarcode, playScanFeedback } from "../lib/barcode";
 import { todayISO } from "../lib/dates";
+import { MENU_PAGES } from "../data/menuPages";
 import PaymentModal from "./PaymentModal";
 import BarcodeScanModal from "./BarcodeScanModal";
 import type { ScanResult } from "./BarcodeScanModal";
@@ -281,7 +282,12 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     setVoucherMsg(null);
     setSelectedMember(null);
     setPendingTxId("");
+  };
+
+  const handleTransaksiLagi = () => { setShowPayment(false); };
+  const handleFinishPay = () => {
     setShowPayment(false);
+    location.href = MENU_PAGES.history;
   };
 
   const pickerColors = showPicker ? [...new Set(showPicker.product.variants.map(v => v.color))] : [];
@@ -571,7 +577,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           memberName={selectedMember?.name}
           pointsEarned={selectedMember ? pointsToEarn : 0}
           onPay={handlePay}
-          onClose={() => setShowPayment(false)}
+          onClose={handleTransaksiLagi}
+          onFinish={handleFinishPay}
         />
       )}
     {showScanner && (

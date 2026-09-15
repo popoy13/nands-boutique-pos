@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useRef } from "react";
 import type { CartItem } from "../data/types";
 import type { PrinterSettings } from "../data/settings";
 import { escapeHtml } from "../lib/sanitize";
@@ -23,6 +23,7 @@ interface Props {
   pointsEarned?: number;
   onPay: (payment: number, method: "cash" | "debit" | "qris") => void;
   onClose: () => void;
+  onFinish: () => void;
 }
 
 type Method = "cash" | "debit" | "qris";
@@ -67,23 +68,27 @@ const QrisIcon = ({ size = 26 }: { size?: number }) => (
   </svg>
 );
 
-export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, total, storeName, cashierName, brandName, printer, memberName, pointsEarned, onPay, onClose }: Props) {
+export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, total, storeName, cashierName, brandName, printer, memberName, pointsEarned, onPay, onClose, onFinish }: Props) {
   const [method, setMethod] = useState<Method>("cash");
   const [payment, setPayment] = useState(total);
   const [success, setSuccess] = useState(false);
+  const [successMeta, setSuccessMeta] = useState<{ txId: string; memberName?: string; pointsEarned?: number } | null>(null);
   const [txDate] = useState(new Date());
+  const paidRef = useRef(false);
 
   const change = Math.max(0, payment - total);
   const isValid = method !== "cash" || payment >= total;
 
   const handleConfirm = () => {
-    if (!isValid) return;
+    if (!isValid || paidRef.current) return;
+    paidRef.current = true;
     setSuccess(true);
+    setSuccessMeta({ txId, memberName, pointsEarned });
     const actualPayment = method !== "cash" ? total : payment;
     if (printer.autoPrint) {
       setTimeout(() => { const w = buildPrintWindow(); if (w) { w.print(); } }, 900);
     }
-    setTimeout(() => onPay(actualPayment, method), 1600);
+    onPay(actualPayment, method);
   };
 
   const buildPrintWindow = () => {
@@ -136,9 +141,9 @@ const methodData = {
               <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
             </div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 20 }} className="mb-1">Pembayaran Berhasil!</div>
-            <div className="font-mono text-xs mb-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{txId}</div>
-            {memberName && pointsEarned && pointsEarned > 0 && (
-              <div className="text-sm mb-4" style={{ color: "#16a34a" }}>+{pointsEarned} poin untuk {memberName}</div>
+            <div className="font-mono text-xs mb-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{successMeta?.txId ?? txId}</div>
+            {successMeta?.memberName && successMeta.pointsEarned && successMeta.pointsEarned > 0 && (
+              <div className="text-sm mb-4" style={{ color: "#16a34a" }}>+{successMeta.pointsEarned} poin untuk {successMeta.memberName}</div>
             )}
             <button onClick={handlePrint}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mt-4"
@@ -146,6 +151,18 @@ const methodData = {
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               Cetak Struk
             </button>
+            <div className="flex gap-3 w-full mt-3">
+              <button onClick={onFinish}
+                className="flex-1 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-150"
+                style={{ fontFamily: "'Outfit', sans-serif", background: "var(--muted)", color: "var(--foreground)" }}>
+                Tutup
+              </button>
+              <button onClick={onClose}
+                className="flex-1 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-150"
+                style={{ fontFamily: "'Outfit', sans-serif", background: "var(--foreground)" }}>
+                Transaksi Lagi
+              </button>
+            </div>
           </div>
         ) : (
           <>

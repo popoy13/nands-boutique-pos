@@ -4,11 +4,11 @@ export type UserRole = "admin" | "manager" | "manager_operasional" | "kasir" | "
 export type MemberTier = "bronze" | "silver" | "gold" | "platinum";
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin:   ["pos", "history", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "settings"],
-  manager: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "settings"],
-  manager_operasional: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "settings"],
-  kasir:   ["pos", "history", "report", "inventory", "attendance"],
-  staff:   ["inventory", "attendance"],
+  admin:   ["pos", "history", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "attendanceHistory", "settings"],
+  manager: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  manager_operasional: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  kasir:   ["pos", "history", "report", "inventory", "attendance", "attendanceHistory"],
+  staff:   ["inventory", "attendance", "attendanceHistory"],
 };
 
 export interface StoreStock {

@@ -24,8 +24,12 @@ const BUILTIN_COLORS: Record<string, string> = {
   staff: "#16a34a",
 };
 
-export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] =>
-  (roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [];
+export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] => {
+  const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
+  // Migrasi: role yang punya akses Absensi otomatis mendapat menu Riwayat Absensi.
+  if (menus.includes("attendance") && !menus.includes("attendanceHistory")) menus.push("attendanceHistory");
+  return menus;
+};
 
 export const getRoleLabel = (role: string, roles?: Record<string, RoleConfig>): string =>
   roles?.[role]?.label ?? DEFAULT_ROLES[role]?.label ?? role;
@@ -44,6 +48,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
   { id: "discount", label: "Diskon" },
   { id: "member", label: "Member" },
   { id: "attendance", label: "Absensi" },
+  { id: "attendanceHistory", label: "Riwayat Absensi" },
   { id: "settings", label: "Setelan" },
 ];
 
@@ -55,6 +60,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
   discount: ["add", "edit", "delete"],
   member: ["add", "edit", "delete"],
   attendance: ["view_all", "delete"],
+  attendanceHistory: ["view_all", "delete"],
   settings: ["printer", "attendance", "roles", "barcode", "brand"],
 };
 
@@ -74,6 +80,7 @@ export const ACTION_LABELS: Record<string, Record<string, string>> = {
   discount: { add: "Tambah diskon", edit: "Edit diskon", delete: "Hapus diskon" },
   member: { add: "Tambah member", edit: "Edit member", delete: "Hapus member" },
   attendance: { view_all: "Lihat riwayat semua karyawan", delete: "Hapus absensi" },
+  attendanceHistory: { view_all: "Lihat riwayat semua karyawan", delete: "Hapus absensi" },
   settings: {
     printer: "Tab Printer",
     attendance: "Tab Jam Operasional",
@@ -95,20 +102,20 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: allActionsFor(MENU_ITEMS.map(m => m.id)),
   manager: {
     ...allActionsFor(["history", "product", "employee", "settings"]),
-    store: [], discount: [], member: [], attendance: ["view_all"],
+    store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   manager_operasional: {
     ...allActionsFor(["history", "product", "employee", "settings"]),
-    store: [], discount: [], member: [], attendance: ["view_all"],
+    store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   kasir: {
-    history: ["print"], attendance: [],
+    history: ["print"], attendance: [], attendanceHistory: [],
     store: [], discount: [], member: [], settings: [], product: [], employee: [], pos: [], report: [], inventory: [],
   },
   staff: {
-    attendance: [],
+    attendance: [], attendanceHistory: [],
     history: [], store: [], discount: [], member: [], settings: [], product: [], employee: [], pos: [], report: [], inventory: [],
   },
 };

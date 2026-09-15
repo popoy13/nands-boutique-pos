@@ -85,9 +85,6 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
     setSuccess(true);
     setSuccessMeta({ txId, memberName, pointsEarned });
     const actualPayment = method !== "cash" ? total : payment;
-    if (printer.autoPrint) {
-      setTimeout(() => { const w = buildPrintWindow(); if (w) { w.print(); } }, 900);
-    }
     onPay(actualPayment, method);
   };
 

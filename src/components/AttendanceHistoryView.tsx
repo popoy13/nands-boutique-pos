@@ -26,7 +26,8 @@ interface Props {
 }
 
 export default function AttendanceHistoryView({ records, stores, employees, currentUser, onDelete, roles, canViewAll }: Props) {
-  const [filterDate, setFilterDate] = useState(todayISO());
+  const [datePreset, setDatePreset] = useState<"today" | "week" | "custom" | "all">("today");
+  const [filterDate, setFilterDate] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterEmp, setFilterEmp] = useState("all");
   const [page, setPage] = useState(1);
@@ -39,6 +40,14 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const viewAll = canViewAll === true;
+  const today = todayISO();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
+  const inDateRange = (r: AttendanceRecord) => {
+    if (datePreset === "today") return r.date === today;
+    if (datePreset === "week") return r.date >= weekStart && r.date <= today;
+    if (datePreset === "custom") return r.date === filterDate;
+    return true;
+  };
 
   const openHourFor = (storeId: string) => stores.find(s => s.id === storeId)?.openHour ?? "08:00";
 
@@ -52,11 +61,11 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
   const filtered = useMemo(() => {
     return records
       .filter(r => viewAll || r.employeeId === currentUser.id)
-      .filter(r => !filterDate || r.date === filterDate)
+      .filter(inDateRange)
       .filter(r => filterStore === "all" || r.storeId === filterStore)
       .filter(r => filterEmp === "all" || r.employeeId === filterEmp)
       .sort((a, b) => (a.date + a.clockIn).localeCompare(b.date + b.clockIn) * -1);
-  }, [records, viewAll, currentUser.id, filterDate, filterStore, filterEmp]);
+  }, [records, viewAll, currentUser.id, datePreset, filterDate, filterStore, filterEmp]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -203,20 +212,29 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               Export
             </button>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => { setDatePreset("today"); resetPage(); }}
+                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: datePreset === "today" ? "var(--accent)" : "var(--card)", color: datePreset === "today" ? "white" : "var(--muted-foreground)", border: `1px solid ${datePreset === "today" ? "var(--accent)" : "var(--border)"}` }}>
+                Hari Ini
+              </button>
+              <button onClick={() => { setDatePreset("week"); resetPage(); }}
+                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: datePreset === "week" ? "var(--accent)" : "var(--card)", color: datePreset === "week" ? "white" : "var(--muted-foreground)", border: `1px solid ${datePreset === "week" ? "var(--accent)" : "var(--border)"}` }}>
+                7 Hari Terakhir
+              </button>
+              <button onClick={() => { setDatePreset("all"); resetPage(); }}
+                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: datePreset === "all" ? "var(--accent)" : "var(--card)", color: datePreset === "all" ? "white" : "var(--muted-foreground)", border: `1px solid ${datePreset === "all" ? "var(--accent)" : "var(--border)"}` }}>
+                Semua Tanggal
+              </button>
+            </div>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] font-semibold leading-none" style={{ color: "var(--muted-foreground)" }}>TANGGAL</span>
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={filterDate} onChange={e => { setFilterDate(e.target.value); resetPage(); }}
-                  className="text-xs rounded-xl px-2.5 py-2 outline-none"
-                  style={{ background: "var(--card)", border: `1px solid ${filterDate ? "var(--accent)" : "var(--border)"}` }} />
-                {filterDate && (
-                  <button onClick={() => { setFilterDate(""); resetPage(); }}
-                    className="px-2.5 py-2 rounded-xl text-xs font-semibold"
-                    style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
-                    Semua
-                  </button>
-                )}
-              </div>
+              <input type="date" value={datePreset === "custom" ? filterDate : ""}
+                onChange={e => { setDatePreset("custom"); setFilterDate(e.target.value); resetPage(); }}
+                className="text-xs rounded-xl px-2.5 py-2 outline-none"
+                style={{ background: "var(--card)", border: `1px solid ${datePreset === "custom" ? "var(--accent)" : "var(--border)"}` }} />
             </label>
             <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>

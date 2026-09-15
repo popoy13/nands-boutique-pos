@@ -4,6 +4,7 @@ import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { MENU_PAGES } from "../data/menuPages";
 import Avatar from "./Avatar";
+import NetRLogo from "./NetRLogo";
 
 interface Props {
   activeTab: string;
@@ -41,7 +42,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       {/* Mobile header */}
       <div className="md:hidden flex flex-col shrink-0" style={{ background: "var(--sidebar)", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-2.5 px-4 pt-3 pb-2.5">
-          <img src={brand.logo} alt={`Logo ${brand.name}`} className="w-8 h-8 rounded-lg object-cover shrink-0" style={{ background: "var(--accent)" }} />
+          <NetRLogo size={32} className="rounded-lg shrink-0" />
           <div className="flex-1 min-w-0">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
@@ -71,7 +72,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       {/* Brand */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-1">
-          <img src={brand.logo} alt={`Logo ${brand.name}`} className="w-9 h-9 rounded-xl object-cover shrink-0" style={{ background: "var(--accent)" }} />
+          <NetRLogo size={36} className="rounded-xl shrink-0" />
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
@@ -189,7 +190,7 @@ export function MobileBottomNav({ allowed, activeTab }: { allowed: string[]; act
         {more.length > 0 && (
           <button onClick={() => setOpen(true)}
             className="flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 px-1 transition-all"
-            style={{ color: "rgba(156,163,175,0.7)", borderTop: "2px solid transparent" }}>
+            style={{ color: more.some(m => m.id === activeTab) ? "var(--accent)" : "rgba(156,163,175,0.7)", borderTop: `2px solid ${more.some(m => m.id === activeTab) ? "var(--accent)" : "transparent"}`, background: more.some(m => m.id === activeTab) ? "rgba(124,58,237,0.08)" : "transparent" }}>
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5h.01M12 12h.01M12 19h.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
             <span className="text-[9px] font-medium">Lainnya</span>
           </button>

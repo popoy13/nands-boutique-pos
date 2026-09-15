@@ -177,15 +177,19 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   }, [barcode.mode, barcode, showPayment]);
 
   const updateQty = (sku: string, delta: number) => {
-    setCart(prev => prev.map(i => {
-      if (i.variantSku !== sku) return i;
-      const newQty = i.quantity + delta;
+    setCart(prev => prev.flatMap(i => {
+      if (i.variantSku !== sku) return [i];
+      if (delta < 0) {
+        const next = i.quantity + delta;
+        return next <= 0 ? [] : [{ ...i, quantity: next, subtotal: next * i.price }];
+      }
       const product = products.find(p => p.variants.some(v => v.sku === sku));
       const variant = product?.variants.find(v => v.sku === sku);
       const maxQty = variant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
-      const cappedQty = Math.min(newQty, maxQty);
-      return { ...i, quantity: cappedQty, subtotal: cappedQty * i.price };
-    }).filter(i => i.quantity > 0));
+      if (maxQty <= i.quantity) return [i];
+      const next = Math.min(i.quantity + delta, maxQty);
+      return [{ ...i, quantity: next, subtotal: next * i.price }];
+    }));
   };
 
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
@@ -299,7 +303,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     <>
       <div className="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Keranjang Belanja</div>
-        <button onClick={() => setCart([])} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
+        <button onClick={() => { setCart([]); clearDiscount(); setSelectedMember(null); setMemberSearch(""); setShowMemberSearch(false); }} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
       </div>
 
       {/* Member section */}
@@ -512,7 +516,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       {/* Cart (mobile floating overlay) */}
       {showCartOverlay && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setShowCartOverlay(false)} style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)", maxHeight: "85vh" }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mt-2.5 mb-1 shrink-0" style={{ background: "var(--border)" }} />
             {cartPanel}
           </div>

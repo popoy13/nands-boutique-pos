@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
+import NetRLogo from "./components/NetRLogo";
 
 const POSView = lazy(() => import("./components/POSView"));
 const HistoryView = lazy(() => import("./components/HistoryView"));
@@ -101,6 +102,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
           localStorage.removeItem(SESSION_EXPIRY_KEY);
         } catch { /* ignore */ }
       }, IDLE_TIMEOUT_MS);
+      try { localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + IDLE_TIMEOUT_MS)); } catch { /* ignore */ }
     };
     IDLE_EVENTS.forEach(ev => window.addEventListener(ev, reset, { passive: true }));
     reset();
@@ -254,7 +256,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
         <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
-        <img src={settings.brand?.logo} alt={settings.brand?.name ?? "Logo"} className="w-16 h-16 object-cover" loading="eager" />
+        <NetRLogo size={64} className="rounded-2xl" />
         <div className="swipe-sweep" />
       </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>

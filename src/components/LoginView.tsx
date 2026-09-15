@@ -4,6 +4,7 @@ import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { verifyPin, hashPin, isLocked, recordFailedAttempt, clearAttempts } from "../lib/auth";
 import Avatar from "./Avatar";
+import NetRLogo from "./NetRLogo";
 
 interface Props {
   employees: Employee[];
@@ -82,14 +83,15 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
     }
   };
 
+  useEffect(() => {
+    if (step !== "pin" || pin.length !== 4 || submittingRef.current) return;
+    const delayTimer = setTimeout(() => { void submitPin(pin); }, 200);
+    return () => clearTimeout(delayTimer);
+  }, [pin]);
+
   const handlePinInput = (digit: string) => {
-    if (!selected || lockTimer > 0) return;
-    setPin(prev => {
-      if (prev.length >= 4) return prev;
-      const next = prev + digit;
-      if (next.length === 4) setTimeout(() => { void submitPin(next); }, 200);
-      return next;
-    });
+    if (!selected || lockTimer > 0 || pin.length >= 4) return;
+    setPin(pin + digit);
   };
 
   const handleBackspace = () => { setPin(p => p.slice(0, -1)); setError(""); };
@@ -108,7 +110,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-3">
-            <img src={brand.logo} alt={`Logo ${brand.name}`} className="w-12 h-12 rounded-2xl object-cover" style={{ background: "var(--accent)" }} />
+            <NetRLogo size={48} className="rounded-2xl" />
           </div>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 26, color: "white", letterSpacing: "0.04em" }}>
             {brand.name}

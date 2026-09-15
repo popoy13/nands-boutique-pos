@@ -72,8 +72,13 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
   const [method, setMethod] = useState<Method>("cash");
   const [payment, setPayment] = useState(total);
   const [success, setSuccess] = useState(false);
-  const [successMeta, setSuccessMeta] = useState<{ txId: string; memberName?: string; pointsEarned?: number } | null>(null);
-  const [txDate] = useState(new Date());
+  const [receiptData, setReceiptData] = useState<{
+    txId: string; txDate: Date; cart: CartItem[];
+    subtotal: number; discountAmt: number; tax: number; total: number;
+    method: Method; payment: number; change: number;
+    storeName: string; cashierName: string; brandName: string;
+    memberName?: string; pointsEarned?: number;
+  } | null>(null);
   const paidRef = useRef(false);
 
   const change = Math.max(0, payment - total);
@@ -82,31 +87,38 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
   const handleConfirm = () => {
     if (!isValid || paidRef.current) return;
     paidRef.current = true;
-    setSuccess(true);
-    setSuccessMeta({ txId, memberName, pointsEarned });
     const actualPayment = method !== "cash" ? total : payment;
+    const actualChange = Math.max(0, actualPayment - total);
+    setReceiptData({
+      txId, txDate: new Date(), cart: [...cart],
+      subtotal, discountAmt, tax, total,
+      method, payment: actualPayment, change: actualChange,
+      storeName, cashierName, brandName,
+      memberName, pointsEarned,
+    });
+    setSuccess(true);
     onPay(actualPayment, method);
   };
 
-  const buildPrintWindow = () => {
+  const buildPrintWindow = (r: NonNullable<typeof receiptData>) => {
     const w = window.open("", "_blank", "width=320,height=700");
     if (!w) return null;
     const width = printer.paperWidth || 80;
     const font = width <= 58 ? 8 : width === 72 ? 10 : 11;
     const body = `
-    <div class="center"><b>${escapeHtml(brandName)}</b><br>${escapeHtml((storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
+    <div class="center"><b>${escapeHtml(r.brandName)}</b><br>${escapeHtml((r.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
     <hr>
-    <div>No: ${escapeHtml(txId)}</div><div>Tgl: ${txDate.toLocaleString("id-ID")}</div><div>Kasir: ${escapeHtml(cashierName)}</div>
-    ${memberName ? `<div>Member: ${escapeHtml(memberName)}${pointsEarned ? ` (+${pointsEarned} pts)` : ""}</div>` : ""}
+    <div>No: ${escapeHtml(r.txId)}</div><div>Tgl: ${r.txDate.toLocaleString("id-ID")}</div><div>Kasir: ${escapeHtml(r.cashierName)}</div>
+    ${r.memberName ? `<div>Member: ${escapeHtml(r.memberName)}${r.pointsEarned ? ` (+${r.pointsEarned} pts)` : ""}</div>` : ""}
     <hr>
-    ${cart.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
+    ${r.cart.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
-    <div class="row"><span>Subtotal</span><span>${fmtNum(subtotal)}</span></div>
-    ${discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(discountAmt)}</span></div>` : ""}
-    <div class="row"><span>Pajak 10%</span><span>${fmtNum(tax)}</span></div>
-    <div class="row"><b><span>TOTAL</span><span>${fmtNum(total)}</span></b></div>
-    <div class="row"><span>Bayar (${method === "cash" ? "Tunai" : method === "debit" ? "Debit" : "QRIS"})</span><span>${fmtNum(method === "cash" ? payment : total)}</span></div>
-    ${method === "cash" && change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(change)}</span></div>` : ""}
+    <div class="row"><span>Subtotal</span><span>${fmtNum(r.subtotal)}</span></div>
+    ${r.discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(r.discountAmt)}</span></div>` : ""}
+    <div class="row"><span>Pajak 10%</span><span>${fmtNum(r.tax)}</span></div>
+    <div class="row"><b><span>TOTAL</span><span>${fmtNum(r.total)}</span></b></div>
+    <div class="row"><span>Bayar (${r.method === "cash" ? "Tunai" : r.method === "debit" ? "Debit" : "QRIS"})</span><span>${fmtNum(r.payment)}</span></div>
+    ${r.method === "cash" && r.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(r.change)}</span></div>` : ""}
     <hr><div class="center">Terima kasih telah berbelanja!<br>www.nandsboutique.id</div>`;
     const copies = Math.max(1, printer.copies || 1);
     const pages = Array.from({ length: copies }, () => `<div style="page-break-after:always;">${body}</div>`).join("");
@@ -118,7 +130,9 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
   };
 
   const handlePrint = () => {
-    const w = buildPrintWindow();
+    const r = receiptData;
+    if (!r) return;
+    const w = buildPrintWindow(r);
     if (!w) return;
     w.print();
   };
@@ -138,9 +152,9 @@ const methodData = {
               <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
             </div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 20 }} className="mb-1">Pembayaran Berhasil!</div>
-            <div className="font-mono text-xs mb-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{successMeta?.txId ?? txId}</div>
-            {successMeta?.memberName && successMeta.pointsEarned && successMeta.pointsEarned > 0 && (
-              <div className="text-sm mb-4" style={{ color: "#16a34a" }}>+{successMeta.pointsEarned} poin untuk {successMeta.memberName}</div>
+            <div className="font-mono text-xs mb-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{receiptData?.txId}</div>
+            {receiptData?.memberName && receiptData.pointsEarned && receiptData.pointsEarned > 0 && (
+              <div className="text-sm mb-4" style={{ color: "#16a34a" }}>+{receiptData.pointsEarned} poin untuk {receiptData.memberName}</div>
             )}
             <button onClick={handlePrint}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mt-4"

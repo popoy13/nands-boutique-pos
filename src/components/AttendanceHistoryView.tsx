@@ -41,7 +41,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
 
   const viewAll = canViewAll === true;
   const today = todayISO();
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - 6); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; })();
   const inDateRange = (r: AttendanceRecord) => {
     if (datePreset === "today") return r.date === today;
     if (datePreset === "week") return r.date >= weekStart && r.date <= today;

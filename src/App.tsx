@@ -1,7 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
-import NetRLogo from "./components/NetRLogo";
 
 const POSView = lazy(() => import("./components/POSView"));
 const HistoryView = lazy(() => import("./components/HistoryView"));
@@ -256,9 +255,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
         <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
-        <NetRLogo size={64} className="rounded-2xl" />
-        <div className="swipe-sweep" />
-      </div>
+          <img src="/loadingscreen.png" alt={settings.brand?.name ?? "NAND'S BOUTIQUE"} className="w-16 h-16 object-cover" />
+          <div className="swipe-sweep" />
+        </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{settings.brand?.name ?? "NAND'S BOUTIQUE"}</div>
         <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>sabar guys loading dulu</div>
       </div>

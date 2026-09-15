@@ -48,7 +48,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
   const filtered = members.filter(m =>
     (filterTier === "all" || m.tier === filterTier) &&
     (filterStore === "all" || m.storeId === filterStore) &&
-    (m.name.toLowerCase().includes(search.toLowerCase()) || m.phone.includes(search))
+    (m.name.toLowerCase().includes(search.toLowerCase()) || (m.phone ?? "").includes(search))
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -220,7 +220,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
               <div key={f.key}>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
                 <input type={f.type} value={(editing as any)[f.key]}
-                  onChange={e => setEditing(p => p ? { ...p, [f.key]: f.type === "number" ? (e.target.value === "" ? (p as any)[f.key] : Number(e.target.value)) : e.target.value } : null)}
+                  onChange={e => setEditing(p => p ? { ...p, [f.key]: f.type === "number" ? (e.target.value === "" ? (p as any)[f.key] : Math.max(0, Number(e.target.value))) : e.target.value } : null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
               </div>

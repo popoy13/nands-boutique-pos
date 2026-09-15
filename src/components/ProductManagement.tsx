@@ -234,6 +234,11 @@ export default function ProductManagement({ products, stores, categories, onUpda
     if (!editing?.name.trim() || editing.basePrice <= 0) return;
     const existingSkus = new Set<string>();
     products.forEach(p => { if (p.id !== editing.id) p.variants.forEach(v => existingSkus.add(v.sku)); });
+    const localSeen = new Set<string>();
+    for (const v of editing.variants) {
+      if (localSeen.has(v.sku)) { showToast(`SKU "${v.sku}" duplikat dalam produk ini`, false); return; }
+      localSeen.add(v.sku);
+    }
     const dup = editing.variants.find(v => existingSkus.has(v.sku));
     if (dup) { showToast(`SKU "${dup.sku}" sudah digunakan produk lain`, false); return; }
     const updated = isNew ? [...products, editing] : products.map(p => p.id === editing!.id ? editing! : p);
@@ -837,7 +842,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
                               {store.name.replace("NAND'S BOUTIQUE - ", "")}
                             </span>
                             <input type="number" value={qty}
-                              onChange={e => updateVariantStock(activeVariantIdx, store.id, Number(e.target.value))}
+                              onChange={e => updateVariantStock(activeVariantIdx, store.id, Math.max(0, Number(e.target.value) || 0))}
                               className="w-16 text-center text-xs font-mono font-bold rounded-lg px-2 py-1.5 outline-none"
                               style={{ background: "var(--card)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
                           </div>

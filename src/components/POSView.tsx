@@ -43,6 +43,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const [showPayment, setShowPayment] = useState(false);
   const [pendingTxId, setPendingTxId] = useState("");
   const [showScanner, setShowScanner] = useState(false);
+  const cartRef = useRef<HTMLDivElement | null>(null);
   const [pickerColor, setPickerColor] = useState("");
   const [pickerSize, setPickerSize] = useState<Size | "">("");
   const [voucherCode, setVoucherCode] = useState("");
@@ -65,7 +66,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
   const memberSuggestions = useMemo(() =>
     memberSearch.length >= 2
-      ? members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()) || m.phone.includes(memberSearch)).slice(0, 5)
+      ? members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()) || (m.phone ?? "").includes(memberSearch)).slice(0, 5)
       : [],
     [members, memberSearch]);
 
@@ -193,6 +194,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const total = subtotal - discountAmt + tax;
   const pointsToEarn = Math.floor(total / 10000) * POINTS_PER_10K;
 
+  const scrollToCart = () => cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   const applyVoucher = () => {
     const code = voucherCode.trim().toUpperCase();
     if (!code) return;
@@ -287,7 +290,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const storeStockQty = selectedVariant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
       {/* Catalog */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
         <div className="px-5 pt-5 pb-3 shrink-0" style={{ background: "var(--background)", borderBottom: "1px solid var(--border)" }}>
@@ -350,7 +353,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
       {/* Cart */}
       {cart.length > 0 && (
-      <div className="flex flex-col shrink-0 w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
+      <div ref={cartRef} className="flex flex-col shrink-0 w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
         <div className="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Keranjang Belanja</div>
           <button onClick={() => setCart([])} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus</button>
@@ -457,7 +460,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                     <option value="amount">Rp</option>
                     <option value="percent">%</option>
                   </select>
-                  <input type="number" value={discount || ""} onChange={e => setDiscount(Number.isFinite(Number(e.target.value)) ? Math.max(0, Number(e.target.value)) : 0)}
+                  <input type="number" value={discount || ""} onChange={e => { const v = Number.isFinite(Number(e.target.value)) ? Math.max(0, Number(e.target.value)) : 0; setDiscount(discountType === "percent" ? Math.min(100, v) : v); }}
                     placeholder="0" className="w-20 text-right text-xs font-mono outline-none px-2 py-1 rounded-lg"
                     style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }} />
                 </div>
@@ -573,6 +576,21 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       )}
     {showScanner && (
         <BarcodeScanModal barcode={barcode} onClose={() => setShowScanner(false)} onResult={handleScanResult} />
+      )}
+
+      {cart.length > 0 && !showPayment && !showPicker && (
+        <div className="fixed bottom-0 inset-x-0 lg:hidden z-30 px-4 pb-5 pt-8 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 p-3 rounded-2xl shadow-2xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-medium" style={{ color: "var(--muted-foreground)" }}>{cart.reduce((s, i) => s + i.quantity, 0)} item</div>
+              <div className="text-sm font-mono font-bold truncate" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</div>
+            </div>
+            <button onClick={scrollToCart} className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ background: "var(--foreground)", fontFamily: "'Outfit', sans-serif" }}>
+              Lanjut ke Keranjang
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

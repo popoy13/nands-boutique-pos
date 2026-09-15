@@ -308,11 +308,13 @@ export function productsToDB(
   ps: Product[],
   catMap: Map<string, string>,
 ): ProductWrite {
+  const nameToId = new Map<string, string>()
+  for (const [id, name] of catMap) nameToId.set(name, id)
   const products = ps.map((p) => ({
     id: p.id,
     name: p.name,
     brand: p.brand,
-    category_id: catMap.get(p.category) ?? null,
+    category_id: nameToId.get(p.category) ?? null,
     base_price: p.basePrice,
     image: p.image || null,
   }))

@@ -91,7 +91,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     return [...transactions].reverse().filter(t => {
       if (filterStore !== "all" && t.storeId !== filterStore) return false;
       if (filterMethod !== "all" && t.paymentMethod !== filterMethod) return false;
-      if (search && !t.id.toLowerCase().includes(search.toLowerCase()) && !t.cashierName.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !t.id.toLowerCase().includes(search.toLowerCase()) && !(t.cashierName ?? "").toLowerCase().includes(search.toLowerCase())) return false;
       if (dateFrom) { const from = new Date(dateFrom); from.setHours(0,0,0,0); if (t.date < from) return false; }
       if (dateTo) { const to = new Date(dateTo); to.setHours(23,59,59,999); if (t.date > to) return false; }
       return true;
@@ -113,7 +113,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     <style>body{font-family:'Courier New',monospace;font-size:${font}px;padding:8mm;width:${width}mm;} .row{display:flex;justify-content:space-between;} hr{border:none;border-top:1px dashed #000;margin:5px 0;} .center{text-align:center;} @page{size:${width}mm auto;margin:0;}</style>
     </head><body>
     <div class="center"><b>${escapeHtml(brandName ?? "NAND'S BOUTIQUE")}</b><br>${escapeHtml((t.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
-    <hr><div>No: ${escapeHtml(t.id)}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${escapeHtml(t.cashierName)}</div>
+    <hr><div>No: ${escapeHtml(t.id)}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>
     ${t.memberName ? `<div>Member: ${escapeHtml(t.memberName)}</div>` : ""}
     <hr>
     ${t.items.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}

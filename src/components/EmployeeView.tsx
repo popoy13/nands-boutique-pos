@@ -59,6 +59,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [showPin, setShowPin] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+  const savingRef = useRef(false);
 
   const roleConfigs = ensureRoles(roles);
   const roleOptions = Object.entries(roleConfigs);
@@ -81,10 +82,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const filtered = employees.filter(e =>
     (filterStore === "all" || e.storeId === filterStore) &&
     (filterRole === "all" || e.role === filterRole) &&
-    (e.name.toLowerCase().includes(search.toLowerCase()) || e.email.toLowerCase().includes(search.toLowerCase()))
+    (e.name.toLowerCase().includes(search.toLowerCase()) || (e.email ?? "").toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleSaveEmployee = async () => {
+    if (savingRef.current) return;
     if (!editing || !editing.name.trim()) return;
     const pinNew = pinInput.trim();
     if (isNew && !pinNew) {
@@ -99,21 +101,26 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       showToast("PIN terlalu lemah. Gunakan kombinasi yang sulit ditebak (contoh: 7361)", false);
       return;
     }
-    const pinHashed = pinNew
-      ? await hashPin(pinNew)
-      : /^\d{4}$/.test(editing.pin)
-        ? await hashPin(editing.pin)
-        : editing.pin;
-    const toSave: Employee = { ...editing, pin: pinHashed };
-    if (isNew) {
-      onSave([...employees, toSave]);
-    } else {
-      onSave(employees.map(e => e.id === toSave.id ? toSave : e));
+    savingRef.current = true;
+    try {
+      const pinHashed = pinNew
+        ? await hashPin(pinNew)
+        : /^\d{4}$/.test(editing.pin)
+          ? await hashPin(editing.pin)
+          : editing.pin;
+      const toSave: Employee = { ...editing, pin: pinHashed };
+      if (isNew) {
+        onSave([...employees, toSave]);
+      } else {
+        onSave(employees.map(e => e.id === toSave.id ? toSave : e));
+      }
+      setEditing(null);
+      setIsNew(false);
+      setPinInput("");
+      showToast("Data karyawan disimpan");
+    } finally {
+      savingRef.current = false;
     }
-    setEditing(null);
-    setIsNew(false);
-    setPinInput("");
-    showToast("Data karyawan disimpan");
   };
 
   const handleDelete = (id: string) => {

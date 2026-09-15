@@ -95,8 +95,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     switch (table) {
       case "products": {
         const removed = productsRemovedRef.current;
-        productsRemovedRef.current = { products: [], variants: [] };
         await writeProducts(payload as Product[], removed);
+        productsRemovedRef.current = { products: [], variants: [] };
         break;
       }
       case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
@@ -105,10 +105,10 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     }
     try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
     const removedIds = removedRef.current[table];
-    removedRef.current[table] = [];
     if (removedIds?.length) {
       try { await deleteRows(table, removedIds); } catch (e) { console.warn("[sync] hapus baris gagal:", table, e); }
     }
+    removedRef.current[table] = [];
   } catch (e) {
     console.warn("[sync] tulis ke database gagal:", table, e);
     onFail?.(payload);
@@ -119,6 +119,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   const setProducts: Dispatch<SetStateAction<Product[]>> = (upd) => setProductsState(prev => {
     const next = typeof upd === "function" ? (upd as (p: Product[]) => Product[])(prev) : upd;
     if (next !== prev) {
+      const pr = productsRemovedRef.current;
       const goneProducts = prev.filter(p => !next.some(n => n.id === p.id)).map(p => p.id);
       const goneVariants: string[] = [];
       for (const p of prev) {
@@ -130,11 +131,13 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
           }
         }
       }
-      if (goneProducts.length || goneVariants.length) {
-        const pr = productsRemovedRef.current;
-        pr.products = [...new Set([...pr.products, ...goneProducts])];
-        pr.variants = [...new Set([...pr.variants, ...goneVariants])];
-      }
+      if (goneProducts.length) pr.products = [...new Set([...pr.products, ...goneProducts])];
+      if (goneVariants.length) pr.variants = [...new Set([...pr.variants, ...goneVariants])];
+      const reAddedP = new Set(next.map(n => n.id));
+      pr.products = pr.products.filter(id => !reAddedP.has(id));
+      const reAddedV = new Set<string>();
+      for (const p of next) for (const v of p.variants) reAddedV.add(stableVariantId(p.id, v.sku));
+      pr.variants = pr.variants.filter(id => !reAddedV.has(id));
       propagate("products", next);
     }
     return next;
@@ -232,7 +235,16 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     if (!payload || !Array.isArray(payload.rows)) return;
     const rows = payload.rows as Record<string, unknown>[];
     switch (payload.table) {
-      case "products": setProductsState(payload.rows as Product[]); break;
+      case "products": {
+        const incoming = payload.rows as Product[];
+        const keptP = new Set(incoming.map(p => p.id));
+        productsRemovedRef.current.products = productsRemovedRef.current.products.filter(id => !keptP.has(id));
+        const keptV = new Set<string>();
+        for (const p of incoming) for (const v of p.variants) keptV.add(stableVariantId(p.id, v.sku));
+        productsRemovedRef.current.variants = productsRemovedRef.current.variants.filter(id => !keptV.has(id));
+        setProductsState(incoming);
+        break;
+      }
       case "stores": setStoresState(rows.map(storeFromDB)); break;
       case "employees": setEmployeesState(rows.map(empFromDB)); validEmpIdsRef.current = new Set(rows.map(r => String(r.id))); break;
       case "members": setMembersState(rows.map(memFromDB)); break;
@@ -305,6 +317,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setSettingsState(d.settings);
             setCategoriesState(d.categories);
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
+            productsRemovedRef.current = { products: [], variants: [] };
+            for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
           }
         }
         lastStatusRef.current = status;

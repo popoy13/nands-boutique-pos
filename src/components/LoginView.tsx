@@ -39,8 +39,8 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
 
   const handleSelect = (emp: Employee) => {
     const lock = isLocked(emp.id);
+    setLockTimer(lock.locked ? lock.secondsLeft : 0);
     if (lock.locked) {
-      setLockTimer(lock.secondsLeft);
       setError(`Terlalu banyak percobaan. Coba lagi dalam ${lock.secondsLeft}s`);
     }
     setSelected(emp);

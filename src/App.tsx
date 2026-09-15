@@ -19,6 +19,7 @@ import type { Employee, Transaction, AttendanceRecord, Member } from "./data/typ
 import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
 import { MENU_PAGES } from "./data/menuPages";
 import { todayISO } from "./lib/dates";
+import { getTier } from "./data/members";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -216,10 +217,15 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
           : v;
       }),
     })));
-    if (target.memberId && target.pointsEarned) {
-      setMembers(prev => prev.map(m => m.id === target.memberId ? { ...m, points: Math.max(0, m.points - (target.pointsEarned ?? 0)) } : m));
+    if (target.memberId) {
+      setMembers(prev => prev.map(m => m.id === target.memberId ? {
+        ...m,
+        points: Math.max(0, m.points - (target.pointsEarned ?? 0)),
+        totalSpend: Math.max(0, m.totalSpend - (target.total ?? 0)),
+        tier: getTier(Math.max(0, m.totalSpend - (target.total ?? 0))),
+      } : m));
     }
-    void flush().then(() => deleteTransaction(id)).catch(e => console.warn("[sync] hapus transaksi gagal:", e));
+    void flush().catch(e => console.warn("[sync] flush transaksi gagal:", e)).then(() => deleteTransaction(id)).catch(e => console.warn("[sync] hapus transaksi gagal:", e));
   };
 
   const handleUseVoucher = (id: string) => {
@@ -315,6 +321,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
         <Suspense fallback={<MenuLoading logo={settings.brand.logo} name={settings.brand.name} />}>
         {safeTab === "pos" && (
           <POSView
+            key={activeStore}
             activeStore={activeStore}
             storeName={storeName}
             cashierId={currentUser.id}

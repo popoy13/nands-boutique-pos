@@ -71,7 +71,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     if (!pinVerifyInput) return;
     deletingRef.current = true;
     try {
-    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin) || currentUser.pin.startsWith("pbkdf2$")
       ? await verifyPin(pinVerifyInput, currentUser.pin)
       : pinVerifyInput === currentUser.pin;
     if (pinOk) {

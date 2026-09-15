@@ -175,7 +175,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
   const paymentLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
 
   const handleExport = () => {
-    if (filtered.length === 0) return;
+    if (filtered.length === 0 && filteredDeleted.length === 0) return;
 
     const fmtPick = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-";
     const periodLabel = customRange

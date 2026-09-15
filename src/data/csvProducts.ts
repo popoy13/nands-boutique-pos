@@ -132,7 +132,9 @@ export function parseProductsCsv(raw: string, storeIds: string[], existing: Prod
     for (const sid of storeIds) {
       const si = stockCols.get(sid.toLowerCase());
       if (si !== undefined && si < cells.length) {
-        stocks.push({ storeId: sid, quantity: Math.max(0, parseNumber(cells[si])) });
+        const q = parseNumber(cells[si]);
+        if (q < 0) errors.push(`Baris ${li + 1} (${name || sku || "?"}): stok negatif, disetel ke 0.`);
+        stocks.push({ storeId: sid, quantity: Math.max(0, q) });
       }
     }
 

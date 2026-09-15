@@ -67,6 +67,18 @@ export function useSyncedStore(): SyncedStore {
     removedRef.current[table] = [...new Set([...(removedRef.current[table] ?? []), ...gone])];
   };
 
+const onAttendanceFail = (again: unknown) => {
+    pendingRef.current["attendance_records"] = again;
+    if (timersRef.current["attendance_records"]) return;
+    timersRef.current["attendance_records"] = setTimeout(() => {
+      timersRef.current["attendance_records"] = null;
+      const retry = pendingRef.current["attendance_records"];
+      pendingRef.current["attendance_records"] = null;
+      if (retry === undefined || retry === null) return;
+      void writeTable("attendance_records", retry, onAttendanceFail);
+    }, 2000);
+  };
+
 const propagate = (table: string, rows: unknown) => {
   pendingRef.current[table] = rows;
   if (table === "attendance_records") {
@@ -74,9 +86,7 @@ const propagate = (table: string, rows: unknown) => {
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
-    void writeTable(table, payload, (again) => {
-      if (pendingRef.current["attendance_records"] == null) pendingRef.current["attendance_records"] = again;
-    });
+    void writeTable(table, payload, onAttendanceFail);
     return;
   }
   if (timersRef.current[table]) return;

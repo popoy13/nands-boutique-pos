@@ -143,7 +143,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const liveTime = now.toLocaleTimeString("en-GB", { hour12: false });
 
   const todayStr = todayISO();
-  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
+  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,6 +160,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   };
 
   const handleClockIn = () => {
+    if (todayRecord) { showToast("Anda sudah absen masuk hari ini"); return; }
     if (!photo) { showToast("Ambil foto dulu sebelum absen masuk"); return; }
     onClock({
       id: `att-${Date.now()}`,

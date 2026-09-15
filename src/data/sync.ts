@@ -405,7 +405,6 @@ export const settingsFromDB = (
   for (const r of rows) if (r && r.key) obj[s(r.key)] = r.value
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
-  const roles = (obj.roles ?? {}) as Partial<AppSettings["roles"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
   return {
     ...defaultSettings,

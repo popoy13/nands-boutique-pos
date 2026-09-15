@@ -7,12 +7,52 @@ const SHA256 = async (str: string): Promise<string> => {
 };
 
 const SALT = "nands-pos-2026-v1";
+const PBKDF2_ITERATIONS = 15000;
 
-export const hashPin = (pin: string): Promise<string> => SHA256(`${SALT}:${pin}`);
+const toHex = (bytes: Iterable<number>): string =>
+  Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+
+const pbkdf2Hex = async (pin: string, saltHex: string, iterations: number): Promise<string> => {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`${SALT}:${pin}`),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: new TextEncoder().encode(saltHex), iterations, hash: "SHA-256" },
+    keyMaterial,
+    256,
+  );
+  return toHex(new Uint8Array(bits));
+};
+
+export const hashPin = async (pin: string): Promise<string> => {
+  const saltHex = toHex(crypto.getRandomValues(new Uint8Array(8)));
+  const derived = await pbkdf2Hex(pin, saltHex, PBKDF2_ITERATIONS);
+  return `pbkdf2$${saltHex}$${PBKDF2_ITERATIONS}$${derived}`;
+};
+
+const constantTimeEqual = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+};
 
 export const verifyPin = async (pin: string, storedHash: string): Promise<boolean> => {
-  const h = await hashPin(pin);
-  return h === storedHash;
+  if (!storedHash) return false;
+  if (storedHash.startsWith("pbkdf2$")) {
+    const parts = storedHash.split("$");
+    if (parts.length !== 4) return false;
+    const iterations = Number(parts[2]);
+    if (!parts[1] || !Number.isFinite(iterations) || iterations <= 0) return false;
+    const derived = await pbkdf2Hex(pin, parts[1], iterations);
+    return constantTimeEqual(derived, parts[3]);
+  }
+  const h = await SHA256(`${SALT}:${pin}`);
+  return constantTimeEqual(h, storedHash);
 };
 
 const WEAK_PINS = new Set([

@@ -24,7 +24,7 @@ export const getTier = (totalSpend: number): MemberTier => {
 };
 
 export const generateMemberId = () =>
-  `MBR-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+  `MBR-${Date.now().toString(36).toUpperCase().slice(-6)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
 export const initialMembers: Member[] = [
   { id: "m1", name: "Sari Indah",      phone: "08111234567", email: "sari.i@gmail.com",   tier: "gold",     points: 520, totalSpend: 6200000,  joinDate: "2023-01-15", storeId: "s1", note: "" },

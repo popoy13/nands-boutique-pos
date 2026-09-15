@@ -60,7 +60,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
         setPin("");
         return;
       }
-      const isHashed = /^[a-f0-9]{64}$/i.test(selected.pin);
+      const isHashed = /^[a-f0-9]{64}$/i.test(selected.pin) || selected.pin.startsWith("pbkdf2$");
       const ok = isHashed
         ? await verifyPin(pinToCheck, selected.pin)
         : pinToCheck === selected.pin;

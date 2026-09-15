@@ -9,7 +9,7 @@ const d = (daysAgo: number, hour: number) => {
 
 export const generateId = (storeId: string) => {
   const now = new Date();
-  const sn = storeId.replace("s", "");
+  const sn = storeId.replace(/^s/, "");
   const rand = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
   const uniq = Date.now().toString(36).slice(-5);
   return `TRX-S${sn}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${rand}${uniq}`;

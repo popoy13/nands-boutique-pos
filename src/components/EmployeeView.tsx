@@ -138,7 +138,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
   const submitPinDelete = async () => {
     if (!confirmDelete || !pinVerifyInput || !currentUser) return;
-    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin) || currentUser.pin.startsWith("pbkdf2$")
       ? await verifyPin(pinVerifyInput, currentUser.pin)
       : pinVerifyInput === currentUser.pin;
     if (pinOk) {

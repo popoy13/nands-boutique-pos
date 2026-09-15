@@ -381,7 +381,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
 
   const submitBulkPinDelete = async () => {
     if (!confirmBulkDelete || !bulkPinInput || !currentUser) return;
-    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin)
+    const pinOk = /^[a-f0-9]{64}$/i.test(currentUser.pin) || currentUser.pin.startsWith("pbkdf2$")
       ? await verifyPin(bulkPinInput, currentUser.pin)
       : bulkPinInput === currentUser.pin;
     if (pinOk) {

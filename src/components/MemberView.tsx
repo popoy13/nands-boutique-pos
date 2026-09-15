@@ -81,6 +81,68 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
   const tierCounts = { bronze: 0, silver: 0, gold: 0, platinum: 0 };
   members.forEach(m => { tierCounts[m.tier]++; });
 
+  const editBody = editing ? (
+    <>
+      <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Daftar Member" : "Edit Member"}</div>
+        <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-3">
+        {[
+          { label: "Nama Lengkap", key: "name", type: "text" },
+          { label: "No. HP", key: "phone", type: "text" },
+          { label: "Email", key: "email", type: "email" },
+          { label: "Tanggal Bergabung", key: "joinDate", type: "date" },
+          { label: "Total Belanja (Rp)", key: "totalSpend", type: "number" },
+          { label: "Poin", key: "points", type: "number" },
+        ].map(f => (
+          <div key={f.key}>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+            <input type={f.type} value={(editing as any)[f.key]}
+              onChange={e => setEditing(p => p ? { ...p, [f.key]: f.type === "number" ? (e.target.value === "" ? (p as any)[f.key] : Math.max(0, Number(e.target.value))) : e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          </div>
+        ))}
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TOKO ASAL</label>
+          <select value={editing.storeId} onChange={e => setEditing(p => p ? { ...p, storeId: e.target.value } : null)}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
+            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>CATATAN</label>
+          <textarea value={editing.note} onChange={e => setEditing(p => p ? { ...p, note: e.target.value } : null)}
+            rows={2} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
+            style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+        </div>
+
+        <div className="p-3 rounded-xl" style={{ background: TIER_COLOR[getTier(editing.totalSpend)].bg }}>
+          <div className="text-xs font-semibold mb-0.5" style={{ color: TIER_COLOR[getTier(editing.totalSpend)].text }}>
+            Tier: {TIER_LABEL[getTier(editing.totalSpend)]}
+          </div>
+          <div className="text-xs" style={{ color: TIER_COLOR[getTier(editing.totalSpend)].text, opacity: 0.8 }}>
+            Berdasarkan total belanja {fmt(editing.totalSpend)}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button onClick={handleSave} disabled={!editing.name.trim() || !editing.phone.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: editing.name.trim() && editing.phone.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.phone.trim() ? "white" : "var(--muted-foreground)" }}>
+          Simpan Member
+        </button>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>{toast}</div>}
@@ -205,66 +267,19 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
         />
       </div>
 
-      {/* Edit Panel */}
-      {editing && (
-        <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Daftar Member" : "Edit Member"}</div>
-            <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
+      {/* Edit Panel - desktop */}
+      {editBody && (
+        <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[340px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          <div className="flex flex-col h-full overflow-y-auto">{editBody}</div>
+        </div>
+      )}
 
-          <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-3">
-            {[
-              { label: "Nama Lengkap", key: "name", type: "text" },
-              { label: "No. HP", key: "phone", type: "text" },
-              { label: "Email", key: "email", type: "email" },
-              { label: "Tanggal Bergabung", key: "joinDate", type: "date" },
-              { label: "Total Belanja (Rp)", key: "totalSpend", type: "number" },
-              { label: "Poin", key: "points", type: "number" },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                <input type={f.type} value={(editing as any)[f.key]}
-                  onChange={e => setEditing(p => p ? { ...p, [f.key]: f.type === "number" ? (e.target.value === "" ? (p as any)[f.key] : Math.max(0, Number(e.target.value))) : e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              </div>
-            ))}
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TOKO ASAL</label>
-              <select value={editing.storeId} onChange={e => setEditing(p => p ? { ...p, storeId: e.target.value } : null)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>CATATAN</label>
-              <textarea value={editing.note} onChange={e => setEditing(p => p ? { ...p, note: e.target.value } : null)}
-                rows={2} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none"
-                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-            </div>
-
-            {/* Tier preview */}
-            <div className="p-3 rounded-xl" style={{ background: TIER_COLOR[getTier(editing.totalSpend)].bg }}>
-              <div className="text-xs font-semibold mb-0.5" style={{ color: TIER_COLOR[getTier(editing.totalSpend)].text }}>
-                Tier: {TIER_LABEL[getTier(editing.totalSpend)]}
-              </div>
-              <div className="text-xs" style={{ color: TIER_COLOR[getTier(editing.totalSpend)].text, opacity: 0.8 }}>
-                Berdasarkan total belanja {fmt(editing.totalSpend)}
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
-            <button onClick={handleSave} disabled={!editing.name.trim() || !editing.phone.trim()}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: editing.name.trim() && editing.phone.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.phone.trim() ? "white" : "var(--muted-foreground)" }}>
-              Simpan Member
-            </button>
+      {/* Edit Panel - mobile */}
+      {editBody && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setEditing(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
+            <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
       )}

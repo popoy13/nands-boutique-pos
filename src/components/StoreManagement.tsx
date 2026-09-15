@@ -46,6 +46,64 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
     showToast("Toko dihapus");
   };
 
+  const editBody = editing ? (
+    <>
+      <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Toko" : "Edit Toko"}</div>
+        <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
+        {[
+          { label: "Nama Toko", key: "name", placeholder: "NAND'S BOUTIQUE - Lokasi" },
+          { label: "Alamat Lengkap", key: "address", placeholder: "Jl. ..." },
+          { label: "No. Telepon", key: "phone", placeholder: "021-xxxxxxx" },
+        ].map(f => (
+          <div key={f.key}>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+            <input
+              type="text"
+              value={(editing as any)[f.key]}
+              onChange={e => setEditing(prev => prev ? { ...prev, [f.key]: e.target.value } : null)}
+              placeholder={f.placeholder}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+            />
+          </div>
+        ))}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>JAM BUKA</label>
+            <input type="time" value={editing.openHour ?? "08:00"}
+              onChange={e => setEditing(prev => prev ? { ...prev, openHour: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>JAM TUTUP</label>
+            <input type="time" value={editing.closeHour ?? "21:00"}
+              onChange={e => setEditing(prev => prev ? { ...prev, closeHour: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button
+          onClick={handleSave}
+          disabled={!editing.name.trim() || !editing.address.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: editing.name.trim() && editing.address.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.address.trim() ? "white" : "var(--muted-foreground)" }}
+        >
+          Simpan Toko
+        </button>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {toast && (
@@ -128,59 +186,19 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
         </div>
       </div>
 
-      {/* Edit Panel */}
-      {editing && (canEdit || canAdd) && (
-        <div className="shrink-0 flex flex-col w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Toko" : "Edit Toko"}</div>
-            <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-          <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            {[
-              { label: "Nama Toko", key: "name", placeholder: "NAND'S BOUTIQUE - Lokasi" },
-              { label: "Alamat Lengkap", key: "address", placeholder: "Jl. ..." },
-              { label: "No. Telepon", key: "phone", placeholder: "021-xxxxxxx" },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                <input
-                  type="text"
-                  value={(editing as any)[f.key]}
-                  onChange={e => setEditing(prev => prev ? { ...prev, [f.key]: e.target.value } : null)}
-                  placeholder={f.placeholder}
-className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-              />
-              </div>
-            ))}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>JAM BUKA</label>
-                <input type="time" value={editing.openHour ?? "08:00"}
-                  onChange={e => setEditing(prev => prev ? { ...prev, openHour: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>JAM TUTUP</label>
-                <input type="time" value={editing.closeHour ?? "21:00"}
-                  onChange={e => setEditing(prev => prev ? { ...prev, closeHour: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-              </div>
-            </div>
-          </div>
-          <div className="px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
-            <button
-              onClick={handleSave}
-              disabled={!editing.name.trim() || !editing.address.trim()}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: editing.name.trim() && editing.address.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.address.trim() ? "white" : "var(--muted-foreground)" }}
-            >
-              Simpan Toko
-            </button>
+      {/* Edit Panel - desktop */}
+      {(canEdit || canAdd) && editBody && (
+        <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[340px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          <div className="flex flex-col h-full overflow-y-auto">{editBody}</div>
+        </div>
+      )}
+
+      {/* Edit Panel - mobile */}
+      {(canEdit || canAdd) && editBody && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setEditing(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
+            <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
       )}

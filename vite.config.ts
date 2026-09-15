@@ -17,6 +17,7 @@ export const MENU_PAGE_FILES: Record<string, string> = {
   diskon: path.resolve(__dirname, 'diskon.html'),
   member: path.resolve(__dirname, 'member.html'),
   absensi: path.resolve(__dirname, 'absensi.html'),
+  riwayatAbsensi: path.resolve(__dirname, 'riwayat-absensi.html'),
   setelan: path.resolve(__dirname, 'setelan.html'),
 }
 

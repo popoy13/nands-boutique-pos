@@ -241,6 +241,160 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
   const activeCount = employees.filter(e => e.status === "active").length;
 
+  const editBody = editing && (canEdit || canAdd) ? (
+    <>
+      <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Karyawan" : "Edit Karyawan"}</div>
+        <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4">
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Foto Karyawan</label>
+            <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white shrink-0" style={{ background: "var(--foreground)" }}>
+                {editing.photo
+                  ? <img src={editing.photo} alt="Foto" className="w-full h-full object-cover" />
+                  : <span>{editing.name.charAt(0) || "?"}</span>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => photoRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  {editing.photo ? "Ganti Foto" : "Unggah Foto"}
+                </button>
+                {editing.photo && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(prev => prev ? { ...prev, photo: undefined } : null)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: "#fef2f2", color: "#ef4444" }}>
+                    Hapus Foto
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          {[
+            { label: "Nama Lengkap", key: "name", type: "text" },
+            { label: "No. HP", key: "phone", type: "text" },
+            { label: "Email", key: "email", type: "email" },
+            { label: "Tanggal Bergabung", key: "joinDate", type: "date" },
+            { label: "Gaji (Rp)", key: "salary", type: "number" },
+          ].map(field => (
+            <div key={field.key}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{field.label}</label>
+              <input
+                type={field.type}
+                value={(editing as any)[field.key]}
+                onChange={e => setEditing(prev => prev ? { ...prev, [field.key]: field.type === "number" ? Number(e.target.value) : e.target.value } : null)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+              />
+            </div>
+          ))}
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>PIN Login (4 digit){isNew ? "" : " · kosongkan jika tidak diubah"}</label>
+            <div className="relative">
+              <input
+                type={showPin ? "text" : "password"}
+                inputMode="numeric"
+                maxLength={4}
+                value={pinInput}
+                placeholder={isNew ? "Contoh: 7361" : "••••"}
+                onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
+                className="w-full px-3 py-2.5 pr-11 rounded-xl text-sm outline-none"
+                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(v => !v)}
+                aria-label={showPin ? "Sembunyikan PIN" : "Lihat PIN"}
+                className="absolute top-1/2 -translate-y-1/2 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                {showPin ? (
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 104.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 000 12s3 7 10 7a9.74 9.74 0 005.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
+                ) : (
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                )}
+              </button>
+            </div>
+            <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
+              {isNew
+                ? "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."
+                : /^\d{4}$/.test(editing.pin)
+                  ? "PIN saat ini terbaca sebagai teks biasa (legacy). Saat disimpan, PIN akan di-hash."
+                  : "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Jabatan</label>
+            <select
+              value={editing.role}
+              onChange={e => setEditing(prev => prev ? { ...prev, role: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+            >
+              {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Toko</label>
+            <select
+              value={editing.storeId}
+              onChange={e => setEditing(prev => prev ? { ...prev, storeId: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+            >
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Status</label>
+            <div className="flex gap-2">
+              {(["active", "inactive"] as const).map(s => (
+                <button key={s} onClick={() => setEditing(prev => prev ? { ...prev, status: s } : null)}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={{
+                    background: editing.status === s ? "var(--foreground)" : "var(--background)",
+                    color: editing.status === s ? "white" : "var(--muted-foreground)",
+                    border: `1px solid ${editing.status === s ? "var(--foreground)" : "var(--border)"}`,
+                  }}>
+                  {s === "active" ? "Aktif" : "Tidak Aktif"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button
+          onClick={handleSaveEmployee}
+          disabled={!editing.name.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{
+            background: editing.name.trim() ? "var(--foreground)" : "var(--muted)",
+            color: editing.name.trim() ? "white" : "var(--muted-foreground)",
+          }}
+        >
+          Simpan Karyawan
+        </button>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {/* Toast */}
@@ -426,157 +580,19 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
         </div>
       </div>
 
-      {/* Edit Panel */}
-      {editing && (canEdit || canAdd) && (
-        <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[340px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Karyawan" : "Edit Karyawan"}</div>
-            <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
+      {/* Edit Panel - desktop */}
+      {editBody && (
+        <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[340px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          <div className="flex flex-col h-full overflow-y-auto">{editBody}</div>
+        </div>
+      )}
 
-          <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4">
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Foto Karyawan</label>
-                <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white shrink-0" style={{ background: "var(--foreground)" }}>
-                    {editing.photo
-                      ? <img src={editing.photo} alt="Foto" className="w-full h-full object-cover" />
-                      : <span>{editing.name.charAt(0) || "?"}</span>}
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => photoRef.current?.click()}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                      style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      {editing.photo ? "Ganti Foto" : "Unggah Foto"}
-                    </button>
-                    {editing.photo && (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(prev => prev ? { ...prev, photo: undefined } : null)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                        style={{ background: "#fef2f2", color: "#ef4444" }}>
-                        Hapus Foto
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {[
-                { label: "Nama Lengkap", key: "name", type: "text" },
-                { label: "No. HP", key: "phone", type: "text" },
-                { label: "Email", key: "email", type: "email" },
-                { label: "Tanggal Bergabung", key: "joinDate", type: "date" },
-                { label: "Gaji (Rp)", key: "salary", type: "number" },
-              ].map(field => (
-                <div key={field.key}>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{field.label}</label>
-                  <input
-                    type={field.type}
-                    value={(editing as any)[field.key]}
-                    onChange={e => setEditing(prev => prev ? { ...prev, [field.key]: field.type === "number" ? Number(e.target.value) : e.target.value } : null)}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                    style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-                  />
-                </div>
-              ))}
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>PIN Login (4 digit){isNew ? "" : " · kosongkan jika tidak diubah"}</label>
-                <div className="relative">
-                  <input
-                    type={showPin ? "text" : "password"}
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={pinInput}
-                    placeholder={isNew ? "Contoh: 7361" : "••••"}
-                    onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); }}
-                    className="w-full px-3 py-2.5 pr-11 rounded-xl text-sm outline-none"
-                    style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPin(v => !v)}
-                    aria-label={showPin ? "Sembunyikan PIN" : "Lihat PIN"}
-                    className="absolute top-1/2 -translate-y-1/2 right-2.5 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    {showPin ? (
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 104.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0112 5c7 0 10 7 10 7a13.16 13.16 0 01-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 000 12s3 7 10 7a9.74 9.74 0 005.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
-                    ) : (
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    )}
-                  </button>
-                </div>
-                <div className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
-                  {isNew
-                    ? "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."
-                    : /^\d{4}$/.test(editing.pin)
-                      ? "PIN saat ini terbaca sebagai teks biasa (legacy). Saat disimpan, PIN akan di-hash."
-                      : "Disimpan sebagai hash — tidak tersimpan sebagai teks biasa."}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Jabatan</label>
-                <select
-                  value={editing.role}
-                  onChange={e => setEditing(prev => prev ? { ...prev, role: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-                >
-                  {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Toko</label>
-                <select
-                  value={editing.storeId}
-                  onChange={e => setEditing(prev => prev ? { ...prev, storeId: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-                >
-                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>Status</label>
-                <div className="flex gap-2">
-                  {(["active", "inactive"] as const).map(s => (
-                    <button key={s} onClick={() => setEditing(prev => prev ? { ...prev, status: s } : null)}
-                      className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-                      style={{
-                        background: editing.status === s ? "var(--foreground)" : "var(--background)",
-                        color: editing.status === s ? "white" : "var(--muted-foreground)",
-                        border: `1px solid ${editing.status === s ? "var(--foreground)" : "var(--border)"}`,
-                      }}>
-                      {s === "active" ? "Aktif" : "Tidak Aktif"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
-            <button
-              onClick={handleSaveEmployee}
-              disabled={!editing.name.trim()}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                background: editing.name.trim() ? "var(--foreground)" : "var(--muted)",
-                color: editing.name.trim() ? "white" : "var(--muted-foreground)",
-              }}
-            >
-              Simpan Karyawan
-            </button>
+      {/* Edit Panel - mobile */}
+      {editBody && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setEditing(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
+            <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
       )}

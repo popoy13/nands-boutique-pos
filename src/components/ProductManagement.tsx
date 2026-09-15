@@ -431,6 +431,140 @@ export default function ProductManagement({ products, stores, categories, onUpda
     showToast("Kategori dihapus");
   };
 
+  const editBody = editing && (canEdit || canAdd) ? (
+    <>
+      <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Produk" : "Edit Produk"}</div>
+        <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <img src={editing.image} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0 bg-gray-100" onError={e => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=80&h=80&fit=crop&auto=format"; }} />
+          <div className="flex-1">
+            <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>FOTO PRODUK</label>
+            <div className="flex gap-2">
+              <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white", opacity: photoBusy ? 0.6 : 1 }}>
+                {photoBusy ? "Memuat..." : "Ubah Foto"}
+              </button>
+              <button onClick={handlePhotoRemove} className="px-3 py-2 rounded-xl text-xs font-semibold text-red-500" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                Hapus
+              </button>
+            </div>
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+          </div>
+        </div>
+
+        {[
+          { label: "NAMA PRODUK", key: "name", type: "text" },
+          { label: "BRAND", key: "brand", type: "text" },
+        ].map(f => (
+          <div key={f.key}>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+            <input type={f.type} value={(editing as any)[f.key]} onChange={e => setEditing(p => p ? { ...p, [f.key]: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          </div>
+        ))}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KATEGORI</label>
+            <select value={editing.category} onChange={e => setEditing(p => p ? { ...p, category: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
+              {catNames.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>HARGA (Rp)</label>
+            <input type="number" value={editing.basePrice} onChange={e => setEditing(p => p ? { ...p, basePrice: Number(e.target.value) } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>VARIAN ({editing.variants.length})</label>
+            <button onClick={addVariant} className="text-xs px-2.5 py-1 rounded-lg font-semibold" style={{ background: "var(--foreground)", color: "white" }}>+ Tambah</button>
+          </div>
+
+          <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
+            {editing.variants.map((v, i) => (
+              <button key={i} onClick={() => setActiveVariantIdx(i)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all"
+                style={{ background: activeVariantIdx === i ? "var(--foreground)" : "var(--background)", color: activeVariantIdx === i ? "white" : "var(--muted-foreground)", border: `1px solid ${activeVariantIdx === i ? "var(--foreground)" : "var(--border)"}` }}>
+                {v.color} / {v.size}
+              </button>
+            ))}
+          </div>
+
+          {editing.variants[activeVariantIdx] && (
+            <div className="p-3 rounded-xl flex flex-col gap-3" style={{ background: "var(--background)" }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>VARIAN {activeVariantIdx + 1}</span>
+                {editing.variants.length > 1 && (
+                  <button onClick={() => removeVariant(activeVariantIdx)} className="text-xs text-red-500 hover:underline">Hapus</button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>Warna</label>
+                  <input type="text" value={editing.variants[activeVariantIdx].color}
+                    onChange={e => updateVariant(activeVariantIdx, "color", e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>Ukuran</label>
+                  <select value={editing.variants[activeVariantIdx].size}
+                    onChange={e => updateVariant(activeVariantIdx, "size", e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    {SIZES.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>SKU</label>
+                <input type="text" value={editing.variants[activeVariantIdx].sku}
+                  onChange={e => updateVariant(activeVariantIdx, "sku", e.target.value)}
+                  className="w-full px-2.5 py-2 rounded-lg text-xs outline-none font-mono" style={{ background: "var(--card)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>STOK PER TOKO</label>
+                <div className="flex flex-col gap-1.5">
+                  {stores.map(store => {
+                    const stockEntry = editing.variants[activeVariantIdx].stocks.find(s => s.storeId === store.id);
+                    const qty = stockEntry?.quantity ?? 0;
+                    return (
+                      <div key={store.id} className="flex items-center justify-between gap-2">
+                        <span className="text-xs truncate" style={{ color: "var(--muted-foreground)", maxWidth: "60%" }}>
+                          {store.name.replace("NAND'S BOUTIQUE - ", "")}
+                        </span>
+                        <input type="number" value={qty}
+                          onChange={e => updateVariantStock(activeVariantIdx, store.id, Math.max(0, Number(e.target.value) || 0))}
+                          className="w-16 text-center text-xs font-mono font-bold rounded-lg px-2 py-1.5 outline-none"
+                          style={{ background: "var(--card)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button onClick={handleSave} disabled={!editing.name.trim() || editing.basePrice <= 0}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: editing.name.trim() && editing.basePrice > 0 ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.basePrice > 0 ? "white" : "var(--muted-foreground)" }}>
+          Simpan Produk
+        </button>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>{toast}</div>}
@@ -733,141 +867,19 @@ export default function ProductManagement({ products, stores, categories, onUpda
         </div>
       )}
 
-      {/* Edit Panel */}
-      {editing && (canEdit || canAdd) && (
-        <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[380px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Tambah Produk" : "Edit Produk"}</div>
-            <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
+      {/* Edit Panel - desktop */}
+      {editBody && (
+        <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[380px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          <div className="flex flex-col h-full overflow-y-auto">{editBody}</div>
+        </div>
+      )}
 
-          <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            {/* Product image */}
-            <div className="flex items-center gap-3">
-              <img src={editing.image} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0 bg-gray-100" onError={e => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=80&h=80&fit=crop&auto=format"; }} />
-              <div className="flex-1">
-                <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>FOTO PRODUK</label>
-                <div className="flex gap-2">
-                  <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
-                    className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white", opacity: photoBusy ? 0.6 : 1 }}>
-                    {photoBusy ? "Memuat..." : "Ubah Foto"}
-                  </button>
-                  <button onClick={handlePhotoRemove} className="px-3 py-2 rounded-xl text-xs font-semibold text-red-500" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
-                    Hapus
-                  </button>
-                </div>
-                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-              </div>
-            </div>
-
-            {[
-              { label: "NAMA PRODUK", key: "name", type: "text" },
-              { label: "BRAND", key: "brand", type: "text" },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                <input type={f.type} value={(editing as any)[f.key]} onChange={e => setEditing(p => p ? { ...p, [f.key]: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              </div>
-            ))}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KATEGORI</label>
-                <select value={editing.category} onChange={e => setEditing(p => p ? { ...p, category: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
-                  {catNames.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>HARGA (Rp)</label>
-                <input type="number" value={editing.basePrice} onChange={e => setEditing(p => p ? { ...p, basePrice: Number(e.target.value) } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              </div>
-            </div>
-
-            {/* Variants */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>VARIAN ({editing.variants.length})</label>
-                <button onClick={addVariant} className="text-xs px-2.5 py-1 rounded-lg font-semibold" style={{ background: "var(--foreground)", color: "white" }}>+ Tambah</button>
-              </div>
-
-              {/* Variant tabs */}
-              <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
-                {editing.variants.map((v, i) => (
-                  <button key={i} onClick={() => setActiveVariantIdx(i)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all"
-                    style={{ background: activeVariantIdx === i ? "var(--foreground)" : "var(--background)", color: activeVariantIdx === i ? "white" : "var(--muted-foreground)", border: `1px solid ${activeVariantIdx === i ? "var(--foreground)" : "var(--border)"}` }}>
-                    {v.color} / {v.size}
-                  </button>
-                ))}
-              </div>
-
-              {/* Active variant editor */}
-              {editing.variants[activeVariantIdx] && (
-                <div className="p-3 rounded-xl flex flex-col gap-3" style={{ background: "var(--background)" }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>VARIAN {activeVariantIdx + 1}</span>
-                    {editing.variants.length > 1 && (
-                      <button onClick={() => removeVariant(activeVariantIdx)} className="text-xs text-red-500 hover:underline">Hapus</button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>Warna</label>
-                      <input type="text" value={editing.variants[activeVariantIdx].color}
-                        onChange={e => updateVariant(activeVariantIdx, "color", e.target.value)}
-                        className="w-full px-2.5 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
-                    </div>
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>Ukuran</label>
-                      <select value={editing.variants[activeVariantIdx].size}
-                        onChange={e => updateVariant(activeVariantIdx, "size", e.target.value)}
-                        className="w-full px-2.5 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                        {SIZES.map(s => <option key={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: "var(--muted-foreground)" }}>SKU</label>
-                    <input type="text" value={editing.variants[activeVariantIdx].sku}
-                      onChange={e => updateVariant(activeVariantIdx, "sku", e.target.value)}
-                      className="w-full px-2.5 py-2 rounded-lg text-xs outline-none font-mono" style={{ background: "var(--card)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>STOK PER TOKO</label>
-                    <div className="flex flex-col gap-1.5">
-                      {stores.map(store => {
-                        const stockEntry = editing.variants[activeVariantIdx].stocks.find(s => s.storeId === store.id);
-                        const qty = stockEntry?.quantity ?? 0;
-                        return (
-                          <div key={store.id} className="flex items-center justify-between gap-2">
-                            <span className="text-xs truncate" style={{ color: "var(--muted-foreground)", maxWidth: "60%" }}>
-                              {store.name.replace("NAND'S BOUTIQUE - ", "")}
-                            </span>
-                            <input type="number" value={qty}
-                              onChange={e => updateVariantStock(activeVariantIdx, store.id, Math.max(0, Number(e.target.value) || 0))}
-                              className="w-16 text-center text-xs font-mono font-bold rounded-lg px-2 py-1.5 outline-none"
-                              style={{ background: "var(--card)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
-            <button onClick={handleSave} disabled={!editing.name.trim() || editing.basePrice <= 0}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: editing.name.trim() && editing.basePrice > 0 ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.basePrice > 0 ? "white" : "var(--muted-foreground)" }}>
-              Simpan Produk
-            </button>
+      {/* Edit Panel - mobile */}
+      {editBody && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setEditing(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
+            <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
       )}

@@ -95,6 +95,116 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
   const isExpired = (d: Discount) => d.endDate < todayISO();
   const isLimitReached = (d: Discount) => d.usageLimit > 0 && d.usedCount >= d.usageLimit;
 
+  const editBody = editing && (canEdit || canAdd) ? (
+    <>
+      <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Buat Diskon" : "Edit Diskon"}</div>
+        <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>NAMA DISKON</label>
+          <input type="text" value={editing.name} onChange={e => setEditing(p => p ? { ...p, name: e.target.value } : null)}
+            placeholder="Contoh: Diskon Weekend 15%" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TIPE DISKON</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(["percent", "amount", "voucher"] as const).map(t => (
+              <button key={t} onClick={() => setEditing(p => p ? { ...p, type: t } : null)}
+                className="py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: editing.type === t ? "var(--foreground)" : "var(--background)", color: editing.type === t ? "white" : "var(--muted-foreground)", border: `1px solid ${editing.type === t ? "var(--foreground)" : "var(--border)"}` }}>
+                {t === "percent" ? "Persen" : t === "amount" ? "Nominal" : "Voucher"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+            NILAI {editing.type === "percent" ? "(%)": editing.type === "voucher" && editing.value <= 100 ? "(% atau Rp)" : "(Rp)"}
+          </label>
+          <input type="number" value={editing.value} onChange={e => setEditing(p => p ? { ...p, value: Number(e.target.value) } : null)}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          {editing.type === "voucher" && (
+            <p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>≤ 100 = persen, &gt; 100 = nominal Rp</p>
+          )}
+        </div>
+
+        {editing.type === "voucher" && (
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KODE VOUCHER</label>
+            <input type="text" value={editing.code ?? ""} onChange={e => setEditing(p => p ? { ...p, code: e.target.value.toUpperCase() } : null)}
+              placeholder="CONTOH: NANDS50K" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>MINIMAL BELANJA (Rp)</label>
+          <input type="number" value={editing.minPurchase} onChange={e => setEditing(p => p ? { ...p, minPurchase: Number(e.target.value) } : null)}
+            placeholder="0 = tidak ada minimal" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>MULAI</label>
+            <input type="date" value={editing.startDate} onChange={e => setEditing(p => p ? { ...p, startDate: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>BERAKHIR</label>
+            <input type="date" value={editing.endDate} onChange={e => setEditing(p => p ? { ...p, endDate: e.target.value } : null)}
+              className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TOKO</label>
+          <select value={editing.storeId} onChange={e => setEditing(p => p ? { ...p, storeId: e.target.value } : null)}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
+            <option value="all">Semua Toko</option>
+            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>BATAS PENGGUNAAN (0 = tidak terbatas)</label>
+          <input type="number" value={editing.usageLimit} onChange={e => setEditing(p => p ? { ...p, usageLimit: Number(e.target.value) } : null)}
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>STATUS</label>
+          <div className="flex gap-2">
+            {([true, false] as const).map(v => (
+              <button key={String(v)} onClick={() => setEditing(p => p ? { ...p, active: v } : null)}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: editing.active === v ? "var(--foreground)" : "var(--background)", color: editing.active === v ? "white" : "var(--muted-foreground)", border: `1px solid ${editing.active === v ? "var(--foreground)" : "var(--border)"}` }}>
+                {v ? "Aktif" : "Nonaktif"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button onClick={handleSave} disabled={!editing.name.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: editing.name.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() ? "white" : "var(--muted-foreground)" }}>
+          Simpan Diskon
+        </button>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
       {toast && (
@@ -224,113 +334,19 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
         />
       </div>
 
-      {/* Edit Panel */}
-      {editing && (canEdit || canAdd) && (
-        <div className="shrink-0 flex flex-col overflow-hidden w-full lg:w-[360px]" style={{ background: "var(--card)", borderTop: "1px solid var(--border)", borderLeft: "1px solid var(--border)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>{isNew ? "Buat Diskon" : "Edit Diskon"}</div>
-            <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
+      {/* Edit Panel - desktop */}
+      {editBody && (
+        <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[360px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
+          <div className="flex flex-col h-full overflow-y-auto">{editBody}</div>
+        </div>
+      )}
 
-          <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>NAMA DISKON</label>
-              <input type="text" value={editing.name} onChange={e => setEditing(p => p ? { ...p, name: e.target.value } : null)}
-                placeholder="Contoh: Diskon Weekend 15%" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TIPE DISKON</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["percent", "amount", "voucher"] as const).map(t => (
-                  <button key={t} onClick={() => setEditing(p => p ? { ...p, type: t } : null)}
-                    className="py-2 rounded-xl text-xs font-semibold transition-all"
-                    style={{ background: editing.type === t ? "var(--foreground)" : "var(--background)", color: editing.type === t ? "white" : "var(--muted-foreground)", border: `1px solid ${editing.type === t ? "var(--foreground)" : "var(--border)"}` }}>
-                    {t === "percent" ? "Persen" : t === "amount" ? "Nominal" : "Voucher"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>
-                NILAI {editing.type === "percent" ? "(%)": editing.type === "voucher" && editing.value <= 100 ? "(% atau Rp)" : "(Rp)"}
-              </label>
-              <input type="number" value={editing.value} onChange={e => setEditing(p => p ? { ...p, value: Number(e.target.value) } : null)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              {editing.type === "voucher" && (
-                <p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>≤ 100 = persen, &gt; 100 = nominal Rp</p>
-              )}
-            </div>
-
-            {editing.type === "voucher" && (
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KODE VOUCHER</label>
-                <input type="text" value={editing.code ?? ""} onChange={e => setEditing(p => p ? { ...p, code: e.target.value.toUpperCase() } : null)}
-                  placeholder="CONTOH: NANDS50K" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none font-mono"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>MINIMAL BELANJA (Rp)</label>
-              <input type="number" value={editing.minPurchase} onChange={e => setEditing(p => p ? { ...p, minPurchase: Number(e.target.value) } : null)}
-                placeholder="0 = tidak ada minimal" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>MULAI</label>
-                <input type="date" value={editing.startDate} onChange={e => setEditing(p => p ? { ...p, startDate: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>BERAKHIR</label>
-                <input type="date" value={editing.endDate} onChange={e => setEditing(p => p ? { ...p, endDate: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TOKO</label>
-              <select value={editing.storeId} onChange={e => setEditing(p => p ? { ...p, storeId: e.target.value } : null)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}>
-                <option value="all">Semua Toko</option>
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>BATAS PENGGUNAAN (0 = tidak terbatas)</label>
-              <input type="number" value={editing.usageLimit} onChange={e => setEditing(p => p ? { ...p, usageLimit: Number(e.target.value) } : null)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--background)", border: "1.5px solid var(--border)" }} />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>STATUS</label>
-              <div className="flex gap-2">
-                {([true, false] as const).map(v => (
-                  <button key={String(v)} onClick={() => setEditing(p => p ? { ...p, active: v } : null)}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-                    style={{ background: editing.active === v ? "var(--foreground)" : "var(--background)", color: editing.active === v ? "white" : "var(--muted-foreground)", border: `1px solid ${editing.active === v ? "var(--foreground)" : "var(--border)"}` }}>
-                    {v ? "Aktif" : "Nonaktif"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
-            <button onClick={handleSave} disabled={!editing.name.trim()}
-              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: editing.name.trim() ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() ? "white" : "var(--muted-foreground)" }}>
-              Simpan Diskon
-            </button>
+      {/* Edit Panel - mobile */}
+      {editBody && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setEditing(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
+            <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
       )}

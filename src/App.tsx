@@ -12,6 +12,7 @@ const DiscountView = lazy(() => import("./components/DiscountView"));
 const ProductManagement = lazy(() => import("./components/ProductManagement"));
 const MemberView = lazy(() => import("./components/MemberView"));
 const AttendanceView = lazy(() => import("./components/AttendanceView"));
+const AttendanceHistoryView = lazy(() => import("./components/AttendanceHistoryView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance, deleteTransaction } from "./data/sync";
@@ -298,6 +299,8 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canMemDelete = has("member", "delete");
   const canDeleteAttendance = has("attendance", "delete");
   const canViewAttendanceAll = has("attendance", "view_all");
+  const canViewAttHistoryAll = has("attendanceHistory", "view_all") || has("attendance", "view_all");
+  const canDeleteAttHistory = has("attendanceHistory", "delete") || has("attendance", "delete");
   const settingsPerms = permRoles[role]?.permissions;
 
   // Guard: if current page not allowed, redirect
@@ -430,8 +433,16 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             employees={employees}
             currentUser={currentUser}
             onClock={handleClock}
-            onDelete={canDeleteAttendance ? handleDeleteAttendance : undefined}
-            canViewAll={canViewAttendanceAll}
+          />
+        )}
+        {safeTab === "attendanceHistory" && (
+          <AttendanceHistoryView
+            records={attendance}
+            stores={stores}
+            employees={employees}
+            currentUser={currentUser}
+            onDelete={canDeleteAttHistory ? handleDeleteAttendance : undefined}
+            canViewAll={canViewAttHistoryAll}
             roles={settings.roles}
           />
         )}

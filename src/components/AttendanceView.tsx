@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import type { AttendanceRecord, Employee } from "../data/types";
-import { getRoleLabel } from "../data/roles";
-import type { RoleConfig } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
 import { todayISO } from "../lib/dates";
-import Pagination from "./Pagination";
 
 interface Props {
   records: AttendanceRecord[];
@@ -13,9 +9,6 @@ interface Props {
   employees: Employee[];
   currentUser: Employee;
   onClock: (record: AttendanceRecord) => void;
-  onDelete?: (id: string) => void;
-  roles?: Record<string, RoleConfig>;
-  canViewAll?: boolean;
 }
 
 const fmtDate = (d: string) => {
@@ -107,23 +100,15 @@ function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: str
   );
 }
 
-export default function AttendanceView({ records, stores, employees, currentUser, onClock, onDelete, roles, canViewAll }: Props) {
+export default function AttendanceView({ records, stores, employees, currentUser, onClock }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [usingFile, setUsingFile] = useState(false);
   const [note, setNote] = useState("");
   const [toast, setToast] = useState("");
-  const [filterDate, setFilterDate] = useState(todayISO());
-  const [filterStore, setFilterStore] = useState("all");
-  const [filterEmp, setFilterEmp] = useState("all");
   const [attStore, setAttStore] = useState(currentUser.storeId);
   const [now, setNow] = useState(new Date());
   const [cameraKey, setCameraKey] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const resetPage = () => setPage(1);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -132,7 +117,6 @@ export default function AttendanceView({ records, stores, employees, currentUser
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  const viewAll = canViewAll === true;
   const canAnyStore = currentUser.role === "admin" || currentUser.role === "manager" || currentUser.role === "manager_operasional";
   const clockStores = canAnyStore ? stores : stores.filter(s => s.id === currentUser.storeId);
   const selStoreId = clockStores.some(s => s.id === attStore) ? attStore : clockStores[0]?.id ?? currentUser.storeId;
@@ -186,47 +170,6 @@ export default function AttendanceView({ records, stores, employees, currentUser
     showToast("Absen pulang tercatat");
   };
 
-  const openHourFor = (storeId: string) => stores.find(s => s.id === storeId)?.openHour ?? "08:00";
-
-  const statusRec = (r: AttendanceRecord) => {
-    const oh = openHourFor(r.storeId);
-    if (r.clockOut) return { label: isLateFor(r.clockIn, oh) ? "Telat" : "Hadir", bg: isLateFor(r.clockIn, oh) ? "#fef3c7" : "#f0fdf4", text: isLateFor(r.clockIn, oh) ? "#d97706" : "#16a34a" };
-    if (r.date < todayISO()) return { label: "Tidak Catat Pulang", bg: "#fef2f2", text: "#ef4444" };
-    return { label: "Menunggu Pulang", bg: "#fff7ed", text: "#ea580c" };
-  };
-
-  const handleExport = () => {
-    if (filtered.length === 0) { showToast("Tidak ada data untuk diexport"); return; }
-    const rows = filtered.map(r => ({
-      "Tanggal": r.date,
-      "Nama": r.employeeName,
-      "Jabatan": getRoleLabel(r.role, roles),
-      "Toko": r.storeName,
-      "Jam Masuk": r.clockIn,
-      "Jam Pulang": r.clockOut ?? "",
-      "Status": r.clockOut ? (isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : "Hadir") : r.date < todayISO() ? "Tidak Catat Pulang" : "Menunggu Pulang",
-      "Catatan": r.note ?? "",
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Absensi");
-    XLSX.writeFile(wb, `nands-boutique-absensi-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast("File Excel laporan absensi berhasil diunduh");
-  };
-
-  const filtered = records
-    .filter(r => viewAll || r.employeeId === currentUser.id)
-    .filter(r => !filterDate || r.date === filterDate)
-    .filter(r => filterStore === "all" || r.storeId === filterStore)
-    .filter(r => filterEmp === "all" || r.employeeId === filterEmp)
-    .sort((a, b) => (a.date + a.clockIn).localeCompare(b.date + b.clockIn) * -1);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  const empOptions = employees.filter(e => e.status === "active");
-
   const photoArea = (
     <div className="mb-3">
       {photo ? (
@@ -271,224 +214,101 @@ export default function AttendanceView({ records, stores, employees, currentUser
   );
 
   return (
-    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: "var(--background)" }}>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>
           {toast}
         </div>
       )}
 
-      {/* Left: absen hari ini */}
-      <div className="shrink-0 flex flex-col w-full lg:w-[380px] lg:overflow-y-auto" style={{ background: "var(--card)", borderRight: "1px solid var(--border)" }}>
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Absensi Hari Ini</div>
-          <div className="text-xs mt-0.5 flex flex-wrap items-center gap-x-2" style={{ color: "var(--muted-foreground)" }}>
-            <span>{fmtDate(todayStr)} · {attStoreName.replace("NAND'S BOUTIQUE - ", "")}</span>
-            <span className="font-mono font-bold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{liveTime}</span>
-            <span className="px-2 py-0.5 rounded-full" style={{ background: "var(--secondary)", fontSize: 9 }}>Jam {openHour} – {closeHour}</span>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-4">
-            {currentUser.photo ? (
-              <img src={currentUser.photo} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
-            ) : (
-              <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--foreground)" }}>{currentUser.name.charAt(0)}</div>
-            )}
-            <div>
-              <div className="text-sm font-semibold">{currentUser.name}</div>
-              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {todayRecord ? <span>Masuk {todayRecord.clockIn}{todayRecord.clockOut ? ` · Pulang ${todayRecord.clockOut}` : ""}</span> : "Belum absen hari ini"}
-              </div>
+      <div className="w-full max-w-[420px] mx-auto px-4 py-6 lg:py-10 flex flex-col flex-1">
+        <div className="rounded-3xl overflow-hidden" style={{ background: "var(--card)", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+          <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Absensi Hari Ini</div>
+            <div className="text-xs mt-0.5 flex flex-wrap items-center gap-x-2" style={{ color: "var(--muted-foreground)" }}>
+              <span>{fmtDate(todayStr)} · {attStoreName.replace("NAND'S BOUTIQUE - ", "")}</span>
+              <span className="font-mono font-bold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{liveTime}</span>
+              <span className="px-2 py-0.5 rounded-full" style={{ background: "var(--secondary)", fontSize: 9 }}>Jam {openHour} – {closeHour}</span>
             </div>
           </div>
 
-          <div className="mb-4 p-3 rounded-xl" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>LOKASI ABSENSI</label>
-            {clockStores.length > 1 ? (
-              <select value={selStoreId} onChange={e => { setAttStore(e.target.value); setPhoto(null); setUsingFile(false); }}
-                className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                {clockStores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
-              </select>
-            ) : (
-              <div className="text-sm font-semibold">{attStoreName.replace("NAND'S BOUTIQUE - ", "")}</div>
-            )}
-            <div className="text-xs mt-1.5 flex items-center justify-between flex-wrap gap-1">
-              <span>Jam operasional: <b className="font-mono">{openHour} – {closeHour}</b></span>
-              <span style={{ color: isLateFor(liveTime, openHour) ? "#d97706" : "#16a34a" }}>{isLateFor(liveTime, openHour) ? "Terlambat" : "Tepat waktu"}</span>
-            </div>
-          </div>
-
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-
-          {actionArea}
-
-          <input
-            type="text"
-            placeholder="Catatan (opsional)"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            className="w-full mt-3 px-3 py-2.5 rounded-xl text-xs outline-none"
-            style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
-          />
-
-          {!todayRecord && (
-            <button
-              onClick={handleClockIn}
-              disabled={!photo}
-              className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: photo ? "var(--foreground)" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
-            >
-              Absen Masuk
-            </button>
-          )}
-          {todayRecord && !todayRecord.clockOut && (
-            <button
-              onClick={handleClockOut}
-              disabled={!photo}
-              className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: photo ? "#ea580c" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
-            >
-              Absen Pulang
-            </button>
-          )}
-
-          {photo && !todayRecord?.clockOut && (
-            <button
-              onClick={() => { setPhoto(null); setUsingFile(false); setCameraKey(k => k + 1); }}
-              className="w-full mt-2 py-2 rounded-xl text-xs font-semibold"
-              style={{ background: "var(--secondary)" }}
-            >
-              Ulangi Foto
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Right: riwayat */}
-      <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-            <div>
-              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Riwayat Absensi</div>
-              <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-                {viewAll ? "Semua karyawan" : `Riwayat ${currentUser.name}`} · {filtered.length} catatan
-              </div>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={handleExport}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Export
-              </button>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold leading-none" style={{ color: "var(--muted-foreground)" }}>TANGGAL</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="date"
-                    value={filterDate}
-                    onChange={e => { setFilterDate(e.target.value); resetPage(); }}
-                    className="text-xs rounded-xl px-2.5 py-2 outline-none"
-                    style={{ background: "var(--card)", border: `1px solid ${filterDate ? "var(--accent)" : "var(--border)"}` }}
-                  />
-                  {filterDate && (
-                    <button onClick={() => { setFilterDate(""); resetPage(); }}
-                      className="px-2.5 py-2 rounded-xl text-xs font-semibold"
-                      style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
-                      Semua
-                    </button>
-                  )}
-                </div>
-              </label>
-              <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
-                className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                <option value="all">Semua Toko</option>
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
-              </select>
-              {viewAll && (
-                <select value={filterEmp} onChange={e => { setFilterEmp(e.target.value); resetPage(); }}
-                  className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                  <option value="all">Semua Karyawan</option>
-                  {empOptions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                </select>
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              {currentUser.photo ? (
+                <img src={currentUser.photo} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
+              ) : (
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--foreground)" }}>{currentUser.name.charAt(0)}</div>
               )}
+              <div>
+                <div className="text-sm font-semibold">{currentUser.name}</div>
+                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  {todayRecord ? <span>Masuk {todayRecord.clockIn}{todayRecord.clockOut ? ` · Pulang ${todayRecord.clockOut}` : ""}</span> : "Belum absen hari ini"}
+                </div>
+              </div>
             </div>
+
+            <div className="mb-4 p-3 rounded-xl" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>LOKASI ABSENSI</label>
+              {clockStores.length > 1 ? (
+                <select value={selStoreId} onChange={e => { setAttStore(e.target.value); setPhoto(null); setUsingFile(false); }}
+                  className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  {clockStores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
+                </select>
+              ) : (
+                <div className="text-sm font-semibold">{attStoreName.replace("NAND'S BOUTIQUE - ", "")}</div>
+              )}
+              <div className="text-xs mt-1.5 flex items-center justify-between flex-wrap gap-1">
+                <span>Jam operasional: <b className="font-mono">{openHour} – {closeHour}</b></span>
+                <span style={{ color: isLateFor(liveTime, openHour) ? "#d97706" : "#16a34a" }}>{isLateFor(liveTime, openHour) ? "Terlambat" : "Tepat waktu"}</span>
+              </div>
+            </div>
+
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+
+            {actionArea}
+
+            <input
+              type="text"
+              placeholder="Catatan (opsional)"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              className="w-full mt-3 px-3 py-2.5 rounded-xl text-xs outline-none"
+              style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+            />
+
+            {!todayRecord && (
+              <button
+                onClick={handleClockIn}
+                disabled={!photo}
+                className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: photo ? "var(--foreground)" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
+              >
+                Absen Masuk
+              </button>
+            )}
+            {todayRecord && !todayRecord.clockOut && (
+              <button
+                onClick={handleClockOut}
+                disabled={!photo}
+                className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: photo ? "#ea580c" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
+              >
+                Absen Pulang
+              </button>
+            )}
+
+            {photo && !todayRecord?.clockOut && (
+              <button
+                onClick={() => { setPhoto(null); setUsingFile(false); setCameraKey(k => k + 1); }}
+                className="w-full mt-2 py-2 rounded-xl text-xs font-semibold"
+                style={{ background: "var(--secondary)" }}
+              >
+                Ulangi Foto
+              </button>
+            )}
           </div>
         </div>
-
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
-          {filtered.length === 0 ? (
-            <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada catatan absensi</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {pageItems.map(r => {
-                const st = statusRec(r);
-                return (
-                  <div key={r.id} className="p-4 rounded-xl flex items-center gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                    {r.photoIn ? (
-                      <img src={r.photoIn} alt="Foto masuk" className="w-12 h-12 rounded-xl object-cover shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: "var(--accent)" }}>{r.employeeName.charAt(0)}</div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                        <span className="text-sm font-semibold">{viewAll ? r.employeeName : currentUser.name}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: st.bg, color: st.text }}>{st.label}</span>
-                      </div>
-                      <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                        {fmtDate(r.date)} · Masuk <span className="font-mono">{r.clockIn}</span> · Pulang <span className="font-mono">{r.clockOut ?? "—"}</span>
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{r.storeName}</div>
-                      {r.note && (
-                        <div className="text-xs mt-1 flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}>
-                          <svg width="11" height="11" className="shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          <span className="italic">Catatan: {r.note}</span>
-                        </div>
-                      )}
-                    </div>
-                    {r.photoOut && <img src={r.photoOut} alt="Foto pulang" className="w-8 h-8 rounded-lg object-cover shrink-0" title="Foto pulang" />}
-                    {onDelete && (
-                      <button onClick={() => setDeleteTarget(r)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-red-50"
-                        title="Hapus catatan">
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <Pagination
-          total={filtered.length}
-          page={safePage}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          rowLabel="catatan"
-        />
       </div>
-
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Catatan Absensi?</div>
-            <div className="text-sm mb-1" style={{ color: "var(--muted-foreground)" }}>
-              <b>{deleteTarget.employeeName}</b> — {fmtDate(deleteTarget.date)}, masuk <span className="font-mono">{deleteTarget.clockIn}</span>
-            </div>
-            <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Data yang dihapus tidak dapat dikembalikan.</div>
-            <div className="flex gap-2">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
-              <button onClick={() => { onDelete!(deleteTarget.id); setDeleteTarget(null); showToast("Catatan absensi dihapus"); }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Hapus</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

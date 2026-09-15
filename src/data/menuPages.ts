@@ -9,5 +9,6 @@ export const MENU_PAGES: Record<string, string> = {
   discount: "diskon.html",
   member: "member.html",
   attendance: "absensi.html",
+  attendanceHistory: "riwayat-absensi.html",
   settings: "setelan.html",
 };

@@ -7,6 +7,12 @@ export interface PrinterSettings {
   copies: number;
   autoPrint: boolean;
   receiptLogo: string;
+  showTax: boolean;
+  showCashier: boolean;
+  showDate: boolean;
+  showTime: boolean;
+  showChange: boolean;
+  footerText: string;
 }
 
 export interface BrandSettings {
@@ -61,7 +67,7 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
-  printer: { printerName: "Printer Thermal", paperWidth: 80, copies: 1, autoPrint: false, receiptLogo: "" },
+  printer: { printerName: "Printer Thermal", paperWidth: 80, copies: 1, autoPrint: false, receiptLogo: "", showTax: true, showCashier: true, showDate: true, showTime: true, showChange: true, footerText: "Terima kasih telah berbelanja!\nwww.nandsboutique.id" },
   brand: { logo: "logo.jpg", name: "NANDS BOUTIQUE", tagline: "Point of Sale System", loadingImage: "loadingscreen.png", loadingDescription: "sabar guys loading dulu" },
   roles: DEFAULT_ROLES,
   barcode: { mode: "camera", beep: true, vibrate: false, stripPrefix: "", stripSuffix: "", enterEndsScan: true },

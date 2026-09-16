@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord } from "../data/types";
-import type { AppSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
+import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
@@ -420,6 +420,34 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               </div>
             </div>
             <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Tampil di bagian atas struk. Kosong = logo tidak dicetak.</div>
+          </div>
+
+          <div className="mb-5">
+            <div className="text-xs font-semibold mb-2.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI STRUK</div>
+            <div className="rounded-2xl" style={{ border: "1px solid var(--border)" }}>
+              {([
+                { key: "showTax", label: "Pajak", desc: "Baris pajak di bagian rincian" },
+                { key: "showCashier", label: "Kasir", desc: "Nama kasir di bagian atas struk" },
+                { key: "showDate", label: "Tanggal", desc: "Tanggal transaksi di bagian atas struk" },
+                { key: "showTime", label: "Jam", desc: "Jam transaksi di bagian atas struk" },
+                { key: "showChange", label: "Kembalian", desc: "Baris kembalian di bagian rincian" },
+              ] as { key: keyof PrinterSettings; label: string; desc: string }[]).map((row, i) => (
+                <div key={row.key} className="flex items-center justify-between p-3" style={{ borderBottom: i < 4 ? "1px solid var(--border)" : "none" }}>
+                  <div>
+                    <div className="text-sm font-semibold">{row.label}</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{row.desc}</div>
+                  </div>
+                  {toggle(draftPrinter[row.key] as boolean, v => setDraftPrinter(p => ({ ...p, [row.key]: v })))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>DESKRIPSI BAWAH STRUK</label>
+            <textarea value={draftPrinter.footerText} onChange={e => setDraftPrinter(p => ({ ...p, footerText: e.target.value }))}
+              rows={3} placeholder="Contoh: Terima kasih telah berbelanja!" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={field} />
+            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Teks di bagian bawah struk. Tiap baris otomatis menjadi baris baru.</div>
           </div>
 
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>

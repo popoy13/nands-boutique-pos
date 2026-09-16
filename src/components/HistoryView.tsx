@@ -117,19 +117,22 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     </head><body>
     ${printer?.receiptLogo ? `<div class="center"><img class="logo" src="${escapeHtml(printer.receiptLogo)}" alt="" /></div>` : ""}
     <div class="center"><b>${escapeHtml(brandName ?? "NAND'S BOUTIQUE")}</b><br>${escapeHtml((t.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
-    <hr><div>No: ${escapeHtml(t.id)}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>
+    <hr><div>No: ${escapeHtml(t.id)}</div>
+    ${printer?.showDate !== false ? `<div>Tgl: ${fmtDate(t.date)}</div>` : ""}
+    ${printer?.showTime !== false ? `<div>Jam: ${new Date(t.date).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>` : ""}
+    ${printer?.showCashier !== false ? `<div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>` : ""}
     ${t.memberName ? `<div>Member: ${escapeHtml(t.memberName)}</div>` : ""}
     <hr>
     ${t.items.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
     <div class="row"><span>Subtotal</span><span>${fmtNum(t.subtotal)}</span></div>
     ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
-    <div class="row"><span>${escapeHtml(payments?.tax?.label ?? "Pajak 10%")}</span><span>${fmtNum(t.tax)}</span></div>
+    ${printer?.showTax !== false ? `<div class="row"><span>${escapeHtml(payments?.tax?.label ?? "Pajak 10%")}</span><span>${fmtNum(t.tax)}</span></div>` : ""}
     ${(() => { const rd = t.total - t.subtotal + (t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount) - t.tax; return rd !== 0 ? `<div class="row"><span>Pembulatan</span><span>+${fmtNum(rd)}</span></div>` : ""; })()}
     <div class="row"><b><span>TOTAL</span><span>${fmtNum(t.total)}</span></b></div>
     <div class="row"><span>Bayar (${escapeHtml(labelOf(t.paymentMethod, payments))})</span><span>${fmtNum(t.payment)}</span></div>
-    ${t.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
-    <hr><div class="center">Terima kasih!<br>www.nandsboutique.id</div>
+    ${t.change > 0 && printer?.showChange !== false ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
+    ${printer?.footerText ? `<hr><div class="center">${escapeHtml(printer.footerText).split("\n").join("<br>")}</div>` : ""}
     </body></html>`);
     w.document.close();
     w.print();

@@ -102,19 +102,22 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
     ${printer.receiptLogo ? `<div class="center"><img class="logo" src="${escapeHtml(printer.receiptLogo)}" alt="" /></div>` : ""}
     <div class="center"><b>${escapeHtml(r.brandName)}</b><br>${escapeHtml((r.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
     <hr>
-    <div>No: ${escapeHtml(r.txId)}</div><div>Tgl: ${r.txDate.toLocaleString("id-ID")}</div><div>Kasir: ${escapeHtml(r.cashierName)}</div>
+    <div>No: ${escapeHtml(r.txId)}</div>
+    ${printer.showDate !== false ? `<div>Tgl: ${r.txDate.toLocaleDateString("id-ID")}</div>` : ""}
+    ${printer.showTime !== false ? `<div>Jam: ${r.txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>` : ""}
+    ${printer.showCashier !== false ? `<div>Kasir: ${escapeHtml(r.cashierName)}</div>` : ""}
     ${r.memberName ? `<div>Member: ${escapeHtml(r.memberName)}${r.pointsEarned ? ` (+${r.pointsEarned} pts)` : ""}</div>` : ""}
     <hr>
     ${r.cart.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
     <div class="row"><span>Subtotal</span><span>${fmtNum(r.subtotal)}</span></div>
     ${r.discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(r.discountAmt)}</span></div>` : ""}
-    <div class="row"><span>${escapeHtml(taxLabel)}</span><span>${fmtNum(r.tax)}</span></div>
+    ${printer.showTax !== false ? `<div class="row"><span>${escapeHtml(taxLabel)}</span><span>${fmtNum(r.tax)}</span></div>` : ""}
     ${r.roundingDiff ? `<div class="row"><span>Pembulatan</span><span>+${fmtNum(r.roundingDiff)}</span></div>` : ""}
     <div class="row"><b><span>TOTAL</span><span>${fmtNum(r.total)}</span></b></div>
     <div class="row"><span>Bayar (${escapeHtml(methodLabel(r.method))})</span><span>${fmtNum(r.payment)}</span></div>
-    ${r.cash && r.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(r.change)}</span></div>` : ""}
-    <hr><div class="center">Terima kasih telah berbelanja!<br>www.nandsboutique.id</div>`;
+    ${r.cash && r.change > 0 && printer.showChange !== false ? `<div class="row"><span>Kembalian</span><span>${fmtNum(r.change)}</span></div>` : ""}
+    ${printer.footerText ? `<hr><div class="center">${escapeHtml(printer.footerText).split("\n").join("<br>")}</div>` : ""}`;
     const copies = Math.max(1, printer.copies || 1);
     const pages = Array.from({ length: copies }, () => `<div style="page-break-after:always;">${body}</div>`).join("");
     w.document.write(`<html><head><title>Struk</title>

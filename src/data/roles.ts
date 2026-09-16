@@ -148,6 +148,11 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     if (k in DEFAULT_ROLES && DEFAULT_ROLES[k].permissions?.attendance?.includes("view_all")) {
       perms.attendance = [...new Set([...(perms.attendance ?? []), "view_all"])];
     }
+    // Migrasi: role yang punya akses Setelan otomatis mendapat tab setelan baru
+    // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.
+    if (Array.isArray(perms.settings) && perms.settings.length > 0) {
+      perms.settings = [...new Set([...perms.settings, ...(ACTION_ITEMS.settings ?? [])])];
+    }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).
     if (!(k in DEFAULT_ROLES) && Array.isArray(v.menus)) {

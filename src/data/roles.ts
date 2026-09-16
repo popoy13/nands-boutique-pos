@@ -40,6 +40,7 @@ export const getRoleColor = (role: string, roles?: Record<string, RoleConfig>): 
 export const MENU_ITEMS: { id: string; label: string }[] = [
   { id: "pos", label: "Kasir" },
   { id: "history", label: "Transaksi" },
+  { id: "expense", label: "Pengeluaran" },
   { id: "report", label: "Laporan" },
   { id: "inventory", label: "Inventori" },
   { id: "product", label: "Produk" },

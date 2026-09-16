@@ -4,10 +4,10 @@ export type UserRole = "admin" | "manager" | "manager_operasional" | "kasir" | "
 export type MemberTier = "bronze" | "silver" | "gold" | "platinum";
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin:   ["pos", "history", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "attendanceHistory", "settings"],
-  manager: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
-  manager_operasional: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
-  kasir:   ["pos", "history", "report", "inventory", "attendance", "attendanceHistory"],
+  admin:   ["pos", "history", "expense", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "attendanceHistory", "settings"],
+  manager: ["pos", "history", "expense", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  manager_operasional: ["pos", "history", "expense", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  kasir:   ["pos", "history", "expense", "report", "inventory", "attendance", "attendanceHistory"],
   staff:   ["inventory", "attendance", "attendanceHistory"],
 };
 
@@ -141,4 +141,15 @@ export interface AttendanceRecord {
   photoIn?: string;
   photoOut?: string;
   note?: string;
+}
+
+export interface Expense {
+  id: string;
+  storeId: string;
+  storeName: string;
+  amount: number;
+  description: string;
+  photo?: string;
+  createdByName: string;
+  date: Date;
 }

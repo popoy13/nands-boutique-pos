@@ -85,6 +85,13 @@ body {
   animation: swipe-sweep 1.4s ease-in-out infinite;
 }
 
+/* Bottom sheet (mobile) */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.sheet-up { animation: sheet-up 0.28s ease-out; }
+
 /* Print styles for receipt */
 @media print {
   @page { size: 80mm auto; margin: 0; }

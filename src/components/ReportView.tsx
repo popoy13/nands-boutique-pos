@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import type { Transaction, DeletedTransaction } from "../data/types";
+import type { PaymentSettings } from "../data/settings";
 import DateRangeFilter from "./DateRangeFilter";
 
 const fmt = (n: number) =>
@@ -21,9 +22,12 @@ interface Props {
   transactions: Transaction[];
   deletedTransactions: DeletedTransaction[];
   stores: { id: string; name: string }[];
+  payments?: PaymentSettings;
 }
 
-export default function ReportView({ transactions, deletedTransactions, stores }: Props) {
+const PAY_COLORS = ["#7c3aed", "#3b82f6", "#0d9488", "#ea580c", "#db2777", "#ca8a04", "#16a34a", "#4f46e5"];
+
+export default function ReportView({ transactions, deletedTransactions, stores, payments }: Props) {
   const [filterStore, setFilterStore] = useState("all");
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("7d");
   const [dateFrom, setDateFrom] = useState("");
@@ -154,15 +158,25 @@ export default function ReportView({ transactions, deletedTransactions, stores }
   const storeBreakdownMax = storeBreakdown[0]?.revenue ?? 0;
 
   const paymentBreakdown = useMemo(() => {
-    const map: Record<string, number> = { cash: 0, debit: 0, qris: 0 };
-    filtered.forEach(t => { map[t.paymentMethod || "cash"] += t.total; });
-    const total = Object.values(map).reduce((s, v) => s + v, 0) || 1;
-    return [
-      { method: "cash", label: "Tunai", value: map.cash, pct: Math.round((map.cash / total) * 100), color: "#7c3aed" },
-      { method: "debit", label: "Debit", value: map.debit, pct: Math.round((map.debit / total) * 100), color: "#3b82f6" },
-      { method: "qris", label: "QRIS", value: map.qris, pct: Math.round((map.qris / total) * 100), color: "#7c3aed" },
+    const methods = payments?.methods ?? [
+      { id: "cash", label: "Tunai" },
+      { id: "debit", label: "Debit" },
+      { id: "qris", label: "QRIS" },
     ];
-  }, [filtered]);
+    const map: Record<string, number> = {};
+    const fallback: Record<string, number> = {};
+    filtered.forEach(t => {
+      const m = t.paymentMethod || "cash";
+      if (methods.some(x => x.id === m)) map[m] = (map[m] ?? 0) + t.total;
+      else fallback[m] = (fallback[m] ?? 0) + t.total;
+    });
+    const rows = methods.map((m, i) => ({ method: m.id, label: m.label, value: map[m.id] ?? 0, color: PAY_COLORS[i % PAY_COLORS.length] }));
+    const otherTotal = Object.values(fallback).reduce((s, v) => s + v, 0);
+    if (otherTotal > 0) rows.push({ method: "other", label: "Lainnya", value: otherTotal, color: "#9ca3af" });
+    rows.sort((a, b) => b.value - a.value);
+    const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+    return rows.map(r => ({ ...r, pct: Math.round((r.value / total) * 100) }));
+  }, [filtered, payments]);
 
   const statCards = [
     { label: "Total Pendapatan", value: fmt(stats.revenue), sub: `${stats.count} transaksi`, color: "var(--accent)" },
@@ -172,7 +186,10 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     { label: "Transaksi Dihapus", value: filteredDeleted.length.toString(), sub: `Nominal ${fmt(filteredDeleted.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
   ];
 
-  const paymentLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
+  const paymentLabel: Record<string, string> = {
+    ...(payments?.methods ? Object.fromEntries(payments.methods.map(m => [m.id, m.label])) : {}),
+    cash: "Tunai", debit: "Debit", qris: "QRIS",
+  };
 
   const handleExport = () => {
     if (filtered.length === 0 && filteredDeleted.length === 0) return;

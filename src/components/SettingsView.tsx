@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord } from "../data/types";
-import type { AppSettings } from "../data/settings";
+import type { AppSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
@@ -29,7 +29,7 @@ interface Props {
   onResetAttendance: (ids: string[]) => Promise<ResetResult>;
 }
 
-type Tab = "printer" | "attendance" | "brand" | "roles" | "barcode" | "reset";
+type Tab = "printer" | "attendance" | "pembayaran" | "brand" | "roles" | "barcode" | "reset";
 
 const field = {
   background: "var(--background)",
@@ -62,6 +62,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
   const loadingRef = useRef<HTMLInputElement>(null);
+  const receiptLogoRef = useRef<HTMLInputElement>(null);
   const isAdmin = currentUser?.role === "admin";
 
   const canOpenTab = (id: Tab): boolean => {
@@ -69,7 +70,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     const acts = permissions?.settings;
     return !acts || acts.includes(id);
   };
-  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "brand", "reset"];
+  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "pembayaran", "brand", "reset"];
 
   useEffect(() => {
     if (tab === "reset" && isAdmin) return;
@@ -83,6 +84,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
   const [draftPrinter, setDraftPrinter] = useState({ ...settings.printer });
   const [draftBrand, setDraftBrand] = useState({ ...settings.brand });
+  const [draftPayments, setDraftPayments] = useState<PaymentSettings>(() => ({
+    methods: settings.payments.methods.map(m => ({ ...m })),
+    tax: { ...settings.payments.tax },
+    rounding: { ...settings.payments.rounding },
+  }));
+  const [payLabel, setPayLabel] = useState("");
+  const [payKind, setPayKind] = useState<PaymentMethodKind>("cash");
   const [draftStores, setDraftStores] = useState<Store[]>(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
   const [draftRoles, setDraftRoles] = useState(() => ensureRoles(settings.roles));
   const [draftBarcode, setDraftBarcode] = useState({ ...defaultSettings.barcode, ...settings.barcode });
@@ -97,6 +105,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   // tanpa merusak nilai yang baru saja disimpan.
   useEffect(() => { setDraftPrinter({ ...settings.printer }); }, [settings.printer]);
   useEffect(() => { setDraftBrand({ ...settings.brand }); }, [settings.brand]);
+  useEffect(() => {
+    setDraftPayments({
+      methods: settings.payments.methods.map(m => ({ ...m })),
+      tax: { ...settings.payments.tax },
+      rounding: { ...settings.payments.rounding },
+    });
+  }, [settings.payments]);
   useEffect(() => { setDraftBarcode({ ...defaultSettings.barcode, ...settings.barcode }); }, [settings.barcode]);
   useEffect(() => {
     setDraftStores(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
@@ -135,6 +150,41 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const saveBrand = () => { onSaveSettings({ ...settings, brand: draftBrand }); showToast("Menu utama diperbarui"); };
   const saveAttendance = () => { onSaveStores(draftStores); showToast("Jam operasional toko tersimpan"); };
   const saveBarcode = () => { onSaveSettings({ ...settings, barcode: draftBarcode }); showToast("Setelan perangkat barcode disimpan"); };
+  const savePayments = () => {
+    const label = draftPayments.tax.enabled ? `Pajak ${draftPayments.tax.rate}%` : "Pajak";
+    const withLabel: PaymentSettings = {
+      methods: draftPayments.methods.filter(m => m.label.trim() !== ""),
+      tax: { ...draftPayments.tax, rate: Math.max(0, Math.min(100, Math.round(Number(draftPayments.tax.rate) || 0))), label },
+      rounding: { enabled: draftPayments.rounding.enabled, step: Number(draftPayments.rounding.step) || 0 },
+    };
+    if (withLabel.methods.filter(m => m.enabled).length === 0) { showToast("Minimal satu metode pembayaran aktif", false); return; }
+    onSaveSettings({ ...settings, payments: withLabel });
+    showToast("Setelan pembayaran disimpan");
+  };
+
+  const addPaymentMethod = () => {
+    const label = payLabel.trim();
+    if (!label) { showToast("Masukkan nama metode pembayaran", false); return; }
+    if (draftPayments.methods.some(m => m.label.trim().toLowerCase() === label.toLowerCase())) { showToast("Metode tersebut sudah ada", false); return; }
+    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "metode";
+    let id = base;
+    let i = 1;
+    while (draftPayments.methods.some(m => m.id === id)) { id = `${base}_${i}`; i++; }
+    setDraftPayments(p => ({ ...p, methods: [...p.methods, { id, label, kind: payKind, enabled: true }] }));
+    setPayLabel("");
+    showToast(`Metode "${label}" ditambahkan`);
+  };
+
+  const updatePayMethod = (id: string, patch: Partial<{ label: string; kind: PaymentMethodKind; enabled: boolean }>) =>
+    setDraftPayments(p => ({ ...p, methods: p.methods.map(m => m.id === id ? { ...m, ...patch } : m) }));
+
+  const deletePayMethod = (id: string) => {
+    if (draftPayments.methods.filter(m => m.enabled).length <= 1 && draftPayments.methods.find(m => m.id === id)?.enabled) {
+      showToast("Minimal satu metode pembayaran aktif", false);
+      return;
+    }
+    setDraftPayments(p => ({ ...p, methods: p.methods.filter(m => m.id !== id) }));
+  };
 
   const finishReset = (res: ResetResult, okMsg: string) =>
     showToast(res.ok ? okMsg : (res.msg || "Gagal menghapus data"), res.ok);
@@ -283,6 +333,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
           { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
           { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
+          { id: "pembayaran", label: "Pembayaran", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 8h4" /></svg> },
           { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
           { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
         ] as { id: Tab; label: string; icon: React.ReactNode }[])
@@ -334,9 +385,166 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             {toggle(draftPrinter.autoPrint, v => setDraftPrinter(p => ({ ...p, autoPrint: v })))}
           </div>
 
+          <div className="mb-5">
+            <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO CETAK STRUK</label>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                {draftPrinter.receiptLogo ? (
+                  <img src={draftPrinter.receiptLogo} alt="Logo struk" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] px-1 text-center" style={{ color: "var(--muted-foreground)" }}>Tanpa logo</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input ref={receiptLogoRef} type="file" accept="image/*" className="hidden"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const dataUrl = await compressImage(file, 320, 0.8);
+                      setDraftPrinter(p => ({ ...p, receiptLogo: dataUrl }));
+                    } catch {
+                      showToast("Gagal membaca gambar", false);
+                    }
+                    e.target.value = "";
+                  }} />
+                <button onClick={() => receiptLogoRef.current?.click()} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                  Unggah Logo
+                </button>
+                {draftPrinter.receiptLogo && (
+                  <button onClick={() => setDraftPrinter(p => ({ ...p, receiptLogo: defaultSettings.printer.receiptLogo }))}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--secondary)" }}>
+                    Hapus Logo
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Tampil di bagian atas struk. Kosong = logo tidak dicetak.</div>
+          </div>
+
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
             Simpan Setelan Printer
           </button>
+        </div>
+      )}
+
+      {/* PEMBAYARAN — floating overlay (bottom sheet on mobile, centered on desktop) */}
+      {tab === "pembayaran" && (
+        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
+          <div className="w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92dvh] overflow-hidden flex flex-col" style={{ background: "var(--card)" }}>
+            <div className="pt-2.5 pb-1 flex justify-center shrink-0 sm:hidden">
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--muted)" }} />
+            </div>
+            <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Setelan Pembayaran</div>
+              <button onClick={() => setTab("printer")} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-4 flex flex-col gap-5">
+              {/* Metode pembayaran */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Metode Pembayaran</div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                    {draftPayments.methods.filter(m => m.enabled).length}/{draftPayments.methods.length} aktif
+                  </span>
+                </div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Atur cara pembayaran yang muncul saat checkout kasir.</div>
+
+                <div className="flex flex-col gap-2 mb-3">
+                  {draftPayments.methods.map(m => (
+                    <div key={m.id} className="flex items-center gap-2.5 p-2.5 rounded-xl" style={{ background: "var(--background)", border: `1.5px solid ${m.enabled ? "var(--border)" : "var(--border)"}`, opacity: m.enabled ? 1 : 0.65 }}>
+                      <input type="text" value={m.label} onChange={e => updatePayMethod(m.id, { label: e.target.value })}
+                        placeholder="Nama metode" className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                      <select value={m.kind} onChange={e => updatePayMethod(m.id, { kind: e.target.value as PaymentMethodKind })}
+                        className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                        <option value="cash">Tunai</option>
+                        <option value="card">Nominal tetap</option>
+                      </select>
+                      {toggle(m.enabled, v => updatePayMethod(m.id, { enabled: v }))}
+                      <button onClick={() => deletePayMethod(m.id)} className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-xl flex flex-wrap items-center gap-2" style={{ background: "var(--background)", border: "1px dashed var(--border)" }}>
+                  <input type="text" placeholder="Nama metode baru (mis. E-Wallet)" value={payLabel}
+                    onChange={e => setPayLabel(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addPaymentMethod()}
+                    className="flex-1 min-w-[140px] px-3 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                  <select value={payKind} onChange={e => setPayKind(e.target.value as PaymentMethodKind)}
+                    className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    <option value="cash">Tunai</option>
+                    <option value="card">Nominal tetap</option>
+                  </select>
+                  <button onClick={addPaymentMethod} className="px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0" style={{ background: "var(--foreground)" }}>
+                    + Tambah
+                  </button>
+                </div>
+                <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                  "Tunai" = kasir memasukkan nominal bayar & ada kembalian. "Nominal tetap" = dibayar sesuai total.
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1.5px solid var(--border)" }} />
+              {/* Pajak */}
+              <div>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Pajak</div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Persentase pajak yang diterapkan di bawah diskon pada tiap transaksi.</div>
+                <div className="flex items-center justify-between p-3 rounded-xl mb-2.5" style={{ background: "var(--background)" }}>
+                  <div>
+                    <div className="text-sm font-semibold">Aktifkan pajak</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pajak dihitung otomatis saat checkout</div>
+                  </div>
+                  {toggle(draftPayments.tax.enabled, v => setDraftPayments(p => ({ ...p, tax: { ...p.tax, enabled: v } })))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TARIF PAJAK (%)</label>
+                    <input type="number" min={0} max={100} value={draftPayments.tax.rate} onChange={e => setDraftPayments(p => ({ ...p, tax: { ...p.tax, rate: Number(e.target.value) } }))}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI STRUK</label>
+                    <div className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: "var(--secondary)" }}>
+                      {draftPayments.tax.enabled ? `Pajak ${draftPayments.tax.rate}%` : "Pajak (nonaktif)"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1.5px solid var(--border)" }} />
+              {/* Pembulatan */}
+              <div>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Pembulatan Total</div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Bulatkan total tagihan ke nilai terdekat yang mudah untuk kembalian (biasanya untuk bayar tunai).</div>
+                <div className="flex items-center justify-between p-3 rounded-xl mb-2.5" style={{ background: "var(--background)" }}>
+                  <div>
+                    <div className="text-sm font-semibold">Aktifkan pembulatan</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Total dibulatkan ke atas sesuai kelipatan</div>
+                  </div>
+                  {toggle(draftPayments.rounding.enabled, v => setDraftPayments(p => ({ ...p, rounding: { ...p.rounding, enabled: v } })))}
+                </div>
+                {draftPayments.rounding.enabled && (
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KELIPATAN PEMBULATAN</label>
+                    <select value={draftPayments.rounding.step} onChange={e => setDraftPayments(p => ({ ...p, rounding: { ...p.rounding, step: Number(e.target.value) } }))}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
+                      {[100, 500, 1000, 2000, 5000].map(s => <option key={s} value={s}>Rp {s.toLocaleString("id-ID")}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <button onClick={savePayments} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
+                Simpan Setelan Pembayaran
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

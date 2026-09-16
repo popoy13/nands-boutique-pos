@@ -426,6 +426,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             brandName={settings.brand.name}
             printer={settings.printer}
             barcode={settings.barcode}
+            payments={settings.payments}
           />
         )}
         {safeTab === "history" && (
@@ -439,11 +440,12 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
             brandName={settings.brand.name}
             printer={settings.printer}
+            payments={settings.payments}
             currentUser={currentUser}
           />
         )}
         {safeTab === "report" && (
-          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} />
+          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} />
         )}
         {safeTab === "inventory" && (
           <StockView

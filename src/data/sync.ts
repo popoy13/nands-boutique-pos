@@ -432,6 +432,7 @@ export const settingsFromDB = (
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
+  const payments = (obj.payments ?? {}) as Partial<AppSettings["payments"]>
   // Migrasi branding lama "NET R" -> default baru (NANDS BOUTIQUE)
   if (brand.name === "NET R") brand.name = defaultSettings.brand.name
   return {
@@ -443,6 +444,11 @@ export const settingsFromDB = (
       ...(obj.roles ?? {}),
     } as AppSettings["roles"],
     barcode: { ...defaultSettings.barcode, ...barcode },
+    payments: {
+      methods: payments.methods ?? defaultSettings.payments.methods,
+      tax: { ...defaultSettings.payments.tax, ...(payments.tax ?? {}) },
+      rounding: { ...defaultSettings.payments.rounding, ...(payments.rounding ?? {}) },
+    },
   }
 }
 export const settingsToDB = (st: AppSettings) => [
@@ -450,6 +456,7 @@ export const settingsToDB = (st: AppSettings) => [
   { key: "brand", value: st.brand },
   { key: "roles", value: st.roles },
   { key: "barcode", value: st.barcode },
+  { key: "payments", value: st.payments },
 ]
 export async function saveSettingsRows(
   rows: Record<string, unknown>[],

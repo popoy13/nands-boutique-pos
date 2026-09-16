@@ -61,7 +61,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
   member: ["add", "edit", "delete"],
   attendance: ["view_all", "delete"],
   attendanceHistory: ["view_all", "delete"],
-  settings: ["printer", "attendance", "roles", "barcode", "brand"],
+  settings: ["printer", "attendance", "roles", "barcode", "brand", "pembayaran"],
 };
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
@@ -87,6 +87,7 @@ export const ACTION_LABELS: Record<string, Record<string, string>> = {
     roles: "Tab Role & Menu",
     barcode: "Tab Perangkat Barcode",
     brand: "Tab Menu Utama",
+    pembayaran: "Tab Pembayaran",
   },
 };
 

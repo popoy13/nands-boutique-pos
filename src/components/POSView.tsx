@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import type { Product, ProductVariant, CartItem, Transaction, Size, Discount, Member } from "../data/types";
-import type { PrinterSettings, BarcodeSettings } from "../data/settings";
+import type { PrinterSettings, BarcodeSettings, PaymentSettings } from "../data/settings";
 import { generateId } from "../data/transactions";
 import { POINTS_PER_10K, getTier, TIER_COLOR } from "../data/members";
 import { cleanBarcode, playScanFeedback } from "../lib/barcode";
@@ -26,6 +26,7 @@ interface Props {
   brandName: string;
   printer: PrinterSettings;
   barcode: BarcodeSettings;
+  payments: PaymentSettings;
   onNewTransaction: (t: Transaction) => void;
   onUpdateMember: (m: Member) => void;
   onUseVoucher: (id: string) => void;
@@ -33,7 +34,7 @@ interface Props {
 
 interface VariantPicker { product: Product }
 
-export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
+export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, payments, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -195,8 +196,12 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
   const rawDiscAmt = discountType === "percent" ? Math.round(subtotal * discount / 100) : discount;
   const discountAmt = Math.min(rawDiscAmt, subtotal);
-  const tax = Math.max(0, Math.round((subtotal - discountAmt) * 0.1));
-  const total = subtotal - discountAmt + tax;
+  const taxRate = payments.tax.enabled ? payments.tax.rate : 0;
+  const tax = Math.max(0, Math.round((subtotal - discountAmt) * taxRate / 100));
+  const rawTotal = subtotal - discountAmt + tax;
+  const roundStep = payments.rounding.enabled ? payments.rounding.step : 0;
+  const total = roundStep > 0 ? Math.ceil(rawTotal / roundStep) * roundStep : Math.max(0, rawTotal);
+  const roundingDiff = total - rawTotal;
   const pointsToEarn = Math.floor(total / 10000) * POINTS_PER_10K;
 
   useEffect(() => { if (cart.length === 0) setShowCartOverlay(false); }, [cart.length]);
@@ -229,7 +234,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     setDiscount(0); setDiscountType("amount"); setDiscountLabel(""); setVoucherCode(""); setVoucherMsg(null);
   };
 
-  const handlePay = (payment: number, method: "cash" | "debit" | "qris") => {
+  const handlePay = (payment: number, method: string) => {
     const t: Transaction = {
       id: pendingTxId || generateId(activeStore),
       date: new Date(),
@@ -420,9 +425,15 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             </div>
           )}
           <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--muted-foreground)" }}>Pajak (10%)</span>
+            <span style={{ color: "var(--muted-foreground)" }}>{payments.tax.enabled ? `Pajak (${payments.tax.rate}%)` : "Pajak"}</span>
             <span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(tax)}</span>
           </div>
+          {roundingDiff !== 0 && (
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "var(--muted-foreground)" }}>Pembulatan</span>
+              <span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>+{fmt(roundingDiff)}</span>
+            </div>
+          )}
           {selectedMember && pointsToEarn > 0 && (
             <div className="flex justify-between text-xs" style={{ color: "#16a34a" }}>
               <span>+Poin member</span>
@@ -594,6 +605,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           cashierName={cashierName}
           brandName={brandName}
           printer={printer}
+          methods={payments.methods}
+          taxLabel={payments.tax.enabled ? payments.tax.label : "Pajak"}
           memberName={selectedMember?.name}
           pointsEarned={selectedMember ? pointsToEarn : 0}
           onPay={handlePay}

@@ -62,7 +62,7 @@ export interface Transaction {
   total: number;
   payment: number;
   change: number;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   note: string;
   memberId?: string;
   memberName?: string;

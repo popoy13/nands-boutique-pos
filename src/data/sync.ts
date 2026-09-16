@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase"
+﻿import { supabase } from "../lib/supabase"
 import type {
   Product,
   StoreStock,
@@ -9,6 +9,7 @@ import type {
   Discount,
   Member,
   AttendanceRecord,
+  Expense,
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
@@ -512,6 +513,59 @@ export async function deleteAttendance(id: string): Promise<void> {
   if (error) throw error
 }
 
+/* ---------------- expenses ---------------- */
+
+export const expFromDB = (r: Record<string, unknown>): Expense => ({
+  id: s(r.id),
+  storeId: s(r.store_id),
+  storeName: s(r.store_name),
+  amount: n(r.amount),
+  description: s(r.description),
+  photo: s(r.photo) || undefined,
+  createdByName: s(r.created_by_name),
+  date: d(r.expense_date) ?? new Date(),
+})
+
+export const expToDB = (x: Expense) => ({
+  id: x.id,
+  store_id: x.storeId,
+  store_name: x.storeName,
+  amount: x.amount,
+  description: x.description,
+  photo: x.photo ?? null,
+  created_by_name: x.createdByName,
+  expense_date:
+    x.date instanceof Date ? x.date.toISOString() : String(x.date),
+})
+
+export async function writeExpenses(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const valid = rows.filter(
+    (r) =>
+      r &&
+      typeof r.id === "string" &&
+      r.id &&
+      typeof r.store_id === "string" &&
+      r.store_id &&
+      typeof r.amount === "number",
+  )
+  if (!valid.length) return
+  const { error } = await supabase
+    .from("expenses")
+    .upsert(valid, { onConflict: "id" })
+  if (error) throw error
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  if (!id) return
+  const { error } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", id)
+  if (error) throw error
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   if (!id) return
   const { error } = await supabase.from("transactions").delete().eq("id", id)
@@ -539,6 +593,7 @@ export interface AllData {
   members: Member[]
   discounts: Discount[]
   attendance: AttendanceRecord[]
+  expenses: Expense[]
   transactions: Transaction[]
   deletedTransactions: DeletedTransaction[]
   settings: AppSettings
@@ -567,6 +622,7 @@ export async function loadAll(): Promise<LoadResult> {
       memR,
       discR,
       attR,
+      expR,
       trxR,
       delR,
       setR,
@@ -580,6 +636,7 @@ export async function loadAll(): Promise<LoadResult> {
       supabase.from("members").select("*"),
       supabase.from("discounts").select("*"),
       supabase.from("attendance_records").select("*"),
+      supabase.from("expenses").select("*"),
       supabase.from("transactions").select("*"),
       supabase.from("deleted_transactions").select("*"),
       supabase.from("app_settings").select("*"),
@@ -604,6 +661,7 @@ export async function loadAll(): Promise<LoadResult> {
         members: first(memR).map(memFromDB),
         discounts: first(discR).map(discFromDB),
         attendance: first(attR).map(attFromDB),
+        expenses: first(expR).map(expFromDB),
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(first(setR)),

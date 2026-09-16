@@ -26,8 +26,12 @@ const BUILTIN_COLORS: Record<string, string> = {
 
 export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] => {
   const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
+  // Migrasi: role yang punya akses Transaksi otomatis mendapat menu Pengeluaran.
+  if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
   // Migrasi: role yang punya akses Absensi otomatis mendapat menu Riwayat Absensi.
   if (menus.includes("attendance") && !menus.includes("attendanceHistory")) menus.push("attendanceHistory");
+  // Migrasi: role yang punya menu Transaksi otomatis diberi menu Pengeluaran (biar backfill ke role lama yang tersimpan).
+  if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
   return menus;
 };
 
@@ -55,6 +59,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
+  expense: ["add", "delete"],
   product: ["export", "import", "bulk", "category", "add", "edit", "delete"],
   employee: ["import", "export", "add"],
   store: ["add", "edit", "delete"],
@@ -67,6 +72,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
+  expense: { add: "Tambah pengeluaran", delete: "Hapus pengeluaran" },
   product: {
     export: "Export produk",
     import: "Import produk",
@@ -103,12 +109,12 @@ export const defaultPermissionsForMenus = (menus: string[]): Record<string, stri
 const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: allActionsFor(MENU_ITEMS.map(m => m.id)),
   manager: {
-    ...allActionsFor(["history", "product", "employee", "settings"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   manager_operasional: {
-    ...allActionsFor(["history", "product", "employee", "settings"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },

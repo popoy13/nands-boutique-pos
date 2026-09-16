@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { supabase } from "../lib/supabase";
 import {
@@ -6,8 +6,9 @@ import {
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
+  expFromDB, expToDB,
 } from "../data/sync";
-import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord } from "../data/types";
+import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense } from "../data/types";
 import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
@@ -33,6 +34,7 @@ export interface SyncedStore {
   deletedTransactions: DeletedTransaction[]; setDeletedTransactions: Dispatch<SetStateAction<DeletedTransaction[]>>;
   settings: AppSettings; setSettings: Dispatch<SetStateAction<AppSettings>>;
   categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
+  expenses: Expense[]; setExpenses: Dispatch<SetStateAction<Expense[]>>;
   flush: () => Promise<void>;
 }
 
@@ -48,6 +50,7 @@ export function useSyncedStore(): SyncedStore {
   const [deletedTransactions, setDeletedTransactionsState] = useState<DeletedTransaction[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [categories, setCategoriesState] = useState<Category[]>([]);
+  const [expenses, setExpensesState] = useState<Expense[]>([]);
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -82,7 +85,7 @@ const onAttendanceFail = (again: unknown) => {
 const propagate = (table: string, rows: unknown) => {
   pendingRef.current[table] = rows;
   if (table === "attendance_records") {
-    // Attendance is critical & low-frequency — flush immediately (no debounce
+    // Attendance is critical & low-frequency â€” flush immediately (no debounce
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
@@ -218,6 +221,14 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     }
     return next;
   });
+  const setExpenses: Dispatch<SetStateAction<Expense[]>> = (upd) => setExpensesState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: Expense[]) => Expense[])(prev) : upd;
+    if (next !== prev) {
+      trackRemoved("expenses", prev, next);
+      propagate("expenses", next.map(expToDB));
+    }
+    return next;
+  });
 
   const flush = async () => {
     const tasks: Promise<unknown>[] = [];
@@ -267,6 +278,9 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setCategoriesCache(new Map(rows.map(c => [String(c.id), String(c.name)])));
         setCategoriesState(rows.map(c => ({ id: String(c.id), name: String(c.name) })));
         break;
+      case "expenses":
+        setExpensesState(rows.map(expFromDB));
+        break;
     }
   };
   appliedRef.current = applyRemote;
@@ -292,7 +306,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setCategoriesState(d.categories);
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {
-        console.warn("[sync] Supabase belum disetup — jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
+        console.warn("[sync] Supabase belum disetup â€” jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
       setReady(true);
     })();
@@ -326,6 +340,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setDeletedTransactionsState(d.deletedTransactions);
             setSettingsState(d.settings);
             setCategoriesState(d.categories);
+            setExpensesState(d.expenses);
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
             productsRemovedRef.current = { products: [], variants: [] };
             for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
@@ -348,6 +363,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    expenses, setExpenses,
     flush,
   };
 }

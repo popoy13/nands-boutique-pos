@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+﻿import { useState, useEffect, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
 
@@ -13,6 +13,7 @@ const ProductManagement = lazy(() => import("./components/ProductManagement"));
 const MemberView = lazy(() => import("./components/MemberView"));
 const AttendanceView = lazy(() => import("./components/AttendanceView"));
 const AttendanceHistoryView = lazy(() => import("./components/AttendanceHistoryView"));
+const ExpenseView = lazy(() => import("./components/ExpenseView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance, deleteTransaction, deleteRows } from "./data/sync";
@@ -382,6 +383,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canDiscAdd = has("discount", "add");
   const canDiscEdit = has("discount", "edit");
   const canDiscDelete = has("discount", "delete");
+const canExpenseAdd = has("expense", "add");
+const canExpenseEdit = has("expense", "edit");
+const canExpenseDelete = has("expense", "delete");
   const canMemAdd = has("member", "add");
   const canMemEdit = has("member", "edit");
   const canMemDelete = has("member", "delete");
@@ -534,6 +538,16 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             onDelete={canDeleteAttHistory ? handleDeleteAttendance : undefined}
             canViewAll={canViewAttHistoryAll}
             roles={settings.roles}
+          />
+        )}
+        {safeTab === "expense" && (
+          <ExpenseView
+            expenses={expenses}
+            stores={stores}
+            onSave={setExpenses}
+            canAdd={canExpenseAdd}
+            canEdit={canExpenseEdit}
+            canDelete={canExpenseDelete}
           />
         )}
         {safeTab === "settings" && (

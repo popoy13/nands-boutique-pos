@@ -56,8 +56,63 @@ function ResetButton({ label, onReset }: { label: string; onReset: () => void })
 const isoDay = (dt: Date): string =>
   `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 
+function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; brandName: string }) {
+  const now = new Date();
+  const width = printer.paperWidth || 80;
+  const pxPerMm = 3.7795;
+  const scale = Math.min(1, 400 / (width * pxPerMm));
+  const px = Math.round(width * pxPerMm * scale);
+  const fontPx = Math.max(7, Math.round((width <= 58 ? 0.11 : 0.13) * width * scale));
+  const items = [
+    { name: "Kaos Polos Premium", color: "Putih", size: "L", qty: 2, price: 85000, subtotal: 170000 },
+    { name: "Jeans Slim Fit", color: "Navy", size: "32", qty: 1, price: 185000, subtotal: 185000 },
+  ];
+  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const discount = 15000;
+  const tax = Math.round((subtotal - discount) * 0.1);
+  const total = subtotal - discount + tax;
+  const payment = 400000;
+  const change = payment - total;
+  const fmt = (n: number) => n.toLocaleString("id-ID");
+  const div = <div style={{ borderTop: "1px dashed rgba(0,0,0,0.7)", margin: "5px 0" }} />;
+  return (
+    <div className="font-mono" style={{ width: px, background: "#fff", color: "#000", fontSize: `${fontPx}px`, lineHeight: 1.55, padding: `${Math.round(9 * scale)}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.22)", borderRadius: 5 }}>
+      {printer.receiptLogo && (
+        <div className="text-center"><img src={printer.receiptLogo} alt="Logo" style={{ maxWidth: "72%", maxHeight: Math.max(24, Math.round(40 * scale)), objectFit: "contain" }} /></div>
+      )}
+      <div className="text-center"><b>{brandName}</b><br />TOKO CENTRAL<br /></div>
+      {div}
+      <div>No: TRX-20260916-0001</div>
+      {printer.showDate !== false && <div>Tgl: {now.toLocaleDateString("id-ID")}</div>}
+      {printer.showTime !== false && <div>Jam: {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>}
+      {printer.showCashier !== false && <div>Kasir: Andi</div>}
+      {div}
+      {items.map(i => (
+        <div key={i.name}>
+          <div>{i.name} ({i.color}/{i.size})</div>
+          <div className="flex justify-between"><span>{i.qty} x {fmt(i.price)}</span><span>{fmt(i.subtotal)}</span></div>
+        </div>
+      ))}
+      {div}
+      <div className="flex justify-between"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+      <div className="flex justify-between"><span>Diskon</span><span>-{fmt(discount)}</span></div>
+      {printer.showTax !== false && <div className="flex justify-between"><span>Pajak 10%</span><span>{fmt(tax)}</span></div>}
+      <div className="flex justify-between font-bold"><span>TOTAL</span><span>{fmt(total)}</span></div>
+      <div className="flex justify-between"><span>Bayar (Tunai)</span><span>{fmt(payment)}</span></div>
+      {printer.showChange !== false && <div className="flex justify-between"><span>Kembalian</span><span>{fmt(change)}</span></div>}
+      {printer.footerText && (
+        <>
+          {div}
+          <div className="text-center">{printer.footerText.split("\n").map((l, i) => <div key={i}>{l}</div>)}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -352,7 +407,14 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
       {tab === "printer" && (
         <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Printer</div>
-          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
+            <button onClick={() => setPreviewOpen(true)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all"
+              style={{ background: "rgba(124,58,237,0.1)", color: "var(--accent)", border: "1.5px solid rgba(124,58,237,0.25)" }}>
+              Lihat Pratinjau Struk
+            </button>
+          </div>
 
           <div className="mb-4">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>NAMA PRINTER</label>
@@ -453,6 +515,26 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
             Simpan Setelan Printer
           </button>
+        </div>
+      )}
+
+      {/* PRATINJAU STRUK — floating overlay (always available, independent of active tab) */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }} onClick={() => setPreviewOpen(false)}>
+          <div className="w-full sm:w-auto rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92dvh] overflow-hidden flex flex-col" style={{ background: "var(--card)" }} onClick={e => e.stopPropagation()}>
+            <div className="pt-2.5 pb-1 flex justify-center shrink-0 sm:hidden">
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--muted)" }} />
+            </div>
+            <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Pratinjau Struk</div>
+              <button onClick={() => setPreviewOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5 flex justify-center" style={{ background: "var(--background)" }}>
+              <ReceiptPreview printer={draftPrinter} brandName={draftBrand.name} />
+            </div>
+          </div>
         </div>
       )}
 

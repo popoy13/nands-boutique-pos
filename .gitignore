@@ -1,7 +1,0 @@
-node_modules/
-dist/
-android/
-*.apk
-*.local
-log
-vite-dev.log

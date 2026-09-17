@@ -127,7 +127,7 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
   if (editingName && !employeeNames.has(editingName)) knownNames.push(editingName);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-y-auto lg:overflow-hidden">
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: "#16a34a" }}>{toast}</div>
       )}

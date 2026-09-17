@@ -1,0 +1,1 @@
+var e=`./`.replace(/\/?$/,`/`);function t(t){return t?/^[a-z][a-z0-9+.-]*:/i.test(t)?t:`${e}${t.replace(/^\/+/,``)}`:t??``}export{t};

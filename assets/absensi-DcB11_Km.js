@@ -1,0 +1,1 @@
+import{i as e,n as t,t as n}from"./jsx-runtime-whcwHwgs.js";import{n as r,t as i}from"./src-BazoQqum.js";import{t as a}from"./AppErrorBoundary-BCSXpkJt.js";var o=e(t(),1),s=e(r(),1),c=n();s.createRoot(document.getElementById(`root`)).render((0,c.jsx)(o.StrictMode,{children:(0,c.jsx)(a,{children:(0,c.jsx)(i,{menu:`attendance`})})}));

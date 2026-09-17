@@ -1,1 +1,0 @@
-import{i as e,n as t,t as n}from"./jsx-runtime-Dzc6vF-m.js";import{n as r,t as i}from"./src-pDECFtj-.js";var a=e(t(),1),o=e(r(),1),s=n();o.createRoot(document.getElementById(`root`)).render((0,s.jsx)(a.StrictMode,{children:(0,s.jsx)(i,{menu:`attendance`})}));

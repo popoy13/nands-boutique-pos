@@ -1,0 +1,1 @@
+var e=8*1024*1024,t=[`image/jpeg`,`image/png`,`image/webp`];function n(n,r=e){return n?t.includes(n.type)?n.size>r?`Ukuran gambar maksimal ${Math.round(r/1024/1024)} MB`:n.size===0?`File gambar kosong`:null:`Format gambar harus JPG, PNG, atau WEBP`:`Tidak ada file yang dipilih`}export{n as t};

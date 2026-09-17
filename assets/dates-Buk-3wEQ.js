@@ -1,0 +1,1 @@
+var e=()=>{let e=new Date,t=e=>String(e).padStart(2,`0`);return`${e.getFullYear()}-${t(e.getMonth()+1)}-${t(e.getDate())}`},t=t=>{let n=t instanceof Date?t:new Date(t);if(Number.isNaN(n.getTime()))return e();let r=e=>String(e).padStart(2,`0`);return`${n.getFullYear()}-${r(n.getMonth()+1)}-${r(n.getDate())}`};export{e as n,t};

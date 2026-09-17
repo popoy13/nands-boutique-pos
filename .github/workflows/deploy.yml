@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - run: corepack enable
       - run: corepack prepare pnpm@10.34.3 --activate
       - uses: actions/setup-node@v4

@@ -41,16 +41,6 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
       }
     };
 
-    const getBackCameraId = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const vids = devices.filter(d => d.kind === "videoinput" && d.deviceId);
-        return vids.find(d => /back|rear|belakang|0/i.test(d.label))?.deviceId ?? vids[0]?.deviceId;
-      } catch {
-        return undefined;
-      }
-    };
-
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setStatus("error");
@@ -59,16 +49,43 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
         return;
       }
 
-      let stream: MediaStream | null = null;
-      const backDeviceId = await getBackCameraId();
-      const constraints: MediaStreamConstraints = backDeviceId
-        ? { video: { deviceId: { exact: backDeviceId } }, audio: false }
-        : { video: { facingMode: "environment" }, audio: false };
+      const video = videoRef.current;
+      if (!video) return;
+      video.setAttribute("autoplay", "true");
+      video.setAttribute("muted", "true");
+      video.setAttribute("playsinline", "true");
+
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const controls = await reader.decodeFromConstraints(constraints, video, handleResult);
+        if (!cancelled) {
+          controlsRef.current = controls;
+          streamRef.current = (video.srcObject as MediaStream | null) ?? null;
+          setStatus("ready");
+        } else {
+          controls.stop();
+        }
       } catch {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          const controls = await reader.decodeFromConstraints(
+            { audio: false, video: true },
+            video,
+            handleResult,
+          );
+          if (!cancelled) {
+            controlsRef.current = controls;
+            streamRef.current = (video.srcObject as MediaStream | null) ?? null;
+            setStatus("ready");
+          } else {
+            controls.stop();
+          }
         } catch {
           if (!cancelled) {
             setStatus("error");
@@ -76,31 +93,6 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
             setFlash("Tidak ada kamera / izin ditolak. Gunakan input kode manual di bawah.");
           }
           return;
-        }
-      }
-
-      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-      streamRef.current = stream;
-
-      const video = videoRef.current;
-      if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
-      video.srcObject = stream;
-
-      try {
-        await video.play();
-      } catch { /* some browsers block autoplay */ }
-
-      try {
-        const controls = await reader.decodeFromVideoElement(video, handleResult);
-        if (!cancelled) {
-          controlsRef.current = controls;
-          setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) {
-          setStatus("error");
-          onDone(null);
-          setFlash("Gagal mengaktifkan scanner. Gunakan input kode manual di bawah.");
         }
       }
     };

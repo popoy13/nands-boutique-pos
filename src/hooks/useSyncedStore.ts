@@ -7,8 +7,9 @@ import {
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
   expFromDB, expToDB, writeExpenses, saveExpensesJson,
+  depFromDB, depToDB, writeDeposits, saveDepositsJson,
 } from "../data/sync";
-import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense } from "../data/types";
+import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit } from "../data/types";
 import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
@@ -35,6 +36,7 @@ export interface SyncedStore {
   settings: AppSettings; setSettings: Dispatch<SetStateAction<AppSettings>>;
   categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
   expenses: Expense[]; setExpenses: Dispatch<SetStateAction<Expense[]>>;
+  deposits: CashDeposit[]; setDeposits: Dispatch<SetStateAction<CashDeposit[]>>;
   flush: () => Promise<void>;
 }
 
@@ -51,6 +53,7 @@ export function useSyncedStore(): SyncedStore {
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [categories, setCategoriesState] = useState<Category[]>([]);
   const [expenses, setExpensesState] = useState<Expense[]>([]);
+  const [deposits, setDepositsState] = useState<CashDeposit[]>([]);
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -121,6 +124,16 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         await saveExpensesJson(rows);
         try { await writeExpenses(rows); } catch (e) {
           console.warn("[sync] tabel expenses belum tersedia:", e);
+        }
+        break;
+      }
+      case "deposits": {
+        const rows = payload as Record<string, unknown>[];
+        // Analog expenses: simpan ke app_settings (JSON) supaya selalu tercatat
+        // walau tabel `cash_deposits` belum dibuat, lalu upsert best-effort.
+        await saveDepositsJson(rows);
+        try { await writeDeposits(rows); } catch (e) {
+          console.warn("[sync] tabel cash_deposits belum tersedia:", e);
         }
         break;
       }
@@ -239,6 +252,14 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     }
     return next;
   });
+  const setDeposits: Dispatch<SetStateAction<CashDeposit[]>> = (upd) => setDepositsState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: CashDeposit[]) => CashDeposit[])(prev) : upd;
+    if (next !== prev) {
+      trackRemoved("deposits", prev, next);
+      propagate("deposits", next.map(depToDB));
+    }
+    return next;
+  });
 
   const flush = async () => {
     const tasks: Promise<unknown>[] = [];
@@ -291,6 +312,9 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       case "expenses":
         setExpensesState(rows.map(expFromDB));
         break;
+      case "deposits":
+        setDepositsState(rows.map(depFromDB));
+        break;
     }
   };
   appliedRef.current = applyRemote;
@@ -315,6 +339,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setSettingsState(d.settings);
         setCategoriesState(d.categories);
         setExpensesState(d.expenses);
+        setDepositsState(d.deposits);
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {        console.warn("[sync] Supabase belum disetup â€” jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
@@ -351,6 +376,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setSettingsState(d.settings);
             setCategoriesState(d.categories);
             setExpensesState(d.expenses);
+            setDepositsState(d.deposits);
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
             productsRemovedRef.current = { products: [], variants: [] };
             for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
@@ -374,6 +400,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     settings, setSettings,
     categories, setCategories,
     expenses, setExpenses,
+    deposits, setDeposits,
     flush,
   };
 }

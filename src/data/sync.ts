@@ -10,6 +10,7 @@ import type {
   Member,
   AttendanceRecord,
   Expense,
+  CashDeposit,
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
@@ -436,6 +437,7 @@ export const settingsFromDB = (
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
   const payments = (obj.payments ?? {}) as Partial<AppSettings["payments"]>
   const sizesArr = Array.isArray(obj.sizes) ? obj.sizes.map(s => String(s)).filter(Boolean) : []
+  const banksArr = Array.isArray(obj.banks) ? obj.banks.map(s => String(s)).filter(Boolean) : []
   // Migrasi branding lama "NET R" -> default baru (NANDS BOUTIQUE)
   if (brand.name === "NET R") brand.name = defaultSettings.brand.name
   return {
@@ -453,6 +455,7 @@ export const settingsFromDB = (
       rounding: { ...defaultSettings.payments.rounding, ...(payments.rounding ?? {}) },
     },
     sizes: sizesArr.length ? sizesArr : defaultSettings.sizes,
+    banks: banksArr.length ? banksArr : defaultSettings.banks,
   }
 }
 export const settingsToDB = (st: AppSettings) => [
@@ -462,6 +465,7 @@ export const settingsToDB = (st: AppSettings) => [
   { key: "barcode", value: st.barcode },
   { key: "payments", value: st.payments },
   { key: "sizes", value: st.sizes },
+  { key: "banks", value: st.banks },
 ]
 export async function saveSettingsRows(
   rows: Record<string, unknown>[],
@@ -538,7 +542,7 @@ export const expToDB = (x: Expense) => ({
   description: x.description,
   photo: x.photo ?? null,
   created_by_name: x.createdByName,
-  expense_date: x.date instanceof Date ? x.date.toISOString() : String(x.date),
+  expense_date: String(x.date),
 })
 
 export async function writeExpenses(
@@ -589,6 +593,83 @@ export async function deleteExpense(id: string): Promise<void> {
   if (error) throw error
 }
 
+/* ---------------- cash deposits (setor tunai) ---------------- */
+
+export const depFromDB = (r: Record<string, unknown>): CashDeposit => ({
+  id: s(r.id),
+  storeId: s(r.store_id),
+  storeName: s(r.store_name),
+  date: isoDay(d(r.deposit_date) ?? new Date()),
+  bank: s(r.bank),
+  amount: n(r.amount),
+  referenceCode: s(r.reference_code),
+  notes: s(r.notes),
+  photo: s(r.photo) || undefined,
+  createdByName: s(r.created_by_name),
+})
+
+export const depToDB = (x: CashDeposit) => ({
+  id: x.id,
+  store_id: x.storeId,
+  store_name: x.storeName,
+  deposit_date: String(x.date),
+  bank: x.bank,
+  amount: x.amount,
+  reference_code: x.referenceCode,
+  notes: x.notes,
+  photo: x.photo ?? null,
+  created_by_name: x.createdByName,
+})
+
+export async function writeDeposits(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const valid = rows.filter(
+    (r) =>
+      r &&
+      typeof r.id === "string" &&
+      r.id &&
+      typeof r.store_id === "string" &&
+      r.store_id &&
+      typeof r.amount === "number" &&
+      typeof r.bank === "string",
+  )
+  if (!valid.length) return
+  const { error } = await supabase
+    .from("cash_deposits")
+    .upsert(valid, { onConflict: "id" })
+  if (error) throw error
+}
+
+/* Simpan setor tunai via app_settings (JSON) agar tetap tercatat
+   walau tabel `cash_deposits` belum dibuat di database. */
+export async function saveDepositsJson(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({ key: "cash_deposits", value: rows }, { onConflict: "key" })
+  if (error) throw error
+}
+
+export const depositsFromSettings = (
+  rows: Record<string, unknown>[],
+): CashDeposit[] => {
+  const row = rows.find((r) => r && r.key === "cash_deposits")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(depFromDB)
+}
+
+export async function deleteDeposit(id: string): Promise<void> {
+  if (!id) return
+  const { error } = await supabase
+    .from("cash_deposits")
+    .delete()
+    .eq("id", id)
+  if (error) throw error
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   if (!id) return
   const { error } = await supabase.from("transactions").delete().eq("id", id)
@@ -617,6 +698,7 @@ export interface AllData {
   discounts: Discount[]
   attendance: AttendanceRecord[]
   expenses: Expense[]
+  deposits: CashDeposit[]
   transactions: Transaction[]
   deletedTransactions: DeletedTransaction[]
   settings: AppSettings
@@ -646,6 +728,7 @@ export async function loadAll(): Promise<LoadResult> {
       discR,
       attR,
       expR,
+      depR,
       trxR,
       delR,
       setR,
@@ -660,6 +743,7 @@ export async function loadAll(): Promise<LoadResult> {
       supabase.from("discounts").select("*"),
       supabase.from("attendance_records").select("*"),
       supabase.from("expenses").select("*"),
+      supabase.from("cash_deposits").select("*"),
       supabase.from("transactions").select("*"),
       supabase.from("deleted_transactions").select("*"),
       supabase.from("app_settings").select("*"),
@@ -680,6 +764,10 @@ export async function loadAll(): Promise<LoadResult> {
     const expenses = expensesFromTable.length
       ? expensesFromTable
       : expensesFromSettings(settingsRows)
+    const depoesFromTable = depR.error ? [] : (depR.data ?? []).map(depFromDB)
+    const deposits = depoesFromTable.length
+      ? depoesFromTable
+      : depositsFromSettings(settingsRows)
 
     return {
       ok: true,
@@ -691,6 +779,7 @@ export async function loadAll(): Promise<LoadResult> {
         discounts: first(discR).map(discFromDB),
         attendance: first(attR).map(attFromDB),
         expenses,
+        deposits,
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(settingsRows),

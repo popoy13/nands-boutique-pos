@@ -40,7 +40,7 @@ INSERT INTO transactions (id, transaction_date, store_id, store_name, cashier_id
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['stores','categories','products','product_variants','store_stocks','employees','members','discounts','transactions','deleted_transactions','attendance_records','app_settings','expenses'] LOOP
+  FOREACH t IN ARRAY ARRAY['stores','categories','products','product_variants','store_stocks','employees','members','discounts','transactions','deleted_transactions','attendance_records','app_settings','expenses','cash_deposits'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS p_all_anon ON %I', t);
     EXECUTE format('CREATE POLICY p_all_anon ON %I FOR ALL TO anon USING (true) WITH CHECK (true)', t);
@@ -54,7 +54,7 @@ END $$;
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE stores, categories, products, product_variants, store_stocks, employees, members, discounts, transactions, deleted_transactions, attendance_records, app_settings, expenses;
+  ALTER PUBLICATION supabase_realtime ADD TABLE stores, categories, products, product_variants, store_stocks, employees, members, discounts, transactions, deleted_transactions, attendance_records, app_settings, expenses, cash_deposits;
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'realtime publication skipped: %', SQLERRM;
 END $$;

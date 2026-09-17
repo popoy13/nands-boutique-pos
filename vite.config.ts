@@ -10,6 +10,7 @@ export const MENU_PAGE_FILES: Record<string, string> = {
   kasir: path.resolve(__dirname, 'kasir.html'),
   transaksi: path.resolve(__dirname, 'transaksi.html'),
   pengeluaran: path.resolve(__dirname, 'pengeluaran.html'),
+  setor: path.resolve(__dirname, 'setor.html'),
   laporan: path.resolve(__dirname, 'laporan.html'),
   inventori: path.resolve(__dirname, 'inventori.html'),
   produk: path.resolve(__dirname, 'produk.html'),

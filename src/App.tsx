@@ -14,6 +14,7 @@ const MemberView = lazy(() => import("./components/MemberView"));
 const AttendanceView = lazy(() => import("./components/AttendanceView"));
 const AttendanceHistoryView = lazy(() => import("./components/AttendanceHistoryView"));
 const ExpenseView = lazy(() => import("./components/ExpenseView"));
+const DepositView = lazy(() => import("./components/DepositView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance, deleteTransaction, deleteRows } from "./data/sync";
@@ -68,6 +69,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     settings, setSettings,
     categories, setCategories,
     expenses, setExpenses,
+    deposits, setDeposits,
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -389,6 +391,10 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
 const canExpenseAdd = has("expense", "add");
 const canExpenseEdit = has("expense", "edit");
 const canExpenseDelete = has("expense", "delete");
+const canDepositAdd = has("deposit", "add");
+const canDepositEdit = has("deposit", "edit");
+const canDepositDelete = has("deposit", "delete");
+const canDepositBank = has("deposit", "bank");
   const canMemAdd = has("member", "add");
   const canMemEdit = has("member", "edit");
   const canMemDelete = has("member", "delete");
@@ -556,6 +562,22 @@ const canExpenseDelete = has("expense", "delete");
             canAdd={canExpenseAdd}
             canEdit={canExpenseEdit}
             canDelete={canExpenseDelete}
+          />
+        )}
+        {safeTab === "deposit" && (
+          <DepositView
+            deposits={deposits}
+            stores={stores}
+            employees={employees}
+            banks={settings.banks}
+            onUpdateBanks={b => setSettings(s => ({ ...s, banks: b }))}
+            currentUser={currentUser}
+            onSave={setDeposits}
+            onDelete={undefined}
+            canAdd={canDepositAdd}
+            canEdit={canDepositEdit}
+            canDelete={canDepositDelete}
+            canBank={canDepositBank}
           />
         )}
         {safeTab === "settings" && (

@@ -28,10 +28,10 @@ export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>
   const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
   // Migrasi: role yang punya akses Transaksi otomatis mendapat menu Pengeluaran.
   if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
+  // Migrasi: role yang punya menu Pengeluaran otomatis mendapat menu Setor Tunai.
+  if (menus.includes("expense") && !menus.includes("deposit")) menus.push("deposit");
   // Migrasi: role yang punya akses Absensi otomatis mendapat menu Riwayat Absensi.
   if (menus.includes("attendance") && !menus.includes("attendanceHistory")) menus.push("attendanceHistory");
-  // Migrasi: role yang punya menu Transaksi otomatis diberi menu Pengeluaran (biar backfill ke role lama yang tersimpan).
-  if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
   return menus;
 };
 
@@ -45,6 +45,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
   { id: "pos", label: "Kasir" },
   { id: "history", label: "Transaksi" },
   { id: "expense", label: "Pengeluaran" },
+  { id: "deposit", label: "Setor Tunai" },
   { id: "report", label: "Laporan" },
   { id: "inventory", label: "Inventori" },
   { id: "product", label: "Produk" },
@@ -60,6 +61,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
   expense: ["add", "edit", "delete"],
+  deposit: ["add", "edit", "delete", "bank"],
   product: ["export", "import", "bulk", "category", "size", "add", "edit", "delete"],
   employee: ["import", "export", "add"],
   store: ["add", "edit", "delete"],
@@ -73,6 +75,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
   expense: { add: "Tambah pengeluaran", edit: "Edit pengeluaran", delete: "Hapus pengeluaran" },
+  deposit: { add: "Catat setor tunai", edit: "Edit setor tunai", delete: "Hapus setor tunai", bank: "Kelola daftar bank" },
   product: {
     export: "Export produk",
     import: "Import produk",
@@ -110,12 +113,12 @@ export const defaultPermissionsForMenus = (menus: string[]): Record<string, stri
 const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: allActionsFor(MENU_ITEMS.map(m => m.id)),
   manager: {
-    ...allActionsFor(["history", "product", "employee", "settings", "expense"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense", "deposit"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   manager_operasional: {
-    ...allActionsFor(["history", "product", "employee", "settings", "expense"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense", "deposit"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
@@ -165,6 +168,16 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
     if (Array.isArray(perms.expense) && perms.expense.length > 0) {
       perms.expense = [...new Set([...perms.expense, "edit"])];
+    }
+    // Migrasi: role yang punya aksi setor tunai (add/delete) otomatis
+    // mendapat aksi edit setor tunai walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.deposit) && perms.deposit.length > 0) {
+      perms.deposit = [...new Set([...perms.deposit, "edit"])];
+    }
+    // Migrasi: role bawaan (mis. admin/manager) yang tersimpan sebelum menu Setor
+    // Tunai ada otomatis mendapat aksi default setor tunai bila menunya tersedia.
+    if (k in DEFAULT_ROLES && (DEFAULT_ROLES[k].permissions?.deposit?.length ?? 0) > 0) {
+      perms.deposit = [...new Set([...(perms.deposit ?? []), ...(DEFAULT_ROLES[k].permissions?.deposit ?? [])])];
     }
     // Migrasi: role yang punya aksi kelola kategori produk otomatis mendapat
     // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.

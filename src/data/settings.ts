@@ -65,6 +65,7 @@ export interface AppSettings {
   barcode: BarcodeSettings;
   payments: PaymentSettings;
   sizes: string[];
+  banks: string[];
 }
 
 export const defaultSettings: AppSettings = {
@@ -82,4 +83,5 @@ export const defaultSettings: AppSettings = {
     rounding: { enabled: false, step: 500 },
   },
   sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+  banks: ["BCA", "BRI", "Mandiri", "BNI", "BSI"],
 };

@@ -190,14 +190,14 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
   if (!canEdit) {
     return (
-      <div className="h-full overflow-y-auto px-5 py-5">
-        <div className="flex items-center justify-between mb-4">
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
-        </div>
-        <div className="max-w-2xl p-6 rounded-2xl text-center" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="text-3xl mb-2">🔒</div>
-          <div className="text-sm font-semibold mb-1">Akses Terbatas</div>
-          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Hanya Admin atau Manager yang dapat mengubah setelan aplikasi.</div>
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5">
+          <div className="mb-4" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+          <div className="w-full p-6 rounded-2xl text-center" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+            <div className="text-3xl mb-2">🔒</div>
+            <div className="text-sm font-semibold mb-1">Akses Terbatas</div>
+            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Hanya Admin atau Manager yang dapat mengubah setelan aplikasi.</div>
+          </div>
         </div>
       </div>
     );
@@ -371,43 +371,61 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     </button>
   );
 
+  const tabDefs = ([
+    { id: "printer", label: "Printer", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
+    { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
+    { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
+    { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
+    { id: "pembayaran", label: "Pembayaran", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 8h4" /></svg> },
+    { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+    { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
+  ] as { id: Tab; label: string; icon: React.ReactNode }[]).filter(t => canOpenTab(t.id));
+
   return (
-    <div className="h-full overflow-y-auto px-5 py-5">
+    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
+        <div className="fixed bottom-24 lg:bottom-6 left-1/2 lg:left-auto -translate-x-1/2 lg:translate-x-0 lg:right-6 z-[80] px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
           {toast}
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
-      </div>
+      {/* Sidebar (desktop) */}
+      <aside className="hidden lg:flex flex-col shrink-0 w-60 overflow-y-auto px-3 py-5 border-r" style={{ borderColor: "var(--border)" }}>
+        <div className="px-2 mb-4" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+        <nav className="flex flex-col gap-1">
+          {tabDefs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left"
+              style={{ background: tab === t.id ? "var(--foreground)" : "transparent", color: tab === t.id ? "white" : "var(--muted-foreground)" }}>
+              <span className="shrink-0">{t.icon}</span>
+              <span className="truncate">{t.label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap mb-5">
-        {([
-          { id: "printer", label: "Printer", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
-          { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
-          { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
-          { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
-          { id: "pembayaran", label: "Pembayaran", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 8h4" /></svg> },
-          { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-          { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
-        ] as { id: Tab; label: string; icon: React.ReactNode }[])
-          .filter(t => canOpenTab(t.id))
-          .map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all"
-            style={{ background: tab === t.id ? "var(--foreground)" : "var(--card)", color: tab === t.id ? "white" : "var(--muted-foreground)", border: `1.5px solid ${tab === t.id ? "var(--foreground)" : "var(--border)"}` }}>
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {/* Header + tabs (mobile) */}
+        <div className="lg:hidden shrink-0 px-4 pt-5">
+          <div className="mb-3" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-3">
+            {tabDefs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
+                style={{ background: tab === t.id ? "var(--foreground)" : "var(--card)", color: tab === t.id ? "white" : "var(--muted-foreground)", border: `1.5px solid ${tab === t.id ? "var(--foreground)" : "var(--border)"}` }}>
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5">
 
       {/* PRINTER */}
       {tab === "printer" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Printer</div>
           <div className="flex items-center justify-between gap-3 mb-5">
             <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
@@ -542,21 +560,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
         </div>
       )}
 
-      {/* PEMBAYARAN — floating overlay (bottom sheet on mobile, centered on desktop) */}
+      {/* PEMBAYARAN */}
       {tab === "pembayaran" && (
-        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-          <div className="w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92dvh] overflow-hidden flex flex-col" style={{ background: "var(--card)" }}>
-            <div className="pt-2.5 pb-1 flex justify-center shrink-0 sm:hidden">
-              <div className="w-10 h-1 rounded-full" style={{ background: "var(--muted)" }} />
-            </div>
-            <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
-              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Setelan Pembayaran</div>
-              <button onClick={() => setTab("printer")} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Pembayaran</div>
+          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Atur metode pembayaran, pajak, dan pembulatan total saat checkout kasir.</div>
 
-            <div className="overflow-y-auto px-5 py-4 flex flex-col gap-5">
+            <div className="flex flex-col gap-5">
               {/* Metode pembayaran */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -658,13 +668,12 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                 Simpan Setelan Pembayaran
               </button>
             </div>
-          </div>
         </div>
       )}
 
       {/* ATTENDANCE */}
       {tab === "attendance" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Jam Operasional Toko</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Atur jam buka/tutup tiap toko. Dipakai untuk menilai absensi karyawan di penempatannya.</div>
 
@@ -696,7 +705,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* ROLE & MENU */}
       {tab === "roles" && (
-        <div className="max-w-3xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Role & Otorisasi Menu</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>
             Tambah role karyawan baru dan atur menu mana saja yang boleh dilihat tiap role. Perubahan berlaku otomatis ke semua perangkat.
@@ -886,7 +895,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* BARCODE DEVICE */}
       {tab === "barcode" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Perangkat Barcode</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>
             Atur cara barcode dibaca saat transaksi di menu Kasir (scan barcode).
@@ -959,7 +968,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* BRAND / MAIN MENU */}
       {tab === "brand" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Menu Utama</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Ubah logo, nama, deskripsi aplikasi, dan loading screen.</div>
 
@@ -1050,7 +1059,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* RESET DATA (admin only) */}
       {tab === "reset" && isAdmin && (
-        <div className="max-w-2xl rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div className="p-5 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Reset Data</div>
@@ -1136,6 +1145,9 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           </div>
         </div>
       )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

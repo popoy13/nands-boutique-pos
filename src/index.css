@@ -63,6 +63,10 @@ body {
   color: var(--foreground);
 }
 
+/* Hide scrollbar for horizontal tab strips */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Swipe loading indicator */
 @keyframes swipe-card {
   0%, 100% { transform: translateX(-9px) rotate(-6deg); }

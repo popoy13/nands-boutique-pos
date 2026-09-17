@@ -39,6 +39,7 @@ interface VariantPicker { product: Product }
 
 export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, payments, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -151,26 +152,37 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   useEffect(() => { scanRef.current = handleScanResult; });
 
   useEffect(() => {
-    if (barcode.mode !== "keyboard" || showPayment) return;
+    if (showPayment) return;
     let buf = "";
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastKeyAt = 0;
     const onKeyDown = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      const now = performance.now();
       if (e.key === "Enter") {
         const code = buf;
         buf = "";
+        lastKeyAt = 0;
         clearTimeout(timer);
         if (!code) return;
         e.preventDefault();
         const r = scanRef.current(code);
+        if (r.ok) {
+          setSearch("");
+          searchInputRef.current?.blur();
+        }
         playScanFeedback(r.ok, barcode);
         return;
       }
       if (e.key.length === 1) {
+        // USB/Bluetooth scanners behave like a keyboard and usually send
+        // characters in a tight burst. Do not require the setting to be
+        // "keyboard"; this lets scanners work immediately in Kasir while
+        // keeping the camera scanner available from the scan button.
+        if (lastKeyAt && now - lastKeyAt > 120) buf = "";
         buf += e.key;
+        lastKeyAt = now;
         clearTimeout(timer);
-        timer = setTimeout(() => { buf = ""; }, 300);
+        timer = setTimeout(() => { buf = ""; lastKeyAt = 0; }, 500);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -178,7 +190,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
       window.removeEventListener("keydown", onKeyDown);
       clearTimeout(timer);
     };
-  }, [barcode.mode, barcode, showPayment]);
+  }, [barcode, showPayment]);
 
   const updateQty = (sku: string, delta: number) => {
     setCart(prev => prev.flatMap(i => {
@@ -466,8 +478,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           <div className="flex items-center gap-3 mb-3">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari produk, brand, atau kode..." value={search} onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { const r = handleScanResult(search); if (r.ok) setSearch(""); playScanFeedback(r.ok, barcode); } }}
+              <input ref={searchInputRef} type="text" placeholder="Cari produk, brand, atau kode..." value={search} onChange={e => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }} />
             </div>
             <button onClick={() => setShowScanner(true)} title="Scan Barcode"

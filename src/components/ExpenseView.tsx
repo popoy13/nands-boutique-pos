@@ -336,19 +336,14 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
           </div>
         </div>
 
-        {filtered.length > pageSize && (
-          <div className="px-5 py-3 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
-            <div className="flex items-center justify-between gap-3">
-              <Pagination current={safePage} total={totalPages} onPageChange={setPage} />
-              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                className="px-2 py-1.5 rounded-lg text-xs outline-none" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-              </select>
-            </div>
-          </div>
-        )}
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="catatan"
+        />
       </div>
     </div>
   );

@@ -59,7 +59,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
-  expense: ["add", "delete"],
+  expense: ["add", "edit", "delete"],
   product: ["export", "import", "bulk", "category", "add", "edit", "delete"],
   employee: ["import", "export", "add"],
   store: ["add", "edit", "delete"],
@@ -72,7 +72,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
-  expense: { add: "Tambah pengeluaran", delete: "Hapus pengeluaran" },
+  expense: { add: "Tambah pengeluaran", edit: "Edit pengeluaran", delete: "Hapus pengeluaran" },
   product: {
     export: "Export produk",
     import: "Import produk",
@@ -159,6 +159,11 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.
     if (Array.isArray(perms.settings) && perms.settings.length > 0) {
       perms.settings = [...new Set([...perms.settings, ...(ACTION_ITEMS.settings ?? [])])];
+    }
+    // Migrasi: role yang punya aksi pengeluaran (add/delete) otomatis
+    // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.expense) && perms.expense.length > 0) {
+      perms.expense = [...new Set([...perms.expense, "edit"])];
     }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).

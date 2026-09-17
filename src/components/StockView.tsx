@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import type { Product } from "../data/types";
 import type { Category } from "../data/sync";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -22,6 +23,10 @@ export default function StockView({ products, stores, categories, activeStore, o
   const [editCell, setEditCell] = useState<{ sku: string; storeId: string } | null>(null);
   const [editVal, setEditVal] = useState("");
   const [toast, setToast] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => { setPage(1); }, [search, filterCat]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -90,6 +95,11 @@ export default function StockView({ products, stores, categories, activeStore, o
     return count;
   }, [products, filterStore]);
 
+  const rows = useMemo(() => filtered.map(p => p.variants.map(v => ({ p, v }))).flat(), [filtered]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toast */}
@@ -152,18 +162,19 @@ export default function StockView({ products, stores, categories, activeStore, o
             </tr>
           </thead>
           <tbody>
-            {filtered.map(product =>
-              product.variants.map((variant, vi) => {
+            {pageRows.map(({ p: product, v: variant }, idx) => {
                 const storeQty = variant.stocks.find(s => s.storeId === filterStore)?.quantity ?? 0;
                 const isLow = storeQty > 0 && storeQty <= 3;
                 const isOut = storeQty === 0;
                 const isEditing = editCell?.sku === variant.sku && editCell?.storeId === filterStore;
+                const firstOnPage = idx === 0 || (pageRows[idx - 1]?.p.id ?? null) !== product.id;
+                const spanOnPage = firstOnPage ? pageRows.filter(r => r.p.id === product.id).length : 1;
 
                 return (
                   <tr key={variant.sku} className="transition-colors hover:bg-gray-50"
                     style={{ borderBottom: "1px solid var(--border)", background: isOut ? "#fef2f2" : isLow ? "#fffbeb" : "var(--card)" }}>
-                    {vi === 0 ? (
-                      <td className="px-4 py-3" rowSpan={product.variants.length}>
+                    {firstOnPage ? (
+                      <td className="px-4 py-3" rowSpan={spanOnPage > 1 ? spanOnPage : undefined}>
                         <div className="flex items-center gap-3">
                           <img src={product.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
                           <div className="min-w-0">
@@ -224,14 +235,22 @@ export default function StockView({ products, stores, categories, activeStore, o
                     </td>
                   </tr>
                 );
-              })
-            )}
+              })}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+        {rows.length === 0 && (
           <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada produk ditemukan</div>
         )}
       </div>
+
+      <Pagination
+        total={rows.length}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        rowLabel="varian"
+      />
     </div>
   );
 }

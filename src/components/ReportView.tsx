@@ -5,6 +5,7 @@ import type { PaymentSettings } from "../data/settings";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
 import DateRangeFilter from "./DateRangeFilter";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -30,31 +31,17 @@ interface Props {
 
 const PAY_COLORS = ["#7c3aed", "#3b82f6", "#0d9488", "#ea580c", "#db2777", "#ca8a04", "#16a34a", "#4f46e5"];
 
-const PAGE_SIZE = 6;
-
-function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (n: number) => void }) {
-  if (pages <= 1) return null;
-  const btn = { background: "var(--card)", border: "1px solid var(--border)" };
-  return (
-    <div className="flex items-center justify-center gap-2 mt-4">
-      <button disabled={page <= 0} onClick={() => onPage(page - 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={btn}>← Sebelumnya</button>
-      <div className="text-xs px-3 py-1.5" style={{ color: "var(--muted-foreground)" }}>
-        Halaman {page + 1} dari {pages}
-      </div>
-      <button disabled={page >= pages - 1} onClick={() => onPage(page + 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={btn}>Berikutnya →</button>
-    </div>
-  );
-}
-
 export default function ReportView({ transactions, deletedTransactions, expenses = [], stores, payments }: Props) {
   const [filterStore, setFilterStore] = useState("all");
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("7d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [deletedPage, setDeletedPage] = useState(0);
-  const [expPage, setExpPage] = useState(0);
+  const [deletedPage, setDeletedPage] = useState(1);
+  const [deletedPageSize, setDeletedPageSize] = useState(10);
+  const [expPage, setExpPage] = useState(1);
+  const [expPageSize, setExpPageSize] = useState(10);
 
-  useEffect(() => { setDeletedPage(0); setExpPage(0); }, [filterStore, period, dateFrom, dateTo]);
+  useEffect(() => { setDeletedPage(1); setExpPage(1); }, [filterStore, period, dateFrom, dateTo]);
 
   const customRange = !!dateFrom || !!dateTo;
 
@@ -273,12 +260,12 @@ export default function ReportView({ transactions, deletedTransactions, expenses
 
   const deletedSorted = [...filteredDeleted].reverse();
   const expSorted = [...filteredExpenses].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
-  const deletedPages = Math.max(1, Math.ceil(deletedSorted.length / PAGE_SIZE));
-  const expPages = Math.max(1, Math.ceil(expSorted.length / PAGE_SIZE));
-  const curDeletedPage = Math.min(deletedPage, deletedPages - 1);
-  const curExpPage = Math.min(expPage, expPages - 1);
-  const deletedVisible = deletedSorted.slice(curDeletedPage * PAGE_SIZE, curDeletedPage * PAGE_SIZE + PAGE_SIZE);
-  const expVisible = expSorted.slice(curExpPage * PAGE_SIZE, curExpPage * PAGE_SIZE + PAGE_SIZE);
+  const deletedPages = Math.max(1, Math.ceil(deletedSorted.length / deletedPageSize));
+  const expPages = Math.max(1, Math.ceil(expSorted.length / expPageSize));
+  const safeDeletedPage = Math.min(deletedPage, deletedPages);
+  const safeExpPage = Math.min(expPage, expPages);
+  const deletedVisible = deletedSorted.slice((safeDeletedPage - 1) * deletedPageSize, safeDeletedPage * deletedPageSize);
+  const expVisible = expSorted.slice((safeExpPage - 1) * expPageSize, safeExpPage * expPageSize);
 
   const handleExport = () => {
     if (filtered.length === 0 && filteredDeleted.length === 0 && filteredExpenses.length === 0) return;
@@ -542,7 +529,14 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             ))}
           </div>
         )}
-        <Pager page={curDeletedPage} pages={deletedPages} onPage={setDeletedPage} />
+        <Pagination
+          total={filteredDeleted.length}
+          page={safeDeletedPage}
+          pageSize={deletedPageSize}
+          onPageChange={setDeletedPage}
+          onPageSizeChange={setDeletedPageSize}
+          rowLabel="catatan"
+        />
       </div>
     {/* Pengeluaran */}
       <div className="p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
@@ -586,7 +580,14 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             ))}
           </div>
         )}
-        <Pager page={curExpPage} pages={expPages} onPage={setExpPage} />
+        <Pagination
+          total={filteredExpenses.length}
+          page={safeExpPage}
+          pageSize={expPageSize}
+          onPageChange={setExpPage}
+          onPageSizeChange={setExpPageSize}
+          rowLabel="catatan"
+        />
       </div>
     </div>
   );

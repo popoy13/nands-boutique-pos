@@ -35,14 +35,6 @@ function first<T>(r: QueryResult<T>): T[] {
   return r.data ?? []
 }
 
-function optional<T>(r: QueryResult<T>): T[] {
-  if (r.error) {
-    console.warn("[sync] tabel opsional gagal dibaca:", r.error)
-    return []
-  }
-  return r.data ?? []
-}
-
 /* ---------------- stores ---------------- */
 
 export const storeFromDB = (r: Record<string, unknown>): Store => ({
@@ -565,6 +557,26 @@ export async function writeExpenses(
   if (error) throw error
 }
 
+/* Simpan pengeluaran via app_settings (JSON) agar tetap tercatat
+   walau tabel `expenses` belum dibuat di database. */
+export async function saveExpensesJson(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({ key: "expenses", value: rows }, { onConflict: "key" })
+  if (error) throw error
+}
+
+export const expensesFromSettings = (
+  rows: Record<string, unknown>[],
+): Expense[] => {
+  const row = rows.find((r) => r && r.key === "expenses")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(expFromDB)
+}
+
 export async function deleteExpense(id: string): Promise<void> {
   if (!id) return
   const { error } = await supabase
@@ -660,6 +672,12 @@ export async function loadAll(): Promise<LoadResult> {
     for (const c of catR.data ?? []) catMap.set(s(c.id), s(c.name))
     setCategoriesCache(catMap)
 
+    const settingsRows = first(setR)
+    const expensesFromTable = expR.error ? [] : (expR.data ?? []).map(expFromDB)
+    const expenses = expensesFromTable.length
+      ? expensesFromTable
+      : expensesFromSettings(settingsRows)
+
     return {
       ok: true,
       data: {
@@ -669,10 +687,10 @@ export async function loadAll(): Promise<LoadResult> {
         members: first(memR).map(memFromDB),
         discounts: first(discR).map(discFromDB),
         attendance: first(attR).map(attFromDB),
-        expenses: optional(expR).map(expFromDB),
+        expenses,
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
-        settings: settingsFromDB(first(setR)),
+        settings: settingsFromDB(settingsRows),
         categories: first(catR).map((c) => ({ id: s(c.id), name: s(c.name) })),
       },
     }

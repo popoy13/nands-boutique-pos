@@ -6,7 +6,7 @@ import {
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
-  expFromDB, expToDB,
+  expFromDB, expToDB, writeExpenses, saveExpensesJson,
 } from "../data/sync";
 import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense } from "../data/types";
 import type { Category } from "../data/sync";
@@ -114,6 +114,15 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       }
       case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
+      case "expenses": {
+        try {
+          await writeExpenses(payload as Record<string, unknown>[]);
+        } catch (e) {
+          console.warn("[sync] tabel expenses tidak ada, simpan via app_settings:", e);
+          await saveExpensesJson(payload as Record<string, unknown>[]);
+        }
+        break;
+      }
       default: await saveRows(table, payload as Record<string, unknown>[]);
     }
     try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }

@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import type { Transaction, DeletedTransaction, Expense } from "../data/types";
 import type { PaymentSettings } from "../data/settings";
@@ -30,11 +30,31 @@ interface Props {
 
 const PAY_COLORS = ["#7c3aed", "#3b82f6", "#0d9488", "#ea580c", "#db2777", "#ca8a04", "#16a34a", "#4f46e5"];
 
+const PAGE_SIZE = 6;
+
+function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (n: number) => void }) {
+  if (pages <= 1) return null;
+  const btn = { background: "var(--card)", border: "1px solid var(--border)" };
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4">
+      <button disabled={page <= 0} onClick={() => onPage(page - 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={btn}>← Sebelumnya</button>
+      <div className="text-xs px-3 py-1.5" style={{ color: "var(--muted-foreground)" }}>
+        Halaman {page + 1} dari {pages}
+      </div>
+      <button disabled={page >= pages - 1} onClick={() => onPage(page + 1)} className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={btn}>Berikutnya →</button>
+    </div>
+  );
+}
+
 export default function ReportView({ transactions, deletedTransactions, expenses = [], stores, payments }: Props) {
   const [filterStore, setFilterStore] = useState("all");
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("7d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [deletedPage, setDeletedPage] = useState(0);
+  const [expPage, setExpPage] = useState(0);
+
+  useEffect(() => { setDeletedPage(0); setExpPage(0); }, [filterStore, period, dateFrom, dateTo]);
 
   const customRange = !!dateFrom || !!dateTo;
 
@@ -250,6 +270,15 @@ export default function ReportView({ transactions, deletedTransactions, expenses
     ...(payments?.methods ? Object.fromEntries(payments.methods.map(m => [m.id, m.label])) : {}),
     cash: "Tunai", debit: "Debit", qris: "QRIS",
   };
+
+  const deletedSorted = [...filteredDeleted].reverse();
+  const expSorted = [...filteredExpenses].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+  const deletedPages = Math.max(1, Math.ceil(deletedSorted.length / PAGE_SIZE));
+  const expPages = Math.max(1, Math.ceil(expSorted.length / PAGE_SIZE));
+  const curDeletedPage = Math.min(deletedPage, deletedPages - 1);
+  const curExpPage = Math.min(expPage, expPages - 1);
+  const deletedVisible = deletedSorted.slice(curDeletedPage * PAGE_SIZE, curDeletedPage * PAGE_SIZE + PAGE_SIZE);
+  const expVisible = expSorted.slice(curExpPage * PAGE_SIZE, curExpPage * PAGE_SIZE + PAGE_SIZE);
 
   const handleExport = () => {
     if (filtered.length === 0 && filteredDeleted.length === 0 && filteredExpenses.length === 0) return;
@@ -487,7 +516,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
           <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada transaksi yang dihapus</div>
         ) : (
           <div className="flex flex-col gap-2">
-            {[...filteredDeleted].reverse().map(d => (
+            {deletedVisible.map(d => (
               <div key={d.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
@@ -513,6 +542,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             ))}
           </div>
         )}
+        <Pager page={curDeletedPage} pages={deletedPages} onPage={setDeletedPage} />
       </div>
     {/* Pengeluaran */}
       <div className="p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
@@ -529,7 +559,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
           <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada pengeluaran pada periode ini</div>
         ) : (
           <div className="flex flex-col gap-2">
-            {[...filteredExpenses].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? ""))).map(e => (
+            {expVisible.map(e => (
               <div key={e.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
@@ -556,6 +586,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             ))}
           </div>
         )}
+        <Pager page={curExpPage} pages={expPages} onPage={setExpPage} />
       </div>
     </div>
   );

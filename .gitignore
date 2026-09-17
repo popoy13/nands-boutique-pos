@@ -1,6 +1,9 @@
 node_modules/
 dist/
-android/
+android/**/build/
+android/.gradle/
+android/.idea/
+android/local.properties
 *.apk
 *.local
 log

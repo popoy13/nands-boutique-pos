@@ -46,6 +46,10 @@ export default function ReportView({ transactions, deletedTransactions, expenses
 
   const customRange = !!dateFrom || !!dateTo;
 
+  const periodCaption = customRange
+    ? `Rentang kustom${dateFrom ? ` \u00b7 dari ${dateFrom}` : ""}${dateTo ? ` \u00b7 sampai ${dateTo}` : ""}`
+    : period === "7d" ? "7 hari terakhir" : period === "30d" ? "30 hari terakhir" : "semua waktu";
+
   const filtered = useMemo(() => {
     const now = new Date();
     const cutoff = period === "7d" ? new Date(now.getTime() - 7 * 86400000)
@@ -351,13 +355,25 @@ export default function ReportView({ transactions, deletedTransactions, expenses
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 sm:px-6 py-5">
+    <div className="h-full overflow-y-auto" style={{ background: "var(--background)" }}>
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-5">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Laporan Penjualan</div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Laporan Penjualan</div>
+            <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{periodCaption}</div>
+          </div>
+          <button onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+            style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
-            className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
             <option value="all">Semua Toko</option>
             {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -371,31 +387,25 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             ))}
           </div>
           <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} />
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Export
-          </button>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-5">
         {statCards.map(c => (
-          <div key={c.label} className="p-4 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-            <div className="text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
-            <div className="font-mono text-lg font-bold" style={{ color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
-            <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{c.sub}</div>
+          <div key={c.label} className="p-3.5 sm:p-4 rounded-2xl min-w-0" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+            <div className="text-xs mb-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
+            <div className="font-mono text-sm sm:text-lg font-bold leading-tight break-words" style={{ color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
+            <div className="text-xs mt-1 leading-snug" style={{ color: "var(--muted-foreground)" }}>{c.sub}</div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-4 mb-4 lg:grid-cols-[1fr_280px]">
         {/* Bar Chart */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Grafik Pendapatan</div>
-          <div className="flex items-end gap-1.5 h-36">
+          <div className="flex items-end gap-1 sm:gap-1.5 h-36">
             {dailyData.map((d, i) => (
               <div key={i} className="flex flex-col items-center gap-1 flex-1 group min-w-0">
                 {dailyData.length <= 14 && (
@@ -420,7 +430,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         </div>
 
         {/* Payment breakdown */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Metode Bayar</div>
           <div className="flex flex-col gap-4">
             {paymentBreakdown.map(({ label, value, pct, color }) => (
@@ -439,9 +449,9 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 mb-4 lg:grid-cols-2">
         {/* Top products */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Produk Terlaris</div>
           {topProducts.length === 0 ? (
             <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada data</div>
@@ -464,7 +474,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         </div>
 
         {/* Store breakdown */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Performa Toko</div>
           {storeBreakdown.length === 0 ? (
             <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada toko</div>
@@ -490,7 +500,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       </div>
 
       {/* Deleted transactions */}
-      <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+      <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Transaksi Dihapus</div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -540,7 +550,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         />
       </div>
     {/* Pengeluaran */}
-      <div className="p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+      <div className="p-4 sm:p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Pengeluaran</div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -589,6 +599,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
           onPageSizeChange={setExpPageSize}
           rowLabel="catatan"
         />
+      </div>
       </div>
     </div>
   );

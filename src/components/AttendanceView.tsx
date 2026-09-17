@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { AttendanceRecord, Employee } from "../data/types";
 import { compressImage } from "../lib/compressImage";
+import { validateImageFile } from "../lib/imageFile";
 import { todayISO } from "../lib/dates";
+import { assetUrl } from "../lib/assets";
 
 interface Props {
   records: AttendanceRecord[];
@@ -24,7 +26,16 @@ const fmtTime = () => {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
-const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "").slice(0, 5) > (openHour || "08:00");
+const padHM = (t: string): string => {
+  const m = String(t ?? "").match(/(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+};
+
+const isLateFor = (clockIn: string, openHour?: string) => {
+  const a = padHM(clockIn);
+  if (!a) return false;
+  return a > (padHM(openHour ?? "") || "08:00");
+};
 
 function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: string) => void; onNeedFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -127,12 +138,13 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const liveTime = now.toLocaleTimeString("en-GB", { hour12: false });
 
   const todayStr = todayISO();
-  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr);
+  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { showToast("File harus berupa gambar"); return; }
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr); return; }
     try {
       const compressed = await compressImage(file);
       setPhoto(compressed);
@@ -173,7 +185,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const photoArea = (
     <div className="mb-3">
       {photo ? (
-        <img src={photo} alt="Foto absensi" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1.5px solid var(--border)" }} />
+        <img src={assetUrl(photo)} alt="Foto absensi" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1.5px solid var(--border)" }} />
       ) : usingFile ? (
         <div className="text-xs py-8 text-center rounded-xl" style={{ background: "var(--background)", border: "1.5px dashed var(--border)", color: "var(--muted-foreground)" }}>
           Kamera tidak tersedia. Pilih foto dari perangkat, atau coba kamera kembali.
@@ -235,7 +247,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
           <div className="p-5">
             <div className="flex items-center gap-3 mb-4">
               {currentUser.photo ? (
-                <img src={currentUser.photo} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
+                <img src={assetUrl(currentUser.photo)} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
               ) : (
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--foreground)" }}>{currentUser.name.charAt(0)}</div>
               )}

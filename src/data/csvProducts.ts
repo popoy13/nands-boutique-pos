@@ -9,8 +9,9 @@ export interface ImportResult {
 }
 
 function esc(v: string): string {
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
-  return v;
+  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  if (/[",\n]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }
 
 export function exportProductsCsv(products: Product[], storeIds: string[]): string {
@@ -107,7 +108,10 @@ export function parseProductsCsv(raw: string, storeIds: string[], existing: Prod
   let rows = 0, added = 0, updated = 0;
 
   for (let li = 1; li < lines.length; li++) {
-    const cells = splitLine(lines[li], delim);
+    const cells = splitLine(lines[li], delim).map(c => {
+      const t = c.trim();
+      return /^'[=+\-@\t\r]/.test(t) ? t.slice(1) : t;
+    });
     if (cells.every(c => c.trim() === "")) continue;
     rows++;
 
@@ -124,8 +128,8 @@ export function parseProductsCsv(raw: string, storeIds: string[], existing: Prod
     const category = get("category");
     const price = parseNumber(get("price"));
     const image = get("image");
-    const size = get("size") || "M";
-    const color = get("color") || "Standar";
+    const size = get("size");
+    const color = get("color");
     let sku = get("sku");
 
     let stocks: { storeId: string; quantity: number }[] = [];

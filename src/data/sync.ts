@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase"
+﻿import { supabase } from "../lib/supabase"
 import type {
   Product,
   StoreStock,
@@ -9,9 +9,12 @@ import type {
   Discount,
   Member,
   AttendanceRecord,
+  Expense,
+  CashDeposit,
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
+import { isoDay } from "../lib/dates"
 
 /* ---------------- helpers ---------------- */
 
@@ -187,8 +190,8 @@ const sanitizeItems = (raw: unknown): Transaction["items"] => {
       variantSku: s(row.variantSku) || s(row.variant_sku),
       name: s(row.name),
       brand: s(row.brand),
-      size: (s(row.size) || "M") as Transaction["items"][number]["size"],
-      color: s(row.color) || "Standar",
+      size: (s(row.size) || "") as Transaction["items"][number]["size"],
+      color: s(row.color) || "",
       price,
       quantity,
       subtotal,
@@ -432,6 +435,9 @@ export const settingsFromDB = (
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
+  const payments = (obj.payments ?? {}) as Partial<AppSettings["payments"]>
+  const sizesArr = Array.isArray(obj.sizes) ? obj.sizes.map(s => String(s)).filter(Boolean) : []
+  const banksArr = Array.isArray(obj.banks) ? obj.banks.map(s => String(s)).filter(Boolean) : []
   // Migrasi branding lama "NET R" -> default baru (NANDS BOUTIQUE)
   if (brand.name === "NET R") brand.name = defaultSettings.brand.name
   return {
@@ -443,6 +449,13 @@ export const settingsFromDB = (
       ...(obj.roles ?? {}),
     } as AppSettings["roles"],
     barcode: { ...defaultSettings.barcode, ...barcode },
+    payments: {
+      methods: payments.methods ?? defaultSettings.payments.methods,
+      tax: { ...defaultSettings.payments.tax, ...(payments.tax ?? {}) },
+      rounding: { ...defaultSettings.payments.rounding, ...(payments.rounding ?? {}) },
+    },
+    sizes: sizesArr.length ? sizesArr : defaultSettings.sizes,
+    banks: banksArr.length ? banksArr : defaultSettings.banks,
   }
 }
 export const settingsToDB = (st: AppSettings) => [
@@ -450,6 +463,9 @@ export const settingsToDB = (st: AppSettings) => [
   { key: "brand", value: st.brand },
   { key: "roles", value: st.roles },
   { key: "barcode", value: st.barcode },
+  { key: "payments", value: st.payments },
+  { key: "sizes", value: st.sizes },
+  { key: "banks", value: st.banks },
 ]
 export async function saveSettingsRows(
   rows: Record<string, unknown>[],
@@ -505,6 +521,155 @@ export async function deleteAttendance(id: string): Promise<void> {
   if (error) throw error
 }
 
+/* ---------------- expenses ---------------- */
+
+export const expFromDB = (r: Record<string, unknown>): Expense => ({
+  id: s(r.id),
+  storeId: s(r.store_id),
+  storeName: s(r.store_name),
+  amount: n(r.amount),
+  description: s(r.description),
+  photo: s(r.photo) || undefined,
+  createdByName: s(r.created_by_name),
+  date: isoDay(d(r.expense_date) ?? new Date()),
+})
+
+export const expToDB = (x: Expense) => ({
+  id: x.id,
+  store_id: x.storeId,
+  store_name: x.storeName,
+  amount: x.amount,
+  description: x.description,
+  photo: x.photo ?? null,
+  created_by_name: x.createdByName,
+  expense_date: String(x.date),
+})
+
+export async function writeExpenses(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const valid = rows.filter(
+    (r) =>
+      r &&
+      typeof r.id === "string" &&
+      r.id &&
+      typeof r.store_id === "string" &&
+      r.store_id &&
+      typeof r.amount === "number",
+  )
+  if (!valid.length) return
+  const { error } = await supabase
+    .from("expenses")
+    .upsert(valid, { onConflict: "id" })
+  if (error) throw error
+}
+
+/* Simpan pengeluaran via app_settings (JSON) agar tetap tercatat
+   walau tabel `expenses` belum dibuat di database. */
+export async function saveExpensesJson(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({ key: "expenses", value: rows }, { onConflict: "key" })
+  if (error) throw error
+}
+
+export const expensesFromSettings = (
+  rows: Record<string, unknown>[],
+): Expense[] => {
+  const row = rows.find((r) => r && r.key === "expenses")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(expFromDB)
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  if (!id) return
+  const { error } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", id)
+  if (error) throw error
+}
+
+/* ---------------- cash deposits (setor tunai) ---------------- */
+
+export const depFromDB = (r: Record<string, unknown>): CashDeposit => ({
+  id: s(r.id),
+  storeId: s(r.store_id),
+  storeName: s(r.store_name),
+  date: isoDay(d(r.deposit_date) ?? new Date()),
+  bank: s(r.bank),
+  amount: n(r.amount),
+  referenceCode: s(r.reference_code),
+  notes: s(r.notes),
+  photo: s(r.photo) || undefined,
+  createdByName: s(r.created_by_name),
+})
+
+export const depToDB = (x: CashDeposit) => ({
+  id: x.id,
+  store_id: x.storeId,
+  store_name: x.storeName,
+  deposit_date: String(x.date),
+  bank: x.bank,
+  amount: x.amount,
+  reference_code: x.referenceCode,
+  notes: x.notes,
+  photo: x.photo ?? null,
+  created_by_name: x.createdByName,
+})
+
+export async function writeDeposits(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const valid = rows.filter(
+    (r) =>
+      r &&
+      typeof r.id === "string" &&
+      r.id &&
+      typeof r.store_id === "string" &&
+      r.store_id &&
+      typeof r.amount === "number" &&
+      typeof r.bank === "string",
+  )
+  if (!valid.length) return
+  const { error } = await supabase
+    .from("cash_deposits")
+    .upsert(valid, { onConflict: "id" })
+  if (error) throw error
+}
+
+/* Simpan setor tunai via app_settings (JSON) agar tetap tercatat
+   walau tabel `cash_deposits` belum dibuat di database. */
+export async function saveDepositsJson(
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({ key: "cash_deposits", value: rows }, { onConflict: "key" })
+  if (error) throw error
+}
+
+export const depositsFromSettings = (
+  rows: Record<string, unknown>[],
+): CashDeposit[] => {
+  const row = rows.find((r) => r && r.key === "cash_deposits")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(depFromDB)
+}
+
+export async function deleteDeposit(id: string): Promise<void> {
+  if (!id) return
+  const { error } = await supabase
+    .from("cash_deposits")
+    .delete()
+    .eq("id", id)
+  if (error) throw error
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   if (!id) return
   const { error } = await supabase.from("transactions").delete().eq("id", id)
@@ -532,6 +697,8 @@ export interface AllData {
   members: Member[]
   discounts: Discount[]
   attendance: AttendanceRecord[]
+  expenses: Expense[]
+  deposits: CashDeposit[]
   transactions: Transaction[]
   deletedTransactions: DeletedTransaction[]
   settings: AppSettings
@@ -560,6 +727,8 @@ export async function loadAll(): Promise<LoadResult> {
       memR,
       discR,
       attR,
+      expR,
+      depR,
       trxR,
       delR,
       setR,
@@ -573,6 +742,8 @@ export async function loadAll(): Promise<LoadResult> {
       supabase.from("members").select("*"),
       supabase.from("discounts").select("*"),
       supabase.from("attendance_records").select("*"),
+      supabase.from("expenses").select("*"),
+      supabase.from("cash_deposits").select("*"),
       supabase.from("transactions").select("*"),
       supabase.from("deleted_transactions").select("*"),
       supabase.from("app_settings").select("*"),
@@ -588,6 +759,16 @@ export async function loadAll(): Promise<LoadResult> {
     for (const c of catR.data ?? []) catMap.set(s(c.id), s(c.name))
     setCategoriesCache(catMap)
 
+    const settingsRows = first(setR)
+    const expensesFromTable = expR.error ? [] : (expR.data ?? []).map(expFromDB)
+    const expenses = expensesFromTable.length
+      ? expensesFromTable
+      : expensesFromSettings(settingsRows)
+    const depoesFromTable = depR.error ? [] : (depR.data ?? []).map(depFromDB)
+    const deposits = depoesFromTable.length
+      ? depoesFromTable
+      : depositsFromSettings(settingsRows)
+
     return {
       ok: true,
       data: {
@@ -597,9 +778,11 @@ export async function loadAll(): Promise<LoadResult> {
         members: first(memR).map(memFromDB),
         discounts: first(discR).map(discFromDB),
         attendance: first(attR).map(attFromDB),
+        expenses,
+        deposits,
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
-        settings: settingsFromDB(first(setR)),
+        settings: settingsFromDB(settingsRows),
         categories: first(catR).map((c) => ({ id: s(c.id), name: s(c.name) })),
       },
     }

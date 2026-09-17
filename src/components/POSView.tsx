@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import type { Product, ProductVariant, CartItem, Transaction, Size, Discount, Member } from "../data/types";
-import type { PrinterSettings, BarcodeSettings } from "../data/settings";
+import type { Product, ProductVariant, CartItem, Transaction, Discount, Member } from "../data/types";
+import type { PrinterSettings, BarcodeSettings, PaymentSettings } from "../data/settings";
 import { generateId } from "../data/transactions";
 import { POINTS_PER_10K, getTier, TIER_COLOR } from "../data/members";
 import { cleanBarcode, playScanFeedback } from "../lib/barcode";
@@ -13,7 +13,10 @@ import type { ScanResult } from "./BarcodeScanModal";
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
-const SIZES: Size[] = ["XS", "S", "M", "L", "XL", "XXL"];
+const PICK_UNSET = String.fromCharCode(0);
+
+const variantText = (v: ProductVariant | { color: string; size: string }) =>
+  [v.color, v.size].filter(s => s && s.trim()).join(" / ") || "tanpa warna / ukuran";
 
 interface Props {
   activeStore: string;
@@ -26,6 +29,7 @@ interface Props {
   brandName: string;
   printer: PrinterSettings;
   barcode: BarcodeSettings;
+  payments: PaymentSettings;
   onNewTransaction: (t: Transaction) => void;
   onUpdateMember: (m: Member) => void;
   onUseVoucher: (id: string) => void;
@@ -33,7 +37,7 @@ interface Props {
 
 interface VariantPicker { product: Product }
 
-export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
+export default function POSView({ activeStore, storeName, cashierId, cashierName, products, discounts, members, brandName, printer, barcode, payments, onNewTransaction, onUpdateMember, onUseVoucher }: Props) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -45,8 +49,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const [pendingTxId, setPendingTxId] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [showCartOverlay, setShowCartOverlay] = useState(false);
-  const [pickerColor, setPickerColor] = useState("");
-  const [pickerSize, setPickerSize] = useState<Size | "">("");
+  const [pickerColor, setPickerColor] = useState<string>(PICK_UNSET);
+  const [pickerSize, setPickerSize] = useState<string>(PICK_UNSET);
   const [voucherCode, setVoucherCode] = useState("");
   const [voucherMsg, setVoucherMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -73,8 +77,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
 
   const openPicker = (product: Product, initialColor?: string) => {
     const colors = [...new Set(product.variants.map(v => v.color))];
-    setPickerColor(initialColor && colors.includes(initialColor) ? initialColor : colors[0]);
-    setPickerSize("");
+    setPickerColor(initialColor !== undefined && colors.includes(initialColor) ? initialColor : PICK_UNSET);
+    setPickerSize(PICK_UNSET);
     setShowPicker({ product });
   };
 
@@ -105,7 +109,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   };
 
   const addToCart = () => {
-    if (!showPicker || !pickerColor || !pickerSize) return;
+    if (!showPicker || pickerColor === PICK_UNSET || pickerSize === PICK_UNSET) return;
     const variant = showPicker.product.variants.find(v => v.color === pickerColor && v.size === pickerSize);
     if (!variant) return;
     if (addVariantToCart(showPicker.product, variant)) setShowPicker(null);
@@ -119,8 +123,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     for (const p of products) {
       for (const v of p.variants) {
         if (v.sku.toUpperCase() === c || norm(v.sku) === cn) {
-          if (addVariantToCart(p, v)) return { ok: true, message: `"${p.name}" (${v.color} / ${v.size}) ditambahkan ke keranjang` };
-          return { ok: false, message: `Stok habis untuk "${p.name}" (${v.color} / ${v.size})` };
+          if (addVariantToCart(p, v)) return { ok: true, message: `"${p.name}" (${variantText(v)}) ditambahkan ke keranjang` };
+          return { ok: false, message: `Stok habis untuk "${p.name}" (${variantText(v)})` };
         }
       }
     }
@@ -195,8 +199,12 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
   const rawDiscAmt = discountType === "percent" ? Math.round(subtotal * discount / 100) : discount;
   const discountAmt = Math.min(rawDiscAmt, subtotal);
-  const tax = Math.max(0, Math.round((subtotal - discountAmt) * 0.1));
-  const total = subtotal - discountAmt + tax;
+  const taxRate = payments.tax.enabled ? payments.tax.rate : 0;
+  const tax = Math.max(0, Math.round((subtotal - discountAmt) * taxRate / 100));
+  const rawTotal = subtotal - discountAmt + tax;
+  const roundStep = payments.rounding.enabled ? payments.rounding.step : 0;
+  const total = roundStep > 0 ? Math.ceil(rawTotal / roundStep) * roundStep : Math.max(0, rawTotal);
+  const roundingDiff = total - rawTotal;
   const pointsToEarn = Math.floor(total / 10000) * POINTS_PER_10K;
 
   useEffect(() => { if (cart.length === 0) setShowCartOverlay(false); }, [cart.length]);
@@ -229,7 +237,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     setDiscount(0); setDiscountType("amount"); setDiscountLabel(""); setVoucherCode(""); setVoucherMsg(null);
   };
 
-  const handlePay = (payment: number, method: "cash" | "debit" | "qris") => {
+  const handlePay = (payment: number, method: string) => {
     const t: Transaction = {
       id: pendingTxId || generateId(activeStore),
       date: new Date(),
@@ -295,7 +303,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
   };
 
   const pickerColors = showPicker ? [...new Set(showPicker.product.variants.map(v => v.color))] : [];
-  const pickerSizes = showPicker ? SIZES.filter(s => showPicker.product.variants.some(v => v.color === pickerColor && v.size === s)) : [];
+  const pickerSizes = showPicker ? [...new Set(showPicker.product.variants.filter(v => v.color === pickerColor).map(v => v.size))] : [];
   const selectedVariant = showPicker ? showPicker.product.variants.find(v => v.color === pickerColor && v.size === pickerSize) : null;
   const storeStockQty = selectedVariant?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
 
@@ -355,7 +363,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
               <img src={item.image} alt={item.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold truncate">{item.name}</div>
-                <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{item.color} / {item.size}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{[item.color, item.size].filter(Boolean).join(" / ") || "Tanpa varian"}</div>
                 <div className="text-xs font-mono font-bold mt-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
@@ -420,9 +428,15 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             </div>
           )}
           <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--muted-foreground)" }}>Pajak (10%)</span>
+            <span style={{ color: "var(--muted-foreground)" }}>{payments.tax.enabled ? `Pajak (${payments.tax.rate}%)` : "Pajak"}</span>
             <span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(tax)}</span>
           </div>
+          {roundingDiff !== 0 && (
+            <div className="flex justify-between text-sm">
+              <span style={{ color: "var(--muted-foreground)" }}>Pembulatan</span>
+              <span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>+{fmt(roundingDiff)}</span>
+            </div>
+          )}
           {selectedMember && pointsToEarn > 0 && (
             <div className="flex justify-between text-xs" style={{ color: "#16a34a" }}>
               <span>+Poin member</span>
@@ -542,10 +556,10 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                 <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>WARNA</div>
                 <div className="flex flex-wrap gap-2">
                   {pickerColors.map(color => (
-                    <button key={color} onClick={() => { setPickerColor(color); setPickerSize(""); }}
+                    <button key={color || "__none__"} onClick={() => { setPickerColor(color); setPickerSize(PICK_UNSET); }}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                       style={{ background: pickerColor === color ? "var(--foreground)" : "var(--background)", color: pickerColor === color ? "white" : "var(--foreground)", border: `1.5px solid ${pickerColor === color ? "var(--foreground)" : "var(--border)"}` }}>
-                      {color}
+                      {color ? color : "Tanpa warna"}
                     </button>
                   ))}
                 </div>
@@ -557,23 +571,23 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                     const v = showPicker.product.variants.find(vv => vv.color === pickerColor && vv.size === size);
                     const qty = v?.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0;
                     return (
-                      <button key={size} onClick={() => setPickerSize(size)} disabled={qty === 0}
-                        className="w-12 h-10 rounded-xl text-sm font-semibold transition-all disabled:opacity-30"
+                      <button key={size || "__none__"} onClick={() => setPickerSize(size)} disabled={qty === 0}
+                        className="h-10 px-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-30"
                         style={{ background: pickerSize === size ? "var(--foreground)" : "var(--background)", color: pickerSize === size ? "white" : "var(--foreground)", border: `1.5px solid ${pickerSize === size ? "var(--foreground)" : "var(--border)"}` }}>
-                        {size}
+                        {size ? size : "Tanpa ukuran"}
                       </button>
                     );
                   })}
                 </div>
-                {pickerSize && selectedVariant && (
+                {pickerSize !== PICK_UNSET && selectedVariant && (
                   <div className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
                     Stok: <span className="font-bold" style={{ color: storeStockQty > 3 ? "#16a34a" : "#ef4444" }}>{storeStockQty}</span>
                   </div>
                 )}
               </div>
-              <button onClick={addToCart} disabled={!pickerColor || !pickerSize || storeStockQty === 0}
+              <button onClick={addToCart} disabled={pickerColor === PICK_UNSET || pickerSize === PICK_UNSET || storeStockQty === 0}
                 className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
-                style={{ background: pickerColor && pickerSize && storeStockQty > 0 ? "var(--foreground)" : "var(--muted)", color: pickerColor && pickerSize && storeStockQty > 0 ? "white" : "var(--muted-foreground)" }}>
+                style={{ background: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "var(--foreground)" : "var(--muted)", color: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "white" : "var(--muted-foreground)" }}>
                 Tambah ke Keranjang
               </button>
             </div>
@@ -594,6 +608,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           cashierName={cashierName}
           brandName={brandName}
           printer={printer}
+          methods={payments.methods}
+          taxLabel={payments.tax.enabled ? payments.tax.label : "Pajak"}
           memberName={selectedMember?.name}
           pointsEarned={selectedMember ? pointsToEarn : 0}
           onPay={handlePay}

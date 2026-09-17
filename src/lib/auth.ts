@@ -7,7 +7,19 @@ const SHA256 = async (str: string): Promise<string> => {
 };
 
 const SALT = "nands-pos-2026-v1";
-const PBKDF2_ITERATIONS = 15000;
+const PBKDF2_ITERATIONS = 600000;
+
+const LEGACY_SHA256_RE = /^[a-f0-9]{64}$/i;
+
+export const isHashedPin = (pin: string | null | undefined): boolean =>
+  !!pin && (pin.startsWith("pbkdf2$") || LEGACY_SHA256_RE.test(pin));
+
+export const needsPinUpgrade = (pin: string | null | undefined): boolean => {
+  if (!pin) return false;
+  if (!pin.startsWith("pbkdf2$")) return true;
+  const iterations = Number(pin.split("$")[2]);
+  return !Number.isFinite(iterations) || iterations < PBKDF2_ITERATIONS;
+};
 
 const toHex = (bytes: Iterable<number>): string =>
   Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");

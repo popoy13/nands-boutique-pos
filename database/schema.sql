@@ -64,7 +64,7 @@ CREATE TABLE products (
 CREATE TABLE product_variants (
     id          TEXT PRIMARY KEY,
     product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    size        TEXT NOT NULL CHECK (size IN ('XS','S','M','L','XL','XXL')),
+    size        TEXT NOT NULL DEFAULT '',
     color       TEXT NOT NULL,
     sku         TEXT NOT NULL UNIQUE
 );
@@ -198,6 +198,38 @@ CREATE TABLE app_settings (
 );
 
 -- ----------------------------------------------------------------------------
+-- EXPENSES (pengeluaran / pembelian barang, mis. pembelian stok harian)
+-- ----------------------------------------------------------------------------
+CREATE TABLE expenses (
+    id              TEXT PRIMARY KEY,
+    store_id        TEXT NOT NULL,
+    store_name      TEXT NOT NULL DEFAULT '',
+    amount          NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+    description     TEXT NOT NULL DEFAULT '',
+    photo           TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    expense_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ----------------------------------------------------------------------------
+-- CASH_DEPOSITS (setor tunai per toko ke bank owner perusahaan)
+-- ----------------------------------------------------------------------------
+CREATE TABLE cash_deposits (
+    id              TEXT PRIMARY KEY,
+    store_id        TEXT NOT NULL,
+    store_name      TEXT NOT NULL DEFAULT '',
+    bank            TEXT NOT NULL DEFAULT '',
+    amount          NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+    reference_code  TEXT NOT NULL DEFAULT '',
+    notes           TEXT NOT NULL DEFAULT '',
+    photo           TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    deposit_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ----------------------------------------------------------------------------
 -- INDEXES untuk query umum
 -- ----------------------------------------------------------------------------
 CREATE INDEX idx_product_variants_product ON product_variants(product_id);
@@ -213,3 +245,8 @@ CREATE INDEX idx_attendance_date         ON attendance_records(attendance_date);
 CREATE INDEX idx_attendance_employee     ON attendance_records(employee_id);
 CREATE INDEX idx_attendance_store        ON attendance_records(store_id);
 CREATE INDEX idx_attendance_store_date   ON attendance_records(store_id, attendance_date);
+CREATE INDEX idx_expenses_store          ON expenses(store_id);
+CREATE INDEX idx_expenses_date           ON expenses(expense_date);
+CREATE INDEX idx_cash_deposits_store     ON cash_deposits(store_id);
+CREATE INDEX idx_cash_deposits_date      ON cash_deposits(deposit_date);
+CREATE INDEX idx_cash_deposits_bank      ON cash_deposits(bank);

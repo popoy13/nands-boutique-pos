@@ -1,6 +1,7 @@
 {
   "name": "figma-make-app",
   "private": true,
+  "packageManager": "pnpm@10.34.3",
   "version": "2.0.0",
   "type": "module",
   "license": "MIT",

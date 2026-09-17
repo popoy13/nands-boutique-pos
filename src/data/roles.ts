@@ -26,6 +26,10 @@ const BUILTIN_COLORS: Record<string, string> = {
 
 export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] => {
   const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
+  // Migrasi: role yang punya akses Transaksi otomatis mendapat menu Pengeluaran.
+  if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
+  // Migrasi: role yang punya menu Pengeluaran otomatis mendapat menu Setor Tunai.
+  if (menus.includes("expense") && !menus.includes("deposit")) menus.push("deposit");
   // Migrasi: role yang punya akses Absensi otomatis mendapat menu Riwayat Absensi.
   if (menus.includes("attendance") && !menus.includes("attendanceHistory")) menus.push("attendanceHistory");
   return menus;
@@ -40,6 +44,8 @@ export const getRoleColor = (role: string, roles?: Record<string, RoleConfig>): 
 export const MENU_ITEMS: { id: string; label: string }[] = [
   { id: "pos", label: "Kasir" },
   { id: "history", label: "Transaksi" },
+  { id: "expense", label: "Pengeluaran" },
+  { id: "deposit", label: "Setor Tunai" },
   { id: "report", label: "Laporan" },
   { id: "inventory", label: "Inventori" },
   { id: "product", label: "Produk" },
@@ -54,23 +60,28 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
-  product: ["export", "import", "bulk", "category", "add", "edit", "delete"],
+  expense: ["add", "edit", "delete"],
+  deposit: ["add", "edit", "delete", "bank"],
+  product: ["export", "import", "bulk", "category", "size", "add", "edit", "delete"],
   employee: ["import", "export", "add"],
   store: ["add", "edit", "delete"],
   discount: ["add", "edit", "delete"],
   member: ["add", "edit", "delete"],
   attendance: ["view_all", "delete"],
   attendanceHistory: ["view_all", "delete"],
-  settings: ["printer", "attendance", "roles", "barcode", "brand"],
+  settings: ["printer", "attendance", "roles", "barcode", "brand", "pembayaran"],
 };
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
+  expense: { add: "Tambah pengeluaran", edit: "Edit pengeluaran", delete: "Hapus pengeluaran" },
+  deposit: { add: "Catat setor tunai", edit: "Edit setor tunai", delete: "Hapus setor tunai", bank: "Kelola daftar bank" },
   product: {
     export: "Export produk",
     import: "Import produk",
     bulk: "Edit banyak",
     category: "Kelola kategori",
+    size: "Kelola ukuran",
     add: "Tambah produk",
     edit: "Edit produk",
     delete: "Hapus produk",
@@ -87,6 +98,7 @@ export const ACTION_LABELS: Record<string, Record<string, string>> = {
     roles: "Tab Role & Menu",
     barcode: "Tab Perangkat Barcode",
     brand: "Tab Menu Utama",
+    pembayaran: "Tab Pembayaran",
   },
 };
 
@@ -101,12 +113,12 @@ export const defaultPermissionsForMenus = (menus: string[]): Record<string, stri
 const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, string[]>> = {
   admin: allActionsFor(MENU_ITEMS.map(m => m.id)),
   manager: {
-    ...allActionsFor(["history", "product", "employee", "settings"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense", "deposit"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
   manager_operasional: {
-    ...allActionsFor(["history", "product", "employee", "settings"]),
+    ...allActionsFor(["history", "product", "employee", "settings", "expense", "deposit"]),
     store: [], discount: [], member: [], attendance: ["view_all"], attendanceHistory: ["view_all"],
     pos: [], report: [], inventory: [],
   },
@@ -146,6 +158,31 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     // tetap mendapat aksi ini meski tersimpan di DB sebelum aksi tersebut ada.
     if (k in DEFAULT_ROLES && DEFAULT_ROLES[k].permissions?.attendance?.includes("view_all")) {
       perms.attendance = [...new Set([...(perms.attendance ?? []), "view_all"])];
+    }
+    // Migrasi: role yang punya akses Setelan otomatis mendapat tab setelan baru
+    // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.
+    if (Array.isArray(perms.settings) && perms.settings.length > 0) {
+      perms.settings = [...new Set([...perms.settings, ...(ACTION_ITEMS.settings ?? [])])];
+    }
+    // Migrasi: role yang punya aksi pengeluaran (add/delete) otomatis
+    // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.expense) && perms.expense.length > 0) {
+      perms.expense = [...new Set([...perms.expense, "edit"])];
+    }
+    // Migrasi: role yang punya aksi setor tunai (add/delete) otomatis
+    // mendapat aksi edit setor tunai walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.deposit) && perms.deposit.length > 0) {
+      perms.deposit = [...new Set([...perms.deposit, "edit"])];
+    }
+    // Migrasi: role bawaan (mis. admin/manager) yang tersimpan sebelum menu Setor
+    // Tunai ada otomatis mendapat aksi default setor tunai bila menunya tersedia.
+    if (k in DEFAULT_ROLES && (DEFAULT_ROLES[k].permissions?.deposit?.length ?? 0) > 0) {
+      perms.deposit = [...new Set([...(perms.deposit ?? []), ...(DEFAULT_ROLES[k].permissions?.deposit ?? [])])];
+    }
+    // Migrasi: role yang punya aksi kelola kategori produk otomatis mendapat
+    // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.product) && perms.product.includes("category")) {
+      perms.product = [...new Set([...perms.product, "size"])];
     }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).

@@ -63,6 +63,10 @@ body {
   color: var(--foreground);
 }
 
+/* Hide scrollbar for horizontal tab strips */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Swipe loading indicator */
 @keyframes swipe-card {
   0%, 100% { transform: translateX(-9px) rotate(-6deg); }
@@ -84,6 +88,13 @@ body {
   background: linear-gradient(105deg, rgba(255,255,255,0) 25%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0) 75%);
   animation: swipe-sweep 1.4s ease-in-out infinite;
 }
+
+/* Bottom sheet (mobile) */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.sheet-up { animation: sheet-up 0.28s ease-out; }
 
 /* Print styles for receipt */
 @media print {

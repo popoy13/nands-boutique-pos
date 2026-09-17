@@ -1,9 +1,13 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
+import { validateImageFile } from "../lib/imageFile";
 import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
+import { assetUrl } from "../lib/assets";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -48,6 +52,8 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!editing) return;
@@ -76,7 +82,8 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { showToast("File harus berupa gambar"); return; }
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr, false); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       setEditing(prev => prev ? { ...prev, photo: ev.target?.result as string } : null);
@@ -91,6 +98,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     (filterRole === "all" || e.role === filterRole) &&
     (e.name.toLowerCase().includes(search.toLowerCase()) || (e.email ?? "").toLowerCase().includes(search.toLowerCase()))
   );
+
+  const resetPage = () => setPage(1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSaveEmployee = async () => {
     if (savingRef.current) return;
@@ -176,7 +188,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       "Gaji": e.salary,
       "Status": e.status === "active" ? "Aktif" : "Tidak Aktif",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Karyawan");
     XLSX.writeFile(wb, `nands-boutique-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -195,24 +207,30 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws) as any[];
 
-        const imported: Employee[] = rows.map((row: any) => {
+        const imported: Employee[] = rows.map((row: any): Employee => {
           const storeMatch = stores.find(s => s.name === row["Toko"]);
           const jabatan = String(row["Jabatan"] ?? "").trim();
           const labelToKey = new Map(roleOptions.map(([k, c]) => [c.label, k]));
           const roleKey = labelToKey.get(jabatan) ?? allRoleByLabel(jabatan) ?? "staff";
+          const rawName = String(row["Nama"] ?? "").trim().slice(0, 80);
+          const rawEmail = String(row["Email"] ?? "").trim().slice(0, 120);
+          const rawPhone = String(row["No. HP"] ?? "").trim().slice(0, 25);
+          const rawId = String(row["ID"] ?? "").replace(/[^\w.-]/g, "").slice(0, 64);
+          const rawJoin = String(row["Tanggal Bergabung"] ?? "").trim().slice(0, 10);
+          const salary = Math.min(Math.max(Number(row["Gaji"]) || 0, 0), 1000000000000);
           return {
-            id: row["ID"] || `e-${Date.now()}-${Math.random()}`,
-            name: row["Nama"] || "",
+            id: rawId || `e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: rawName,
             role: roleKey,
             storeId: storeMatch?.id ?? "s1",
-            phone: row["No. HP"] || "",
-            email: row["Email"] || "",
-            joinDate: row["Tanggal Bergabung"] || "",
-            salary: Number(row["Gaji"]) || 0,
+            phone: /^[+\d][\d\s()-]{5,}$/.test(rawPhone) ? rawPhone : "",
+            email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : "",
+            joinDate: /^\d{4}-\d{2}-\d{2}$/.test(rawJoin) ? rawJoin : "",
+            salary,
             status: row["Status"] === "Aktif" ? "active" : "inactive",
             pin: /^\d{4}$/.test(String(row["PIN"] ?? "").trim()) ? String(row["PIN"]).trim() : "",
           };
-        });
+        }).filter(imp => imp.name.length > 0);
 
         void (async () => {
           const merged = [...employees];
@@ -229,7 +247,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             }
           }
           onSave(merged);
-          showToast(`${rows.length} karyawan berhasil diimpor`);
+          showToast(`${imported.length} karyawan berhasil diimpor`);
         })();
       } catch {
         showToast("Gagal membaca file Excel");
@@ -258,7 +276,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white shrink-0" style={{ background: "var(--foreground)" }}>
                 {editing.photo
-                  ? <img src={editing.photo} alt="Foto" className="w-full h-full object-cover" />
+                  ? <img src={assetUrl(editing.photo)} alt="Foto" className="w-full h-full object-cover" />
                   : <span>{editing.name.charAt(0) || "?"}</span>}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -459,7 +477,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Karyawan</div>
@@ -498,15 +516,15 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
           <div className="flex gap-2 flex-wrap">
             <div className="relative" style={{ minWidth: 180 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari nama atau email..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari nama atau email..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
                 className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
             </div>
-            <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
+            <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+            <select value={filterRole} onChange={e => { setFilterRole(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Jabatan</option>
               {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
@@ -514,12 +532,12 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada karyawan ditemukan</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {filtered.map(emp => (
+              {pageItems.map(emp => (
                 <div
                   key={emp.id}
                   className="p-4 rounded-xl flex items-center gap-4 transition-all"
@@ -531,7 +549,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                 >
                   {/* Avatar */}
                   {emp.photo ? (
-                    <img src={emp.photo} alt={emp.name}
+                    <img src={assetUrl(emp.photo)} alt={emp.name}
                       className="w-10 h-10 rounded-full object-cover shrink-0"
                       style={{ filter: emp.status === "inactive" ? "grayscale(1)" : "none" }} />
                   ) : (
@@ -593,6 +611,15 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             </div>
           )}
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="karyawan"
+        />
       </div>
 
       {/* Edit Panel - desktop */}

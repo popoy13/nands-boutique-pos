@@ -4,6 +4,7 @@ import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { MENU_PAGES } from "../data/menuPages";
 import Avatar from "./Avatar";
+import { assetUrl } from "../lib/assets";
 
 interface Props {
   activeTab: string;
@@ -20,6 +21,8 @@ interface Props {
 export const ALL_NAV = [
   { id: "pos",      label: "Kasir",         icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg> },
   { id: "history",  label: "Transaksi",     icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
+  { id: "expense",  label: "Pengeluaran", icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg> },
+  { id: "deposit",  label: "Setor Tunai", icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h2m4 0h2M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4-3h6a2 2 0 012 2v1H7V5a2 2 0 012-2z" /></svg> },
   { id: "report",   label: "Laporan",       icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg> },
   { id: "inventory",label: "Inventori",     icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> },
   { id: "product",  label: "Produk",        icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" /></svg> },
@@ -42,7 +45,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       <div className="md:hidden flex flex-col shrink-0" style={{ background: "var(--sidebar)", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex items-center gap-2.5 px-4 pt-3 pb-2.5">
           <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
-          <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+          <img src={assetUrl(brand.logo)} alt={brand.name} className="w-full h-full object-cover" />
         </div>
           <div className="flex-1 min-w-0">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
@@ -74,7 +77,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
-          <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+          <img src={assetUrl(brand.logo)} alt={brand.name} className="w-full h-full object-cover" />
         </div>
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>

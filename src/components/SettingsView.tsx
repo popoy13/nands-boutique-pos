@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord } from "../data/types";
-import type { AppSettings } from "../data/settings";
+import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
+import { validateImageFile } from "../lib/imageFile";
+import { assetUrl } from "../lib/assets";
 import type { ResetResult } from "../data/sync";
 
 interface Props {
@@ -29,7 +31,7 @@ interface Props {
   onResetAttendance: (ids: string[]) => Promise<ResetResult>;
 }
 
-type Tab = "printer" | "attendance" | "brand" | "roles" | "barcode" | "reset";
+type Tab = "printer" | "attendance" | "pembayaran" | "brand" | "roles" | "barcode" | "reset";
 
 const field = {
   background: "var(--background)",
@@ -56,12 +58,68 @@ function ResetButton({ label, onReset }: { label: string; onReset: () => void })
 const isoDay = (dt: Date): string =>
   `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 
+function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; brandName: string }) {
+  const now = new Date();
+  const width = printer.paperWidth || 80;
+  const pxPerMm = 3.7795;
+  const scale = Math.min(1, 400 / (width * pxPerMm));
+  const px = Math.round(width * pxPerMm * scale);
+  const fontPx = Math.max(7, Math.round((width <= 58 ? 0.11 : 0.13) * width * scale));
+  const items = [
+    { name: "Kaos Polos Premium", color: "Putih", size: "L", qty: 2, price: 85000, subtotal: 170000 },
+    { name: "Jeans Slim Fit", color: "Navy", size: "32", qty: 1, price: 185000, subtotal: 185000 },
+  ];
+  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const discount = 15000;
+  const tax = Math.round((subtotal - discount) * 0.1);
+  const total = subtotal - discount + tax;
+  const payment = 400000;
+  const change = payment - total;
+  const fmt = (n: number) => n.toLocaleString("id-ID");
+  const div = <div style={{ borderTop: "1px dashed rgba(0,0,0,0.7)", margin: "5px 0" }} />;
+  return (
+    <div className="font-mono" style={{ width: px, background: "#fff", color: "#000", fontSize: `${fontPx}px`, lineHeight: 1.55, padding: `${Math.round(9 * scale)}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.22)", borderRadius: 5 }}>
+      {printer.receiptLogo && (
+        <div className="text-center"><img src={assetUrl(printer.receiptLogo)} alt="Logo" style={{ maxWidth: "72%", maxHeight: Math.max(24, Math.round(40 * scale)), objectFit: "contain" }} /></div>
+      )}
+      <div className="text-center"><b>{brandName}</b><br />TOKO CENTRAL<br /></div>
+      {div}
+      <div>No: TRX-20260916-0001</div>
+      {printer.showDate !== false && <div>Tgl: {now.toLocaleDateString("id-ID")}</div>}
+      {printer.showTime !== false && <div>Jam: {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>}
+      {printer.showCashier !== false && <div>Kasir: Andi</div>}
+      {div}
+      {items.map(i => (
+        <div key={i.name}>
+          <div>{i.name} ({i.color}/{i.size})</div>
+          <div className="flex justify-between"><span>{i.qty} x {fmt(i.price)}</span><span>{fmt(i.subtotal)}</span></div>
+        </div>
+      ))}
+      {div}
+      <div className="flex justify-between"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+      <div className="flex justify-between"><span>Diskon</span><span>-{fmt(discount)}</span></div>
+      {printer.showTax !== false && <div className="flex justify-between"><span>Pajak 10%</span><span>{fmt(tax)}</span></div>}
+      <div className="flex justify-between font-bold"><span>TOTAL</span><span>{fmt(total)}</span></div>
+      <div className="flex justify-between"><span>Bayar (Tunai)</span><span>{fmt(payment)}</span></div>
+      {printer.showChange !== false && <div className="flex justify-between"><span>Kembalian</span><span>{fmt(change)}</span></div>}
+      {printer.footerText && (
+        <>
+          {div}
+          <div className="text-center">{printer.footerText.split("\n").map((l, i) => <div key={i}>{l}</div>)}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
   const loadingRef = useRef<HTMLInputElement>(null);
+  const receiptLogoRef = useRef<HTMLInputElement>(null);
   const isAdmin = currentUser?.role === "admin";
 
   const canOpenTab = (id: Tab): boolean => {
@@ -69,7 +127,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     const acts = permissions?.settings;
     return !acts || acts.includes(id);
   };
-  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "brand", "reset"];
+  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "pembayaran", "brand", "reset"];
 
   useEffect(() => {
     if (tab === "reset" && isAdmin) return;
@@ -83,6 +141,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
   const [draftPrinter, setDraftPrinter] = useState({ ...settings.printer });
   const [draftBrand, setDraftBrand] = useState({ ...settings.brand });
+  const [draftPayments, setDraftPayments] = useState<PaymentSettings>(() => ({
+    methods: settings.payments.methods.map(m => ({ ...m })),
+    tax: { ...settings.payments.tax },
+    rounding: { ...settings.payments.rounding },
+  }));
+  const [payLabel, setPayLabel] = useState("");
+  const [payKind, setPayKind] = useState<PaymentMethodKind>("cash");
   const [draftStores, setDraftStores] = useState<Store[]>(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
   const [draftRoles, setDraftRoles] = useState(() => ensureRoles(settings.roles));
   const [draftBarcode, setDraftBarcode] = useState({ ...defaultSettings.barcode, ...settings.barcode });
@@ -97,6 +162,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   // tanpa merusak nilai yang baru saja disimpan.
   useEffect(() => { setDraftPrinter({ ...settings.printer }); }, [settings.printer]);
   useEffect(() => { setDraftBrand({ ...settings.brand }); }, [settings.brand]);
+  useEffect(() => {
+    setDraftPayments({
+      methods: settings.payments.methods.map(m => ({ ...m })),
+      tax: { ...settings.payments.tax },
+      rounding: { ...settings.payments.rounding },
+    });
+  }, [settings.payments]);
   useEffect(() => { setDraftBarcode({ ...defaultSettings.barcode, ...settings.barcode }); }, [settings.barcode]);
   useEffect(() => {
     setDraftStores(stores.map(s => ({ ...s, openHour: s.openHour ?? "08:00", closeHour: s.closeHour ?? "21:00" })));
@@ -118,14 +190,14 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
   if (!canEdit) {
     return (
-      <div className="h-full overflow-y-auto px-5 py-5">
-        <div className="flex items-center justify-between mb-4">
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
-        </div>
-        <div className="max-w-2xl p-6 rounded-2xl text-center" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="text-3xl mb-2">🔒</div>
-          <div className="text-sm font-semibold mb-1">Akses Terbatas</div>
-          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Hanya Admin atau Manager yang dapat mengubah setelan aplikasi.</div>
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5">
+          <div className="mb-4" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+          <div className="w-full p-6 rounded-2xl text-center" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+            <div className="text-3xl mb-2">🔒</div>
+            <div className="text-sm font-semibold mb-1">Akses Terbatas</div>
+            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Hanya Admin atau Manager yang dapat mengubah setelan aplikasi.</div>
+          </div>
         </div>
       </div>
     );
@@ -135,6 +207,41 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const saveBrand = () => { onSaveSettings({ ...settings, brand: draftBrand }); showToast("Menu utama diperbarui"); };
   const saveAttendance = () => { onSaveStores(draftStores); showToast("Jam operasional toko tersimpan"); };
   const saveBarcode = () => { onSaveSettings({ ...settings, barcode: draftBarcode }); showToast("Setelan perangkat barcode disimpan"); };
+  const savePayments = () => {
+    const label = draftPayments.tax.enabled ? `Pajak ${draftPayments.tax.rate}%` : "Pajak";
+    const withLabel: PaymentSettings = {
+      methods: draftPayments.methods.filter(m => m.label.trim() !== ""),
+      tax: { ...draftPayments.tax, rate: Math.max(0, Math.min(100, Math.round(Number(draftPayments.tax.rate) || 0))), label },
+      rounding: { enabled: draftPayments.rounding.enabled, step: Number(draftPayments.rounding.step) || 0 },
+    };
+    if (withLabel.methods.filter(m => m.enabled).length === 0) { showToast("Minimal satu metode pembayaran aktif", false); return; }
+    onSaveSettings({ ...settings, payments: withLabel });
+    showToast("Setelan pembayaran disimpan");
+  };
+
+  const addPaymentMethod = () => {
+    const label = payLabel.trim();
+    if (!label) { showToast("Masukkan nama metode pembayaran", false); return; }
+    if (draftPayments.methods.some(m => m.label.trim().toLowerCase() === label.toLowerCase())) { showToast("Metode tersebut sudah ada", false); return; }
+    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "metode";
+    let id = base;
+    let i = 1;
+    while (draftPayments.methods.some(m => m.id === id)) { id = `${base}_${i}`; i++; }
+    setDraftPayments(p => ({ ...p, methods: [...p.methods, { id, label, kind: payKind, enabled: true }] }));
+    setPayLabel("");
+    showToast(`Metode "${label}" ditambahkan`);
+  };
+
+  const updatePayMethod = (id: string, patch: Partial<{ label: string; kind: PaymentMethodKind; enabled: boolean }>) =>
+    setDraftPayments(p => ({ ...p, methods: p.methods.map(m => m.id === id ? { ...m, ...patch } : m) }));
+
+  const deletePayMethod = (id: string) => {
+    if (draftPayments.methods.filter(m => m.enabled).length <= 1 && draftPayments.methods.find(m => m.id === id)?.enabled) {
+      showToast("Minimal satu metode pembayaran aktif", false);
+      return;
+    }
+    setDraftPayments(p => ({ ...p, methods: p.methods.filter(m => m.id !== id) }));
+  };
 
   const finishReset = (res: ResetResult, okMsg: string) =>
     showToast(res.ok ? okMsg : (res.msg || "Gagal menghapus data"), res.ok);
@@ -264,44 +371,70 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     </button>
   );
 
+  const tabDefs = ([
+    { id: "printer", label: "Printer", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
+    { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
+    { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
+    { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
+    { id: "pembayaran", label: "Pembayaran", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm4 8h4" /></svg> },
+    { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+    { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
+  ] as { id: Tab; label: string; icon: React.ReactNode }[]).filter(t => canOpenTab(t.id));
+
   return (
-    <div className="h-full overflow-y-auto px-5 py-5">
+    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
+        <div className="fixed bottom-24 lg:bottom-6 left-1/2 lg:left-auto -translate-x-1/2 lg:translate-x-0 lg:right-6 z-[80] px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
           {toast}
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
-      </div>
+      {/* Sidebar (desktop) */}
+      <aside className="hidden lg:flex flex-col shrink-0 w-60 overflow-y-auto px-3 py-5 border-r" style={{ borderColor: "var(--border)" }}>
+        <div className="px-2 mb-4" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+        <nav className="flex flex-col gap-1">
+          {tabDefs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left"
+              style={{ background: tab === t.id ? "var(--foreground)" : "transparent", color: tab === t.id ? "white" : "var(--muted-foreground)" }}>
+              <span className="shrink-0">{t.icon}</span>
+              <span className="truncate">{t.label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap mb-5">
-        {([
-          { id: "printer", label: "Printer", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
-          { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
-          { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
-          { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
-          { id: "brand", label: "Menu Utama", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-          { id: "reset", label: "Reset Data", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> },
-        ] as { id: Tab; label: string; icon: React.ReactNode }[])
-          .filter(t => canOpenTab(t.id))
-          .map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all"
-            style={{ background: tab === t.id ? "var(--foreground)" : "var(--card)", color: tab === t.id ? "white" : "var(--muted-foreground)", border: `1.5px solid ${tab === t.id ? "var(--foreground)" : "var(--border)"}` }}>
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {/* Header + tabs (mobile) */}
+        <div className="lg:hidden shrink-0 px-4 pt-5">
+          <div className="mb-3" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Setelan</div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-3">
+            {tabDefs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
+                style={{ background: tab === t.id ? "var(--foreground)" : "var(--card)", color: tab === t.id ? "white" : "var(--muted-foreground)", border: `1.5px solid ${tab === t.id ? "var(--foreground)" : "var(--border)"}` }}>
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5">
 
       {/* PRINTER */}
       {tab === "printer" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Printer</div>
-          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
+            <button onClick={() => setPreviewOpen(true)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all"
+              style={{ background: "rgba(124,58,237,0.1)", color: "var(--accent)", border: "1.5px solid rgba(124,58,237,0.25)" }}>
+              Lihat Pratinjau Struk
+            </button>
+          </div>
 
           <div className="mb-4">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>NAMA PRINTER</label>
@@ -334,15 +467,213 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             {toggle(draftPrinter.autoPrint, v => setDraftPrinter(p => ({ ...p, autoPrint: v })))}
           </div>
 
+          <div className="mb-5">
+            <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO CETAK STRUK</label>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                {draftPrinter.receiptLogo ? (
+                  <img src={assetUrl(draftPrinter.receiptLogo)} alt="Logo struk" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] px-1 text-center" style={{ color: "var(--muted-foreground)" }}>Tanpa logo</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input ref={receiptLogoRef} type="file" accept="image/*" className="hidden"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
+                    try {
+                      const dataUrl = await compressImage(file, 320, 0.8);
+                      setDraftPrinter(p => ({ ...p, receiptLogo: dataUrl }));
+                    } catch {
+                      showToast("Gagal membaca gambar", false);
+                    }
+                    e.target.value = "";
+                  }} />
+                <button onClick={() => receiptLogoRef.current?.click()} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                  Unggah Logo
+                </button>
+                {draftPrinter.receiptLogo && (
+                  <button onClick={() => setDraftPrinter(p => ({ ...p, receiptLogo: defaultSettings.printer.receiptLogo }))}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--secondary)" }}>
+                    Hapus Logo
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Tampil di bagian atas struk. Kosong = logo tidak dicetak.</div>
+          </div>
+
+          <div className="mb-5">
+            <div className="text-xs font-semibold mb-2.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI STRUK</div>
+            <div className="rounded-2xl" style={{ border: "1px solid var(--border)" }}>
+              {([
+                { key: "showTax", label: "Pajak", desc: "Baris pajak di bagian rincian" },
+                { key: "showCashier", label: "Kasir", desc: "Nama kasir di bagian atas struk" },
+                { key: "showDate", label: "Tanggal", desc: "Tanggal transaksi di bagian atas struk" },
+                { key: "showTime", label: "Jam", desc: "Jam transaksi di bagian atas struk" },
+                { key: "showChange", label: "Kembalian", desc: "Baris kembalian di bagian rincian" },
+              ] as { key: keyof PrinterSettings; label: string; desc: string }[]).map((row, i) => (
+                <div key={row.key} className="flex items-center justify-between p-3" style={{ borderBottom: i < 4 ? "1px solid var(--border)" : "none" }}>
+                  <div>
+                    <div className="text-sm font-semibold">{row.label}</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{row.desc}</div>
+                  </div>
+                  {toggle(draftPrinter[row.key] as boolean, v => setDraftPrinter(p => ({ ...p, [row.key]: v })))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>DESKRIPSI BAWAH STRUK</label>
+            <textarea value={draftPrinter.footerText} onChange={e => setDraftPrinter(p => ({ ...p, footerText: e.target.value }))}
+              rows={3} placeholder="Contoh: Terima kasih telah berbelanja!" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={field} />
+            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Teks di bagian bawah struk. Tiap baris otomatis menjadi baris baru.</div>
+          </div>
+
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
             Simpan Setelan Printer
           </button>
         </div>
       )}
 
+      {/* PRATINJAU STRUK — floating overlay (always available, independent of active tab) */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }} onClick={() => setPreviewOpen(false)}>
+          <div className="w-full sm:w-auto rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92dvh] overflow-hidden flex flex-col" style={{ background: "var(--card)" }} onClick={e => e.stopPropagation()}>
+            <div className="pt-2.5 pb-1 flex justify-center shrink-0 sm:hidden">
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--muted)" }} />
+            </div>
+            <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Pratinjau Struk</div>
+              <button onClick={() => setPreviewOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5 flex justify-center" style={{ background: "var(--background)" }}>
+              <ReceiptPreview printer={draftPrinter} brandName={draftBrand.name} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PEMBAYARAN */}
+      {tab === "pembayaran" && (
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Pembayaran</div>
+          <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Atur metode pembayaran, pajak, dan pembulatan total saat checkout kasir.</div>
+
+            <div className="flex flex-col gap-5">
+              {/* Metode pembayaran */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Metode Pembayaran</div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                    {draftPayments.methods.filter(m => m.enabled).length}/{draftPayments.methods.length} aktif
+                  </span>
+                </div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Atur cara pembayaran yang muncul saat checkout kasir.</div>
+
+                <div className="flex flex-col gap-2 mb-3">
+                  {draftPayments.methods.map(m => (
+                    <div key={m.id} className="flex items-center gap-2.5 p-2.5 rounded-xl" style={{ background: "var(--background)", border: `1.5px solid ${m.enabled ? "var(--border)" : "var(--border)"}`, opacity: m.enabled ? 1 : 0.65 }}>
+                      <input type="text" value={m.label} onChange={e => updatePayMethod(m.id, { label: e.target.value })}
+                        placeholder="Nama metode" className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                      <select value={m.kind} onChange={e => updatePayMethod(m.id, { kind: e.target.value as PaymentMethodKind })}
+                        className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                        <option value="cash">Tunai</option>
+                        <option value="card">Nominal tetap</option>
+                      </select>
+                      {toggle(m.enabled, v => updatePayMethod(m.id, { enabled: v }))}
+                      <button onClick={() => deletePayMethod(m.id)} className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-xl flex flex-wrap items-center gap-2" style={{ background: "var(--background)", border: "1px dashed var(--border)" }}>
+                  <input type="text" placeholder="Nama metode baru (mis. E-Wallet)" value={payLabel}
+                    onChange={e => setPayLabel(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addPaymentMethod()}
+                    className="flex-1 min-w-[140px] px-3 py-2 rounded-lg text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                  <select value={payKind} onChange={e => setPayKind(e.target.value as PaymentMethodKind)}
+                    className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    <option value="cash">Tunai</option>
+                    <option value="card">Nominal tetap</option>
+                  </select>
+                  <button onClick={addPaymentMethod} className="px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0" style={{ background: "var(--foreground)" }}>
+                    + Tambah
+                  </button>
+                </div>
+                <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                  "Tunai" = kasir memasukkan nominal bayar & ada kembalian. "Nominal tetap" = dibayar sesuai total.
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1.5px solid var(--border)" }} />
+              {/* Pajak */}
+              <div>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Pajak</div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Persentase pajak yang diterapkan di bawah diskon pada tiap transaksi.</div>
+                <div className="flex items-center justify-between p-3 rounded-xl mb-2.5" style={{ background: "var(--background)" }}>
+                  <div>
+                    <div className="text-sm font-semibold">Aktifkan pajak</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pajak dihitung otomatis saat checkout</div>
+                  </div>
+                  {toggle(draftPayments.tax.enabled, v => setDraftPayments(p => ({ ...p, tax: { ...p.tax, enabled: v } })))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TARIF PAJAK (%)</label>
+                    <input type="number" min={0} max={100} value={draftPayments.tax.rate} onChange={e => setDraftPayments(p => ({ ...p, tax: { ...p.tax, rate: Number(e.target.value) } }))}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI STRUK</label>
+                    <div className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: "var(--secondary)" }}>
+                      {draftPayments.tax.enabled ? `Pajak ${draftPayments.tax.rate}%` : "Pajak (nonaktif)"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1.5px solid var(--border)" }} />
+              {/* Pembulatan */}
+              <div>
+                <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Pembulatan Total</div>
+                <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Bulatkan total tagihan ke nilai terdekat yang mudah untuk kembalian (biasanya untuk bayar tunai).</div>
+                <div className="flex items-center justify-between p-3 rounded-xl mb-2.5" style={{ background: "var(--background)" }}>
+                  <div>
+                    <div className="text-sm font-semibold">Aktifkan pembulatan</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Total dibulatkan ke atas sesuai kelipatan</div>
+                  </div>
+                  {toggle(draftPayments.rounding.enabled, v => setDraftPayments(p => ({ ...p, rounding: { ...p.rounding, enabled: v } })))}
+                </div>
+                {draftPayments.rounding.enabled && (
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>KELIPATAN PEMBULATAN</label>
+                    <select value={draftPayments.rounding.step} onChange={e => setDraftPayments(p => ({ ...p, rounding: { ...p.rounding, step: Number(e.target.value) } }))}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
+                      {[100, 500, 1000, 2000, 5000].map(s => <option key={s} value={s}>Rp {s.toLocaleString("id-ID")}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <button onClick={savePayments} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
+                Simpan Setelan Pembayaran
+              </button>
+            </div>
+        </div>
+      )}
+
       {/* ATTENDANCE */}
       {tab === "attendance" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Jam Operasional Toko</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Atur jam buka/tutup tiap toko. Dipakai untuk menilai absensi karyawan di penempatannya.</div>
 
@@ -374,7 +705,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* ROLE & MENU */}
       {tab === "roles" && (
-        <div className="max-w-3xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Role & Otorisasi Menu</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>
             Tambah role karyawan baru dan atur menu mana saja yang boleh dilihat tiap role. Perubahan berlaku otomatis ke semua perangkat.
@@ -564,7 +895,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* BARCODE DEVICE */}
       {tab === "barcode" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Perangkat Barcode</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>
             Atur cara barcode dibaca saat transaksi di menu Kasir (scan barcode).
@@ -637,19 +968,21 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* BRAND / MAIN MENU */}
       {tab === "brand" && (
-        <div className="max-w-2xl p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Menu Utama</div>
           <div className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>Ubah logo, nama, deskripsi aplikasi, dan loading screen.</div>
 
           <div className="mb-4">
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO</label>
             <div className="flex items-center gap-4">
-              <img src={draftBrand.logo} alt="Logo" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
+              <img src={assetUrl(draftBrand.logo)} alt="Logo" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
               <div className="flex flex-col gap-2">
                 <input ref={logoRef} type="file" accept="image/*" className="hidden"
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
                     try {
                       const dataUrl = await compressImage(file, 512, 0.82);
                       setDraftBrand(b => ({ ...b, logo: dataUrl }));
@@ -684,12 +1017,14 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           <div className="mb-4" style={{ paddingTop: 14, borderTop: "1.5px solid var(--border)" }}>
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>GAMBAR LOADING SCREEN</label>
             <div className="flex items-center gap-4">
-              <img src={draftBrand.loadingImage} alt="Loading screen" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
+              <img src={assetUrl(draftBrand.loadingImage)} alt="Loading screen" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
               <div className="flex flex-col gap-2">
                 <input ref={loadingRef} type="file" accept="image/*" className="hidden"
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
                     try {
                       const dataUrl = await compressImage(file, 1024, 0.85);
                       setDraftBrand(b => ({ ...b, loadingImage: dataUrl }));
@@ -724,7 +1059,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* RESET DATA (admin only) */}
       {tab === "reset" && isAdmin && (
-        <div className="max-w-2xl rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="w-full rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div className="p-5 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Reset Data</div>
@@ -810,6 +1145,9 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           </div>
         </div>
       )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
 
@@ -13,6 +13,8 @@ const ProductManagement = lazy(() => import("./components/ProductManagement"));
 const MemberView = lazy(() => import("./components/MemberView"));
 const AttendanceView = lazy(() => import("./components/AttendanceView"));
 const AttendanceHistoryView = lazy(() => import("./components/AttendanceHistoryView"));
+const ExpenseView = lazy(() => import("./components/ExpenseView"));
+const DepositView = lazy(() => import("./components/DepositView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
 import { deleteAttendance, deleteTransaction, deleteRows } from "./data/sync";
@@ -24,6 +26,8 @@ import { todayISO } from "./lib/dates";
 import { getTier } from "./data/members";
 import { defaultSettings } from "./data/settings";
 import type { BrandSettings } from "./data/settings";
+import { assetUrl } from "./lib/assets";
+import { hashPin, isHashedPin } from "./lib/auth";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -44,7 +48,7 @@ function MenuLoading({ image, name, description }: { image: string; name: string
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
       <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "var(--secondary)" }}>
-        <img src={image} alt={name} className="w-16 h-16 object-cover" />
+        <img src={assetUrl(image)} alt={name} className="w-16 h-16 object-cover" />
         <div className="swipe-sweep" />
       </div>
       <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>{description}</div>
@@ -65,6 +69,8 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    expenses, setExpenses,
+    deposits, setDeposits,
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -105,6 +111,20 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     if (!fresh) return;
     setCurrentUser(fresh);
   }, [ready, employees]);
+
+  // Migrasi PIN lama (masih plaintext) ke hash PBKDF2 terkini.
+  const pinMigratedRef = useRef(false);
+  useEffect(() => {
+    if (!ready || pinMigratedRef.current) return;
+    if (!employees.some(e => e.pin && !isHashedPin(e.pin))) return;
+    pinMigratedRef.current = true;
+    void (async () => {
+      const next = await Promise.all(
+        employees.map(async e => (e.pin && !isHashedPin(e.pin) ? { ...e, pin: await hashPin(e.pin) } : e)),
+      );
+      setEmployees(next);
+    })();
+  }, [ready, employees, setEmployees]);
 
   // Idle timeout: logout otomatis setelah 30 menit tanpa aktivitas.
   useEffect(() => {
@@ -342,7 +362,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
         <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
-          <img src={brandCache.loadingImage} alt={brandCache.name} className="w-16 h-16 object-cover" />
+          <img src={assetUrl(brandCache.loadingImage)} alt={brandCache.name} className="w-16 h-16 object-cover" />
           <div className="swipe-sweep" />
         </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{brandCache.name}</div>
@@ -370,6 +390,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canProductImport = has("product", "import");
   const canProductBulk = has("product", "bulk");
   const canProductCategory = has("product", "category");
+  const canProductSize = has("product", "size");
   const canProductAdd = has("product", "add");
   const canProductEdit = has("product", "edit");
   const canProductDelete = has("product", "delete");
@@ -382,6 +403,13 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canDiscAdd = has("discount", "add");
   const canDiscEdit = has("discount", "edit");
   const canDiscDelete = has("discount", "delete");
+const canExpenseAdd = has("expense", "add");
+const canExpenseEdit = has("expense", "edit");
+const canExpenseDelete = has("expense", "delete");
+const canDepositAdd = has("deposit", "add");
+const canDepositEdit = has("deposit", "edit");
+const canDepositDelete = has("deposit", "delete");
+const canDepositBank = has("deposit", "bank");
   const canMemAdd = has("member", "add");
   const canMemEdit = has("member", "edit");
   const canMemDelete = has("member", "delete");
@@ -426,6 +454,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             brandName={settings.brand.name}
             printer={settings.printer}
             barcode={settings.barcode}
+            payments={settings.payments}
           />
         )}
         {safeTab === "history" && (
@@ -439,11 +468,12 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
             brandName={settings.brand.name}
             printer={settings.printer}
+            payments={settings.payments}
             currentUser={currentUser}
           />
         )}
         {safeTab === "report" && (
-          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} />
+          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} expenses={expenses} />
         )}
         {safeTab === "inventory" && (
           <StockView
@@ -461,11 +491,14 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             stores={stores}
             categories={categories}
             onUpdateCategories={setCategories}
+            sizes={settings.sizes}
+            onUpdateSizes={next => setSettings(s => ({ ...s, sizes: next }))}
             onSave={setProducts}
             canExport={canProductExport}
             canImport={canProductImport}
             canBulk={canProductBulk}
             canCategory={canProductCategory}
+            canSize={canProductSize}
             canAdd={canProductAdd}
             canEdit={canProductEdit}
             canDelete={canProductDelete}
@@ -532,6 +565,34 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
             onDelete={canDeleteAttHistory ? handleDeleteAttendance : undefined}
             canViewAll={canViewAttHistoryAll}
             roles={settings.roles}
+          />
+        )}
+        {safeTab === "expense" && (
+          <ExpenseView
+            expenses={expenses}
+            stores={stores}
+            employees={employees}
+            currentUser={currentUser}
+            onSave={setExpenses}
+            canAdd={canExpenseAdd}
+            canEdit={canExpenseEdit}
+            canDelete={canExpenseDelete}
+          />
+        )}
+        {safeTab === "deposit" && (
+          <DepositView
+            deposits={deposits}
+            stores={stores}
+            employees={employees}
+            banks={settings.banks}
+            onUpdateBanks={b => setSettings(s => ({ ...s, banks: b }))}
+            currentUser={currentUser}
+            onSave={setDeposits}
+            onDelete={undefined}
+            canAdd={canDepositAdd}
+            canEdit={canDepositEdit}
+            canDelete={canDepositDelete}
+            canBank={canDepositBank}
           />
         )}
         {safeTab === "settings" && (

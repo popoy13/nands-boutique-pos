@@ -1,13 +1,13 @@
-export type Size = "XS" | "S" | "M" | "L" | "XL" | "XXL";
+export type Size = string;
 export type PaymentMethod = "cash" | "debit" | "qris";
 export type UserRole = "admin" | "manager" | "manager_operasional" | "kasir" | "staff";
 export type MemberTier = "bronze" | "silver" | "gold" | "platinum";
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin:   ["pos", "history", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "attendanceHistory", "settings"],
-  manager: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
-  manager_operasional: ["pos", "history", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
-  kasir:   ["pos", "history", "report", "inventory", "attendance", "attendanceHistory"],
+  admin:   ["pos", "history", "expense", "deposit", "report", "inventory", "employee", "store", "discount", "product", "member", "attendance", "attendanceHistory", "settings"],
+  manager: ["pos", "history", "expense", "deposit", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  manager_operasional: ["pos", "history", "expense", "deposit", "report", "inventory", "employee", "product", "attendance", "attendanceHistory", "settings"],
+  kasir:   ["pos", "history", "expense", "deposit", "report", "inventory", "attendance", "attendanceHistory"],
   staff:   ["inventory", "attendance", "attendanceHistory"],
 };
 
@@ -62,7 +62,7 @@ export interface Transaction {
   total: number;
   payment: number;
   change: number;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   note: string;
   memberId?: string;
   memberName?: string;
@@ -141,4 +141,28 @@ export interface AttendanceRecord {
   photoIn?: string;
   photoOut?: string;
   note?: string;
+}
+
+export interface Expense {
+  id: string;
+  storeId: string;
+  storeName: string;
+  amount: number;
+  description: string;
+  photo?: string;
+  createdByName: string;
+  date: string;
+}
+
+export interface CashDeposit {
+  id: string;
+  storeId: string;
+  storeName: string;
+  date: string;
+  bank: string;
+  amount: number;
+  referenceCode: string;
+  notes: string;
+  photo?: string;
+  createdByName: string;
 }

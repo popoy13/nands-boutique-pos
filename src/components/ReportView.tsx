@@ -1,7 +1,12 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import type { Transaction, DeletedTransaction } from "../data/types";
+import { safeRows } from "../lib/safeExport";
+import type { Transaction, DeletedTransaction, Expense } from "../data/types";
+import type { PaymentSettings } from "../data/settings";
+import { todayISO } from "../lib/dates";
+import { assetUrl } from "../lib/assets";
 import DateRangeFilter from "./DateRangeFilter";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -20,16 +25,30 @@ const fmtK = (n: number) => {
 interface Props {
   transactions: Transaction[];
   deletedTransactions: DeletedTransaction[];
+  expenses: Expense[];
   stores: { id: string; name: string }[];
+  payments?: PaymentSettings;
 }
 
-export default function ReportView({ transactions, deletedTransactions, stores }: Props) {
+const PAY_COLORS = ["#7c3aed", "#3b82f6", "#0d9488", "#ea580c", "#db2777", "#ca8a04", "#16a34a", "#4f46e5"];
+
+export default function ReportView({ transactions, deletedTransactions, expenses = [], stores, payments }: Props) {
   const [filterStore, setFilterStore] = useState("all");
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("7d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [deletedPage, setDeletedPage] = useState(1);
+  const [deletedPageSize, setDeletedPageSize] = useState(10);
+  const [expPage, setExpPage] = useState(1);
+  const [expPageSize, setExpPageSize] = useState(10);
+
+  useEffect(() => { setDeletedPage(1); setExpPage(1); }, [filterStore, period, dateFrom, dateTo]);
 
   const customRange = !!dateFrom || !!dateTo;
+
+  const periodCaption = customRange
+    ? `Rentang kustom${dateFrom ? ` \u00b7 dari ${dateFrom}` : ""}${dateTo ? ` \u00b7 sampai ${dateTo}` : ""}`
+    : period === "7d" ? "7 hari terakhir" : period === "30d" ? "30 hari terakhir" : "semua waktu";
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -60,6 +79,49 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     });
   }, [deletedTransactions, filterStore, period, dateFrom, dateTo, customRange]);
 
+  const filteredExpenses = useMemo(() => {
+    const now = new Date();
+    const cutoff = period === "7d" ? new Date(now.getTime() - 7 * 86400000)
+      : period === "30d" ? new Date(now.getTime() - 30 * 86400000)
+      : new Date(0);
+    const cutoffISO = cutoff.toLocaleDateString("en-CA");
+    return expenses.filter(e => {
+      if (filterStore !== "all" && e.storeId !== filterStore) return false;
+      const day = String(e.date ?? "").slice(0, 10);
+      if (!customRange && day < cutoffISO) return false;
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      return true;
+    });
+  }, [expenses, filterStore, period, dateFrom, dateTo, customRange]);
+
+  const expenseTotal = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+
+  const weekStats = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 6);
+    const end = new Date(); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 1);
+    const weekTx = filtered.filter(t => t.date >= start && t.date < end);
+    const weekExp = filteredExpenses.filter(e => {
+      const d = new Date(`${String(e.date ?? "").slice(0, 10)}T00:00:00`);
+      return d >= start && d < end;
+    });
+    const revenue = weekTx.reduce((s, t) => s + t.total, 0);
+    const expense = weekExp.reduce((s, e) => s + e.amount, 0);
+    return { revenue, count: weekTx.length, expense, net: revenue - expense };
+  }, [filtered, filteredExpenses]);
+
+  const cashStats = useMemo(() => {
+    const today = todayISO();
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayCash = filtered
+      .filter(t => t.paymentMethod === "cash" && t.date >= todayStart)
+      .reduce((s, t) => s + t.total, 0);
+    const todayExpense = filteredExpenses
+      .filter(e => String(e.date ?? "").slice(0, 10) === today)
+      .reduce((s, e) => s + e.amount, 0);
+    return { todayCash, todayExpense, netCashToday: todayCash - todayExpense };
+  }, [filtered, filteredExpenses]);
+
   const stats = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const todayTx = filtered.filter(t => t.date >= today);
@@ -72,6 +134,8 @@ export default function ReportView({ transactions, deletedTransactions, stores }
       itemsSold: filtered.reduce((s, t) => s + t.items.reduce((a, i) => a + i.quantity, 0), 0),
     };
   }, [filtered]);
+
+  const periodNet = stats.revenue - expenseTotal;
 
   // Daily buckets for chart — align with selected period/custom range
   // (daily bars for <= 31 days, weekly bars otherwise)
@@ -126,9 +190,15 @@ export default function ReportView({ transactions, deletedTransactions, stores }
     }
     return buckets.map(b => {
       const dayTx = filtered.filter(t => t.date >= b.start && t.date < b.end);
-      return { label: b.label, revenue: dayTx.reduce((s, t) => s + t.total, 0), count: dayTx.length };
+      const dayExp = filteredExpenses.filter(e => {
+        const dt = new Date(`${String(e.date ?? "").slice(0, 10)}T00:00:00`);
+        return dt >= b.start && dt < b.end;
+      });
+      const revenue = dayTx.reduce((s, t) => s + t.total, 0);
+      const expense = dayExp.reduce((s, e) => s + e.amount, 0);
+      return { label: b.label, revenue, expense, netCash: revenue - expense, count: dayTx.length };
     });
-  }, [filtered, period, dateFrom, dateTo, customRange]);
+  }, [filtered, filteredExpenses, period, dateFrom, dateTo, customRange]);
 
   const maxRevenue = Math.max(...dailyData.map(d => d.revenue), 1);
 
@@ -144,38 +214,66 @@ export default function ReportView({ transactions, deletedTransactions, stores }
   }, [filtered]);
 
   const storeBreakdown = useMemo(() =>
-    stores.map(s => ({
-      ...s,
-      revenue: filtered.filter(t => t.storeId === s.id).reduce((sum, t) => sum + t.total, 0),
-      count: filtered.filter(t => t.storeId === s.id).length,
-    })).sort((a, b) => b.revenue - a.revenue),
-  [filtered, stores]);
+    stores.map(s => {
+      const stx = filtered.filter(t => t.storeId === s.id);
+      const revenue = stx.reduce((sum, t) => sum + t.total, 0);
+      const expense = filteredExpenses.filter(e => e.storeId === s.id).reduce((sum, e) => sum + e.amount, 0);
+      return { ...s, revenue, expense, net: revenue - expense, count: stx.length };
+    }).sort((a, b) => b.revenue - a.revenue),
+  [filtered, filteredExpenses, stores]);
 
   const storeBreakdownMax = storeBreakdown[0]?.revenue ?? 0;
 
   const paymentBreakdown = useMemo(() => {
-    const map: Record<string, number> = { cash: 0, debit: 0, qris: 0 };
-    filtered.forEach(t => { map[t.paymentMethod || "cash"] += t.total; });
-    const total = Object.values(map).reduce((s, v) => s + v, 0) || 1;
-    return [
-      { method: "cash", label: "Tunai", value: map.cash, pct: Math.round((map.cash / total) * 100), color: "#7c3aed" },
-      { method: "debit", label: "Debit", value: map.debit, pct: Math.round((map.debit / total) * 100), color: "#3b82f6" },
-      { method: "qris", label: "QRIS", value: map.qris, pct: Math.round((map.qris / total) * 100), color: "#7c3aed" },
+    const methods = payments?.methods ?? [
+      { id: "cash", label: "Tunai" },
+      { id: "debit", label: "Debit" },
+      { id: "qris", label: "QRIS" },
     ];
-  }, [filtered]);
+    const map: Record<string, number> = {};
+    const fallback: Record<string, number> = {};
+    filtered.forEach(t => {
+      const m = t.paymentMethod || "cash";
+      if (methods.some(x => x.id === m)) map[m] = (map[m] ?? 0) + t.total;
+      else fallback[m] = (fallback[m] ?? 0) + t.total;
+    });
+    const rows = methods.map((m, i) => ({ method: m.id, label: m.label, value: map[m.id] ?? 0, color: PAY_COLORS[i % PAY_COLORS.length] }));
+    const otherTotal = Object.values(fallback).reduce((s, v) => s + v, 0);
+    if (otherTotal > 0) rows.push({ method: "other", label: "Lainnya", value: otherTotal, color: "#9ca3af" });
+    rows.sort((a, b) => b.value - a.value);
+    const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+    return rows.map(r => ({ ...r, pct: Math.round((r.value / total) * 100) }));
+  }, [filtered, payments]);
 
   const statCards = [
     { label: "Total Pendapatan", value: fmt(stats.revenue), sub: `${stats.count} transaksi`, color: "var(--accent)" },
+    { label: "Bersih Periode", value: fmt(periodNet), sub: `Pendapatan − Pengeluaran ${fmt(expenseTotal)}`, color: "#16a34a" },
+    { label: "Minggu Ini", value: fmt(weekStats.revenue), sub: `${weekStats.count} transaksi · Pglr ${fmt(weekStats.expense)}`, color: "#3b82f6" },
+    { label: "Bersih Minggu Ini", value: fmt(weekStats.net), sub: `Pendapatan − Pengeluaran 7 hari`, color: "#0d9488" },
     { label: "Hari Ini", value: fmt(stats.todayRevenue), sub: `${stats.todayCount} transaksi`, color: "#16a34a" },
+    { label: "Tunai Bersih Hari Ini", value: fmt(cashStats.netCashToday), sub: `Tunai ${fmt(cashStats.todayCash)} − Pengeluaran ${fmt(cashStats.todayExpense)}`, color: "#0d9488" },
+    { label: "Pengeluaran", value: fmt(expenseTotal), sub: `${filteredExpenses.length} catatan`, color: "#db2777" },
     { label: "Rata-rata Transaksi", value: fmt(Math.round(stats.avg)), sub: "per transaksi", color: "#3b82f6" },
     { label: "Item Terjual", value: stats.itemsSold.toString(), sub: "pcs produk", color: "#7c3aed" },
     { label: "Transaksi Dihapus", value: filteredDeleted.length.toString(), sub: `Nominal ${fmt(filteredDeleted.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
   ];
 
-  const paymentLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
+  const paymentLabel: Record<string, string> = {
+    ...(payments?.methods ? Object.fromEntries(payments.methods.map(m => [m.id, m.label])) : {}),
+    cash: "Tunai", debit: "Debit", qris: "QRIS",
+  };
+
+  const deletedSorted = [...filteredDeleted].reverse();
+  const expSorted = [...filteredExpenses].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+  const deletedPages = Math.max(1, Math.ceil(deletedSorted.length / deletedPageSize));
+  const expPages = Math.max(1, Math.ceil(expSorted.length / expPageSize));
+  const safeDeletedPage = Math.min(deletedPage, deletedPages);
+  const safeExpPage = Math.min(expPage, expPages);
+  const deletedVisible = deletedSorted.slice((safeDeletedPage - 1) * deletedPageSize, safeDeletedPage * deletedPageSize);
+  const expVisible = expSorted.slice((safeExpPage - 1) * expPageSize, safeExpPage * expPageSize);
 
   const handleExport = () => {
-    if (filtered.length === 0 && filteredDeleted.length === 0) return;
+    if (filtered.length === 0 && filteredDeleted.length === 0 && filteredExpenses.length === 0) return;
 
     const fmtPick = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-";
     const periodLabel = customRange
@@ -186,7 +284,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
       { "Periode": periodLabel, "Toko": filterStore === "all" ? "Semua Toko" : stores.find(s => s.id === filterStore)?.name ?? filterStore },
       { "Total Pendapatan": stats.revenue, "Jumlah Transaksi": stats.count, "Rata-rata": Math.round(stats.avg), "Item Terjual": stats.itemsSold, "Pendapatan Hari Ini": stats.todayRevenue, "Transaksi Hari Ini": stats.todayCount },
     ];
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    const wsSummary = XLSX.utils.json_to_sheet(safeRows(summaryRows));
 
     const txRows = filtered.map(t => ({
       "Tanggal": t.date.toLocaleDateString("id-ID"),
@@ -202,10 +300,10 @@ export default function ReportView({ transactions, deletedTransactions, stores }
       "Metode Bayar": paymentLabel[t.paymentMethod],
       "Catatan": t.note,
     }));
-    const wsTx = XLSX.utils.json_to_sheet(txRows);
+    const wsTx = XLSX.utils.json_to_sheet(safeRows(txRows));
 
     const productRows = topProducts.map((p, i) => ({ "Peringkat": i + 1, "Produk": p.name, "Qty": p.qty, "Pendapatan": p.revenue }));
-    const wsProducts = XLSX.utils.json_to_sheet(productRows);
+    const wsProducts = XLSX.utils.json_to_sheet(safeRows(productRows));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
@@ -224,21 +322,58 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         "Waktu Hapus": fmtDateSafe(d.deletedAt),
         "Alasan": d.reason,
       }));
-      const wsDeleted = XLSX.utils.json_to_sheet(deletedRows);
+      const wsDeleted = XLSX.utils.json_to_sheet(safeRows(deletedRows));
       XLSX.utils.book_append_sheet(wb, wsDeleted, "Transaksi Dihapus");
     }
+
+    if (filteredExpenses.length > 0) {
+      const expenseRows = filteredExpenses.map(e => ({
+        "Tanggal": String(e.date ?? "").slice(0, 10),
+        "Toko": (e.storeName ?? "").replace("NAND'S BOUTIQUE - ", ""),
+        "Jumlah": e.amount,
+        "Keterangan": e.description ?? "",
+        "Dibuat Oleh": e.createdByName ?? "",
+        "Bukti Foto": e.photo ? "Ada" : "-",
+      }));
+      const wsExpenses = XLSX.utils.json_to_sheet(safeRows(expenseRows));
+      XLSX.utils.book_append_sheet(wb, wsExpenses, "Pengeluaran");
+    }
+
+    const wsSummary2 = XLSX.utils.json_to_sheet(safeRows([{
+      "Total Pengeluaran": expenseTotal,
+      "Bersih Periode": periodNet,
+      "Pendapatan Minggu Ini": weekStats.revenue,
+      "Pengeluaran Minggu Ini": weekStats.expense,
+      "Bersih Minggu Ini": weekStats.net,
+      "Pendapatan Tunai Hari Ini": cashStats.todayCash,
+      "Pengeluaran Hari Ini": cashStats.todayExpense,
+      "Tunai Bersih Hari Ini": cashStats.netCashToday,
+    }]));
+    XLSX.utils.book_append_sheet(wb, wsSummary2, "Ringkasan Tunai");
 
     XLSX.writeFile(wb, `nands-boutique-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
-    <div className="h-full overflow-y-auto px-5 py-5">
+    <div className="h-full overflow-y-auto" style={{ background: "var(--background)" }}>
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-5">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Laporan Penjualan</div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Laporan Penjualan</div>
+            <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{periodCaption}</div>
+          </div>
+          <button onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+            style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
-            className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
             <option value="all">Semua Toko</option>
             {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -252,31 +387,25 @@ export default function ReportView({ transactions, deletedTransactions, stores }
             ))}
           </div>
           <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} />
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Export
-          </button>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-5">
         {statCards.map(c => (
-          <div key={c.label} className="p-4 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-            <div className="text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
-            <div className="font-mono text-lg font-bold" style={{ color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
-            <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{c.sub}</div>
+          <div key={c.label} className="p-3.5 sm:p-4 rounded-2xl min-w-0" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+            <div className="text-xs mb-1.5 leading-snug" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
+            <div className="font-mono text-sm sm:text-lg font-bold leading-tight break-words" style={{ color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.value}</div>
+            <div className="text-xs mt-1 leading-snug" style={{ color: "var(--muted-foreground)" }}>{c.sub}</div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-4 mb-4 lg:grid-cols-[1fr_280px]">
         {/* Bar Chart */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Grafik Pendapatan</div>
-          <div className="flex items-end gap-1.5 h-36">
+          <div className="flex items-end gap-1 sm:gap-1.5 h-36">
             {dailyData.map((d, i) => (
               <div key={i} className="flex flex-col items-center gap-1 flex-1 group min-w-0">
                 {dailyData.length <= 14 && (
@@ -286,7 +415,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                 )}
                 <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{ height: d.revenue > 0 ? `${Math.max(3, (d.revenue / maxRevenue) * 100)}px` : "2px", background: d.revenue > 0 ? "var(--accent)" : "var(--muted)", opacity: d.revenue > 0 ? 1 : 0.35 }}>
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" style={{ background: "var(--foreground)", fontSize: 10 }}>
-                    {fmt(d.revenue)}<br />{d.count} trx
+                    {fmt(d.revenue)}<br />{d.count} trx<br />Pengeluaran {fmt(d.expense)}<br />Bersih <b>{fmt(d.netCash)}</b>
                   </div>
                 </div>
                 {dailyData.length <= 14 && (
@@ -301,7 +430,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         </div>
 
         {/* Payment breakdown */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Metode Bayar</div>
           <div className="flex flex-col gap-4">
             {paymentBreakdown.map(({ label, value, pct, color }) => (
@@ -320,9 +449,9 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 mb-4 lg:grid-cols-2">
         {/* Top products */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Produk Terlaris</div>
           {topProducts.length === 0 ? (
             <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada data</div>
@@ -345,7 +474,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
         </div>
 
         {/* Store breakdown */}
-        <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Performa Toko</div>
           {storeBreakdown.length === 0 ? (
             <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada toko</div>
@@ -360,7 +489,9 @@ export default function ReportView({ transactions, deletedTransactions, stores }
                 <div className="w-full h-1.5 rounded-full mb-1" style={{ background: "var(--muted)" }}>
                   <div className="h-1.5 rounded-full" style={{ width: `${storeBreakdownMax > 0 ? (s.revenue / storeBreakdownMax) * 100 : 0}%`, background: i === 0 ? "#7c3aed" : i === 1 ? "#3b82f6" : "#7c3aed" }} />
                 </div>
-                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{s.count} transaksi</div>
+                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  {s.count} transaksi · Pglr {fmt(s.expense)} · Bersih <b style={{ color: s.net >= 0 ? "#16a34a" : "#db2777" }}>{fmt(s.net)}</b>
+                </div>
               </div>
             ))}
           </div>
@@ -369,7 +500,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
       </div>
 
       {/* Deleted transactions */}
-      <div className="p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+      <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Transaksi Dihapus</div>
           <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -383,7 +514,7 @@ export default function ReportView({ transactions, deletedTransactions, stores }
           <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada transaksi yang dihapus</div>
         ) : (
           <div className="flex flex-col gap-2">
-            {[...filteredDeleted].reverse().map(d => (
+            {deletedVisible.map(d => (
               <div key={d.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
@@ -409,6 +540,66 @@ export default function ReportView({ transactions, deletedTransactions, stores }
             ))}
           </div>
         )}
+        <Pagination
+          total={filteredDeleted.length}
+          page={safeDeletedPage}
+          pageSize={deletedPageSize}
+          onPageChange={setDeletedPage}
+          onPageSizeChange={setDeletedPageSize}
+          rowLabel="catatan"
+        />
+      </div>
+    {/* Pengeluaran */}
+      <div className="p-4 sm:p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Pengeluaran</div>
+          <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span>{filteredExpenses.length} catatan</span>
+            <span className="font-mono font-semibold" style={{ color: "#db2777", fontFamily: "'JetBrains Mono', monospace" }}>
+              Total {fmt(expenseTotal)}
+            </span>
+          </div>
+        </div>
+        {filteredExpenses.length === 0 ? (
+          <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada pengeluaran pada periode ini</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {expVisible.map(e => (
+              <div key={e.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase" style={{ background: "#fdf2f8", color: "#db2777" }}>Pengeluaran</span>
+                      <span className="text-sm">{String(e.date ?? "").slice(0, 10)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#f3f4f6", color: "#6b7280" }}>{(e.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")}</span>
+                    </div>
+                    {e.description && (
+                      <div className="text-xs mt-1.5" style={{ color: "var(--muted-foreground)" }}>{e.description}</div>
+                    )}
+                    {e.createdByName && (
+                      <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Oleh {e.createdByName}</div>
+                    )}
+                    {e.photo && (
+                      <img src={assetUrl(e.photo)} alt="Bukti" className="mt-2 w-12 h-12 rounded-lg object-cover" style={{ border: "1px solid var(--border)" }} />
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#db2777" }}>{fmt(e.amount)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Pagination
+          total={filteredExpenses.length}
+          page={safeExpPage}
+          pageSize={expPageSize}
+          onPageChange={setExpPage}
+          onPageSizeChange={setExpPageSize}
+          rowLabel="catatan"
+        />
+      </div>
       </div>
     </div>
   );

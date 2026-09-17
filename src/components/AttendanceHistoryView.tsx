@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
 import type { AttendanceRecord, Employee } from "../data/types";
 import type { RoleConfig } from "../data/roles";
 import { getRoleLabel } from "../data/roles";
 import { todayISO } from "../lib/dates";
+import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
 
 const fmtDate = (d: string) => {
@@ -13,7 +15,16 @@ const fmtDate = (d: string) => {
   return `${day}-${m}-${y}`;
 };
 
-const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "").slice(0, 5) > (openHour || "08:00");
+const padHM = (t: string): string => {
+  const m = String(t ?? "").match(/(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+};
+
+const isLateFor = (clockIn: string, openHour?: string) => {
+  const a = padHM(clockIn);
+  if (!a) return false;
+  return a > (padHM(openHour ?? "") || "08:00");
+};
 
 interface Props {
   records: AttendanceRecord[];
@@ -85,7 +96,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       "Status": r.clockOut ? (isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : "Hadir") : r.date < todayISO() ? "Tidak Catat Pulang" : "Menunggu Pulang",
       "Catatan": r.note ?? "",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Absensi");
     XLSX.writeFile(wb, `nands-boutique-absensi-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -143,7 +154,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
                   <>
                     <div className="flex items-center gap-3 mb-4">
                       {selected.photoIn ? (
-                        <img src={selected.photoIn} alt="Foto masuk" className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                        <img src={assetUrl(selected.photoIn)} alt="Foto masuk" className="w-14 h-14 rounded-xl object-cover shrink-0" />
                       ) : (
                         <div className="w-14 h-14 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: "var(--accent)" }}>{selected.employeeName.charAt(0)}</div>
                       )}
@@ -178,7 +189,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
                     {selected.photoOut && (
                       <div className="mb-3">
                         <div className="text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>FOTO PULANG</div>
-                        <img src={selected.photoOut} alt="Foto pulang" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1px solid var(--border)" }} />
+                        <img src={assetUrl(selected.photoOut)} alt="Foto pulang" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1px solid var(--border)" }} />
                       </div>
                     )}
 
@@ -197,7 +208,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       )}
 
       {/* Header */}
-      <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+      <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Riwayat Absensi</div>
@@ -253,7 +264,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       </div>
 
       {/* List */}
-      <div className="flex-1 lg:overflow-y-auto px-4 py-3">
+      <div className="flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada catatan absensi</div>
         ) : (
@@ -265,7 +276,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
                   className="w-full text-left p-4 rounded-xl flex items-center gap-4 transition-all duration-150 hover:-translate-y-0.5"
                   style={{ background: selected?.id === r.id ? "rgba(124,58,237,0.05)" : "var(--card)", border: `1.5px solid ${selected?.id === r.id ? "var(--accent)" : "var(--border)"}` }}>
                   {r.photoIn ? (
-                    <img src={r.photoIn} alt="Foto masuk" className="w-12 h-12 rounded-xl object-cover shrink-0" />
+                    <img src={assetUrl(r.photoIn)} alt="Foto masuk" className="w-12 h-12 rounded-xl object-cover shrink-0" />
                   ) : (
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: "var(--accent)" }}>{r.employeeName.charAt(0)}</div>
                   )}
@@ -279,7 +290,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
                     </div>
                     <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{r.storeName}</div>
                   </div>
-                  {r.photoOut && <img src={r.photoOut} alt="Foto pulang" className="w-8 h-8 rounded-lg object-cover shrink-0" title="Foto pulang" />}
+                  {r.photoOut && <img src={assetUrl(r.photoOut)} alt="Foto pulang" className="w-8 h-8 rounded-lg object-cover shrink-0" title="Foto pulang" />}
                   {onDelete && (
                     <button onClick={e => { e.stopPropagation(); setDeleteTarget(r); }}
                       className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-red-50"

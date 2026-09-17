@@ -1,7 +1,9 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
 import type { Product } from "../data/types";
 import type { Category } from "../data/sync";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -22,6 +24,10 @@ export default function StockView({ products, stores, categories, activeStore, o
   const [editCell, setEditCell] = useState<{ sku: string; storeId: string } | null>(null);
   const [editVal, setEditVal] = useState("");
   const [toast, setToast] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => { setPage(1); }, [search, filterCat]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -73,7 +79,7 @@ export default function StockView({ products, stores, categories, activeStore, o
         rows.push(row);
       });
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stok Produk");
     XLSX.writeFile(wb, `nands-boutique-stok-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -90,6 +96,11 @@ export default function StockView({ products, stores, categories, activeStore, o
     return count;
   }, [products, filterStore]);
 
+  const rows = useMemo(() => filtered.map(p => p.variants.map(v => ({ p, v }))).flat(), [filtered]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toast */}
@@ -100,7 +111,7 @@ export default function StockView({ products, stores, categories, activeStore, o
       )}
 
       {/* Header */}
-      <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+      <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Stok</div>
@@ -120,7 +131,7 @@ export default function StockView({ products, stores, categories, activeStore, o
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           <div className="relative" style={{ minWidth: 200 }}>
             <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <input type="text" placeholder="Cari produk / kode..." value={search} onChange={e => setSearch(e.target.value)}
@@ -152,18 +163,19 @@ export default function StockView({ products, stores, categories, activeStore, o
             </tr>
           </thead>
           <tbody>
-            {filtered.map(product =>
-              product.variants.map((variant, vi) => {
+            {pageRows.map(({ p: product, v: variant }, idx) => {
                 const storeQty = variant.stocks.find(s => s.storeId === filterStore)?.quantity ?? 0;
                 const isLow = storeQty > 0 && storeQty <= 3;
                 const isOut = storeQty === 0;
                 const isEditing = editCell?.sku === variant.sku && editCell?.storeId === filterStore;
+                const firstOnPage = idx === 0 || (pageRows[idx - 1]?.p.id ?? null) !== product.id;
+                const spanOnPage = firstOnPage ? pageRows.filter(r => r.p.id === product.id).length : 1;
 
                 return (
                   <tr key={variant.sku} className="transition-colors hover:bg-gray-50"
                     style={{ borderBottom: "1px solid var(--border)", background: isOut ? "#fef2f2" : isLow ? "#fffbeb" : "var(--card)" }}>
-                    {vi === 0 ? (
-                      <td className="px-4 py-3" rowSpan={product.variants.length}>
+                    {firstOnPage ? (
+                      <td className="px-4 py-3" rowSpan={spanOnPage > 1 ? spanOnPage : undefined}>
                         <div className="flex items-center gap-3">
                           <img src={product.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
                           <div className="min-w-0">
@@ -176,9 +188,9 @@ export default function StockView({ products, stores, categories, activeStore, o
                     <td className="px-4 py-2.5">
                       <span className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--muted-foreground)" }}>{variant.sku}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs">{variant.color}</td>
+                    <td className="px-4 py-2.5 text-xs">{variant.color || <span style={{ color: "var(--muted-foreground)" }}>—</span>}</td>
                     <td className="px-4 py-2.5">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{variant.size}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{variant.size || "—"}</span>
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <span className="font-mono text-xs font-medium" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</span>
@@ -224,14 +236,22 @@ export default function StockView({ products, stores, categories, activeStore, o
                     </td>
                   </tr>
                 );
-              })
-            )}
+              })}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+        {rows.length === 0 && (
           <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada produk ditemukan</div>
         )}
       </div>
+
+      <Pagination
+        total={rows.length}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        rowLabel="varian"
+      />
     </div>
   );
 }

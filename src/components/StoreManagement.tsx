@@ -127,7 +127,7 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
 
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Toko</div>
             {canAdd && (
@@ -141,7 +141,7 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto p-5">
+        <div className="lg:flex-1 lg:overflow-y-auto p-4 sm:p-6">
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
             {stores.map((store, i) => (
               <div key={store.id} className="p-5 rounded-2xl transition-all"

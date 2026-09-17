@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useRef } from "react";
 import type { Transaction } from "../data/types";
-import type { PrinterSettings } from "../data/settings";
+import type { PrinterSettings, PaymentSettings } from "../data/settings";
 import DateRangeFilter, { todayISO } from "./DateRangeFilter";
 import { escapeHtml } from "../lib/sanitize";
 import { verifyPin } from "../lib/auth";
@@ -22,19 +22,22 @@ interface Props {
   onUpdate?: (t: Transaction) => void;
   brandName?: string;
   printer?: PrinterSettings;
+  payments?: PaymentSettings;
   currentUser?: { id: string; pin: string } | null;
 }
 
-const methodLabel: Record<string, string> = { cash: "Tunai", debit: "Debit", qris: "QRIS" };
-const methodColor: Record<string, { bg: string; text: string }> = {
+const BUILTIN_LABELS: Record<string, string> = { cash: "Tunai", debit: "Kartu Debit", qris: "QRIS" };
+const BUILTIN_COLORS: Record<string, { bg: string; text: string }> = {
   cash:  { bg: "#f0fdf4", text: "#16a34a" },
   debit: { bg: "#eff6ff", text: "#2563eb" },
   qris:  { bg: "#faf5ff", text: "#7c3aed" },
 };
-const labelOf = (m: string) => methodLabel[m] ?? methodLabel.cash;
-const colorOf = (m: string) => methodColor[m] ?? methodColor.cash;
+const labelOf = (m: string, payments?: PaymentSettings) =>
+  payments?.methods.find(p => p.id === m)?.label ?? BUILTIN_LABELS[m] ?? m;
+const colorOf = (m: string, payments?: PaymentSettings) =>
+  BUILTIN_COLORS[m] ?? { bg: "#f3f4f6", text: "#4b5563" };
 
-export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer, currentUser }: Props) {
+export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer, payments, currentUser }: Props) {
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
@@ -110,21 +113,26 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     const width = printer?.paperWidth ?? 72;
     const font = width <= 58 ? 8 : width === 72 ? 10 : 11;
     w.document.write(`<html><head><title>Struk - ${escapeHtml(t.id)}</title>
-    <style>body{font-family:'Courier New',monospace;font-size:${font}px;padding:8mm;width:${width}mm;} .row{display:flex;justify-content:space-between;} hr{border:none;border-top:1px dashed #000;margin:5px 0;} .center{text-align:center;} @page{size:${width}mm auto;margin:0;}</style>
+    <style>body{font-family:'Courier New',monospace;font-size:${font}px;padding:8mm;width:${width}mm;} .row{display:flex;justify-content:space-between;} hr{border:none;border-top:1px dashed #000;margin:5px 0;} .center{text-align:center;} .logo{max-width:${Math.max(30, width - 14)}mm;max-height:${Math.round(width * 0.32)}mm;object-fit:contain;} @page{size:${width}mm auto;margin:0;}</style>
     </head><body>
+    ${printer?.receiptLogo ? `<div class="center"><img class="logo" src="${escapeHtml(printer.receiptLogo)}" alt="" /></div>` : ""}
     <div class="center"><b>${escapeHtml(brandName ?? "NAND'S BOUTIQUE")}</b><br>${escapeHtml((t.storeName || "").replace("NAND'S BOUTIQUE - ", ""))}<br></div>
-    <hr><div>No: ${escapeHtml(t.id)}</div><div>Tgl: ${fmtDate(t.date)}</div><div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>
+    <hr><div>No: ${escapeHtml(t.id)}</div>
+    ${printer?.showDate !== false ? `<div>Tgl: ${fmtDate(t.date)}</div>` : ""}
+    ${printer?.showTime !== false ? `<div>Jam: ${new Date(t.date).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>` : ""}
+    ${printer?.showCashier !== false ? `<div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>` : ""}
     ${t.memberName ? `<div>Member: ${escapeHtml(t.memberName)}</div>` : ""}
     <hr>
-    ${t.items.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
+    ${t.items.map(i => `<div>${escapeHtml(i.name)}${[i.color, i.size].filter(Boolean).length ? ` (${escapeHtml([i.color, i.size].filter(Boolean).join("/"))})` : ""}</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
     <div class="row"><span>Subtotal</span><span>${fmtNum(t.subtotal)}</span></div>
     ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
-    <div class="row"><span>Pajak 10%</span><span>${fmtNum(t.tax)}</span></div>
+    ${printer?.showTax !== false ? `<div class="row"><span>${escapeHtml(payments?.tax?.label ?? "Pajak 10%")}</span><span>${fmtNum(t.tax)}</span></div>` : ""}
+    ${(() => { const rd = t.total - t.subtotal + (t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount) - t.tax; return rd !== 0 ? `<div class="row"><span>Pembulatan</span><span>+${fmtNum(rd)}</span></div>` : ""; })()}
     <div class="row"><b><span>TOTAL</span><span>${fmtNum(t.total)}</span></b></div>
-    <div class="row"><span>Bayar (${labelOf(t.paymentMethod)})</span><span>${fmtNum(t.payment)}</span></div>
-    ${t.change > 0 ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
-    <hr><div class="center">Terima kasih!<br>www.nandsboutique.id</div>
+    <div class="row"><span>Bayar (${escapeHtml(labelOf(t.paymentMethod, payments))})</span><span>${fmtNum(t.payment)}</span></div>
+    ${t.change > 0 && printer?.showChange !== false ? `<div class="row"><span>Kembalian</span><span>${fmtNum(t.change)}</span></div>` : ""}
+    ${printer?.footerText ? `<hr><div class="center">${escapeHtml(printer.footerText).split("\n").join("<br>")}</div>` : ""}
     </body></html>`);
     w.document.close();
     w.print();
@@ -167,7 +175,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
               <img src={item.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold truncate">{item.name}</div>
-                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.color} / {item.size} · ×{item.quantity}</div>
+                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{[item.color, item.size].filter(Boolean).join(" / ") || "Tanpa varian"} · ×{item.quantity}</div>
               </div>
               <div className="font-mono text-xs font-bold shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
             </div>
@@ -183,12 +191,15 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
             <span className="font-mono" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>-{fmt(selected.discountType === "percent" ? Math.round(selected.subtotal * selected.discount / 100) : selected.discount)}</span>
           </div>
         )}
-        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Pajak (10%)</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.tax)}</span></div>
+        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>{payments?.tax?.enabled !== false ? `Pajak (${payments?.tax?.rate ?? 10}%)` : "Pajak"}</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.tax)}</span></div>
+        {(() => { const rd = selected.total - (selected.subtotal - (selected.discountType === "percent" ? Math.round(selected.subtotal * selected.discount / 100) : selected.discount) + selected.tax); return rd !== 0 ? (
+          <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Pembulatan</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>+{fmt(rd)}</span></div>
+        ) : null; })()}
         <div className="flex justify-between font-bold pt-2 border-t" style={{ borderColor: "var(--border)" }}>
           <span>Total</span>
           <span className="font-mono" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.total)}</span>
         </div>
-        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({labelOf(selected.paymentMethod)})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.payment)}</span></div>
+        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({labelOf(selected.paymentMethod, payments)})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.payment)}</span></div>
         {selected.change > 0 && <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Kembalian</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.change)}</span></div>}
       </div>
 
@@ -262,7 +273,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
 
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }} className="mb-3">Riwayat Transaksi</div>
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
@@ -276,9 +287,9 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
             </select>
             <select value={filterMethod} onChange={e => { setFilterMethod(e.target.value); resetPage(); }} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Metode</option>
-              <option value="cash">Tunai</option>
-              <option value="debit">Debit</option>
-              <option value="qris">QRIS</option>
+              {(payments?.methods ?? [{ id: "cash", label: "Tunai" }, { id: "debit", label: "Debit" }, { id: "qris", label: "QRIS" }]).map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
             </select>
             <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={v => { setDateFrom(v); resetPage(); }} onChangeTo={v => { setDateTo(v); resetPage(); }} />
           </div>
@@ -288,7 +299,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {pageItems.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada transaksi</div>
           ) : (
@@ -308,7 +319,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.total)}</div>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: colorOf(t.paymentMethod).bg, color: colorOf(t.paymentMethod).text }}>{labelOf(t.paymentMethod)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: colorOf(t.paymentMethod).bg, color: colorOf(t.paymentMethod).text }}>{labelOf(t.paymentMethod, payments)}</span>
                     </div>
                   </div>
                 </button>

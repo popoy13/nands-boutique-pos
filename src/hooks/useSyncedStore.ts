@@ -6,8 +6,10 @@ import {
   storeFromDB, storeToDB, empFromDB, empToDB, memFromDB, memToDB,
   discFromDB, discToDB, attFromDB, attToDB, trxFromDB, trxToDB,
   delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
+  expFromDB, expToDB, writeExpenses, saveExpensesJson,
+  depFromDB, depToDB, writeDeposits, saveDepositsJson,
 } from "../data/sync";
-import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord } from "../data/types";
+import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit } from "../data/types";
 import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
@@ -21,6 +23,13 @@ import { seedAttendance } from "../data/attendance";
 
 const DEBOUNCE_MS = 350;
 
+const KNOWN_TABLES = new Set([
+  "products", "stores", "employees", "members", "discounts",
+  "attendance_records", "transactions", "deleted_transactions",
+  "settings", "categories", "expenses", "deposits",
+]);
+const MAX_REMOTE_ROWS = 50000;
+
 export interface SyncedStore {
   ready: boolean;
   products: Product[]; setProducts: Dispatch<SetStateAction<Product[]>>;
@@ -33,6 +42,8 @@ export interface SyncedStore {
   deletedTransactions: DeletedTransaction[]; setDeletedTransactions: Dispatch<SetStateAction<DeletedTransaction[]>>;
   settings: AppSettings; setSettings: Dispatch<SetStateAction<AppSettings>>;
   categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
+  expenses: Expense[]; setExpenses: Dispatch<SetStateAction<Expense[]>>;
+  deposits: CashDeposit[]; setDeposits: Dispatch<SetStateAction<CashDeposit[]>>;
   flush: () => Promise<void>;
 }
 
@@ -48,6 +59,8 @@ export function useSyncedStore(): SyncedStore {
   const [deletedTransactions, setDeletedTransactionsState] = useState<DeletedTransaction[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [categories, setCategoriesState] = useState<Category[]>([]);
+  const [expenses, setExpensesState] = useState<Expense[]>([]);
+  const [deposits, setDepositsState] = useState<CashDeposit[]>([]);
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -82,7 +95,7 @@ const onAttendanceFail = (again: unknown) => {
 const propagate = (table: string, rows: unknown) => {
   pendingRef.current[table] = rows;
   if (table === "attendance_records") {
-    // Attendance is critical & low-frequency — flush immediately (no debounce
+    // Attendance is critical & low-frequency - flush immediately (no debounce
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
@@ -111,6 +124,26 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       }
       case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
+      case "expenses": {
+        const rows = payload as Record<string, unknown>[];
+        // Selalu simpan ke app_settings (works walau array kosong / tabel belum ada),
+        // lalu upsert best-effort ke tabel dedicated bila sudah dibuat.
+        await saveExpensesJson(rows);
+        try { await writeExpenses(rows); } catch (e) {
+          console.warn("[sync] tabel expenses belum tersedia:", e);
+        }
+        break;
+      }
+      case "deposits": {
+        const rows = payload as Record<string, unknown>[];
+        // Analog expenses: simpan ke app_settings (JSON) supaya selalu tercatat
+        // walau tabel `cash_deposits` belum dibuat, lalu upsert best-effort.
+        await saveDepositsJson(rows);
+        try { await writeDeposits(rows); } catch (e) {
+          console.warn("[sync] tabel cash_deposits belum tersedia:", e);
+        }
+        break;
+      }
       default: await saveRows(table, payload as Record<string, unknown>[]);
     }
     try { await channelRef.current?.send({ type: "broadcast", event: "sync", payload: { table, rows: payload } }); } catch { /* noop */ }
@@ -218,6 +251,22 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     }
     return next;
   });
+  const setExpenses: Dispatch<SetStateAction<Expense[]>> = (upd) => setExpensesState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: Expense[]) => Expense[])(prev) : upd;
+    if (next !== prev) {
+      trackRemoved("expenses", prev, next);
+      propagate("expenses", next.map(expToDB));
+    }
+    return next;
+  });
+  const setDeposits: Dispatch<SetStateAction<CashDeposit[]>> = (upd) => setDepositsState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: CashDeposit[]) => CashDeposit[])(prev) : upd;
+    if (next !== prev) {
+      trackRemoved("deposits", prev, next);
+      propagate("deposits", next.map(depToDB));
+    }
+    return next;
+  });
 
   const flush = async () => {
     const tasks: Promise<unknown>[] = [];
@@ -242,7 +291,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   }, []);
 
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
-    if (!payload || !Array.isArray(payload.rows)) return;
+    if (!payload || typeof payload.table !== "string" || !KNOWN_TABLES.has(payload.table)) return;
+    if (!Array.isArray(payload.rows) || payload.rows.length > MAX_REMOTE_ROWS) return;
     const rows = payload.rows as Record<string, unknown>[];
     switch (payload.table) {
       case "products": {
@@ -267,6 +317,12 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setCategoriesCache(new Map(rows.map(c => [String(c.id), String(c.name)])));
         setCategoriesState(rows.map(c => ({ id: String(c.id), name: String(c.name) })));
         break;
+      case "expenses":
+        setExpensesState(rows.map(expFromDB));
+        break;
+      case "deposits":
+        setDepositsState(rows.map(depFromDB));
+        break;
     }
   };
   appliedRef.current = applyRemote;
@@ -290,9 +346,11 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setDeletedTransactionsState(d.deletedTransactions);
         setSettingsState(d.settings);
         setCategoriesState(d.categories);
+        setExpensesState(d.expenses);
+        setDepositsState(d.deposits);
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {
-        console.warn("[sync] Supabase belum disetup — jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
+        console.warn("[sync] Supabase belum disetup - jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
       setReady(true);
     })();
@@ -326,6 +384,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setDeletedTransactionsState(d.deletedTransactions);
             setSettingsState(d.settings);
             setCategoriesState(d.categories);
+            setExpensesState(d.expenses);
+            setDepositsState(d.deposits);
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
             productsRemovedRef.current = { products: [], variants: [] };
             for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
@@ -348,6 +408,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    expenses, setExpenses,
+    deposits, setDeposits,
     flush,
   };
 }

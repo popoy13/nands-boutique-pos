@@ -161,7 +161,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
       )}
 
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Program Member</div>
@@ -177,7 +177,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
           </div>
 
           {/* Tier summary */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
             {(["bronze", "silver", "gold", "platinum"] as const).map(tier => (
               <div key={tier} className="p-2.5 rounded-xl text-center" style={{ background: TIER_COLOR[tier].bg, border: `1px solid ${TIER_COLOR[tier].border}20` }}>
                 <div className="text-lg font-bold" style={{ color: TIER_COLOR[tier].text }}>{tierCounts[tier]}</div>
@@ -186,7 +186,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
             ))}
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input type="text" placeholder="Cari nama atau no. HP..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
@@ -208,7 +208,7 @@ export default function MemberView({ members, stores, onSave, canAdd = true, can
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada member</div>
           ) : (

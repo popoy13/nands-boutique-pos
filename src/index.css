@@ -17,11 +17,16 @@ body,
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--background);
 }
 
 body {
   overscroll-behavior-y: none;
   touch-action: manipulation;
+  min-width: 320px;
+  min-height: 100%;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 select,
@@ -29,6 +34,18 @@ input,
 textarea,
 button {
   -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button,
+a,
+select {
+  touch-action: manipulation;
 }
 
 :root {
@@ -95,6 +112,19 @@ body {
   to   { transform: translateY(0); }
 }
 .sheet-up { animation: sheet-up 0.28s ease-out; }
+
+@media (max-width: 767px) {
+  button,
+  a,
+  select,
+  input {
+    min-height: 42px;
+  }
+
+  .mobile-page-content {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
 
 /* Print styles for receipt */
 @media print {

@@ -9,6 +9,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "android:sync": "pnpm build && cap sync android",
+    "android:open": "cap open android",
+    "android:build": "pnpm android:sync && cd android && .\\gradlew.bat assembleDebug",
     "format": "oxfmt"
   },
   "dependencies": {

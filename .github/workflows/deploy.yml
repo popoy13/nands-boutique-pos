@@ -1,1 +1,44 @@
-﻿name: Deploy to GitHub Pageson:  push:    branches: [ main ]  workflow_dispatch:permissions:  contents: read  pages: write  id-token: writeconcurrency:  group: pages  cancel-in-progress: truejobs:  build:    runs-on: ubuntu-latest    steps:      - uses: actions/checkout@v4      - run: corepack enable      - run: corepack prepare pnpm@10.34.3 --activate      - uses: actions/setup-node@v4        with:          node-version: 20      - run: pnpm install --frozen-lockfile      - run: pnpm build        env:          FIGMA_PUBLIC_URL: https://popoy13.github.io/nands-boutique-pos      - uses: actions/configure-pages@v5      - uses: actions/upload-pages-artifact@v3        with:          path: dist  deploy:    environment:      name: github-pages      url: ${{ steps.deployment.outputs.page_url }}    runs-on: ubuntu-latest    needs: build    steps:      - id: deployment        uses: actions/deploy-pages@v4
+﻿name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - run: corepack prepare pnpm@10.34.3 --activate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          FIGMA_PUBLIC_URL: https://popoy13.github.io/nands-boutique-pos
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

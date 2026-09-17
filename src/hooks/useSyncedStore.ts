@@ -304,9 +304,9 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setDeletedTransactionsState(d.deletedTransactions);
         setSettingsState(d.settings);
         setCategoriesState(d.categories);
+        setExpensesState(d.expenses);
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
-      } else {
-        console.warn("[sync] Supabase belum disetup â€” jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
+      } else {        console.warn("[sync] Supabase belum disetup â€” jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
       setReady(true);
     })();

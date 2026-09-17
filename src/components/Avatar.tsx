@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { assetUrl } from "../lib/assets";
 
 const ROLE_COLOR: Record<string, string> = { admin: "#7c3aed", manager: "#2563eb", manager_operasional: "#0d9488", kasir: "#7c3aed", staff: "#16a34a" };
 
@@ -21,7 +22,7 @@ export default function Avatar({ src, name, role, className = "" }: Props) {
     );
   }
   return (
-    <img src={src} alt={name} draggable={false} onError={() => setFailed(true)}
+    <img src={assetUrl(src)} alt={name} draggable={false} onError={() => setFailed(true)}
       className={`rounded-full object-cover shrink-0 ${className}`} />
   );
 }

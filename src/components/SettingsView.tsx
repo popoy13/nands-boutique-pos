@@ -4,6 +4,7 @@ import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings }
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
+import { assetUrl } from "../lib/assets";
 import type { ResetResult } from "../data/sync";
 
 interface Props {
@@ -78,7 +79,7 @@ function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; bran
   return (
     <div className="font-mono" style={{ width: px, background: "#fff", color: "#000", fontSize: `${fontPx}px`, lineHeight: 1.55, padding: `${Math.round(9 * scale)}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.22)", borderRadius: 5 }}>
       {printer.receiptLogo && (
-        <div className="text-center"><img src={printer.receiptLogo} alt="Logo" style={{ maxWidth: "72%", maxHeight: Math.max(24, Math.round(40 * scale)), objectFit: "contain" }} /></div>
+        <div className="text-center"><img src={assetUrl(printer.receiptLogo)} alt="Logo" style={{ maxWidth: "72%", maxHeight: Math.max(24, Math.round(40 * scale)), objectFit: "contain" }} /></div>
       )}
       <div className="text-center"><b>{brandName}</b><br />TOKO CENTRAL<br /></div>
       {div}
@@ -452,7 +453,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
                 {draftPrinter.receiptLogo ? (
-                  <img src={draftPrinter.receiptLogo} alt="Logo struk" className="w-full h-full object-contain" />
+                  <img src={assetUrl(draftPrinter.receiptLogo)} alt="Logo struk" className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-[9px] px-1 text-center" style={{ color: "var(--muted-foreground)" }}>Tanpa logo</span>
                 )}
@@ -962,7 +963,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           <div className="mb-4">
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO</label>
             <div className="flex items-center gap-4">
-              <img src={draftBrand.logo} alt="Logo" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
+              <img src={assetUrl(draftBrand.logo)} alt="Logo" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
               <div className="flex flex-col gap-2">
                 <input ref={logoRef} type="file" accept="image/*" className="hidden"
                   onChange={async e => {
@@ -1002,7 +1003,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           <div className="mb-4" style={{ paddingTop: 14, borderTop: "1.5px solid var(--border)" }}>
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>GAMBAR LOADING SCREEN</label>
             <div className="flex items-center gap-4">
-              <img src={draftBrand.loadingImage} alt="Loading screen" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
+              <img src={assetUrl(draftBrand.loadingImage)} alt="Loading screen" className="w-16 h-16 rounded-2xl object-cover shrink-0" style={{ background: "var(--secondary)" }} />
               <div className="flex flex-col gap-2">
                 <input ref={loadingRef} type="file" accept="image/*" className="hidden"
                   onChange={async e => {

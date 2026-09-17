@@ -4,6 +4,7 @@ import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { verifyPin, hashPin, isLocked, recordFailedAttempt, clearAttempts } from "../lib/auth";
 import Avatar from "./Avatar";
+import { assetUrl } from "../lib/assets";
 
 interface Props {
   employees: Employee[];
@@ -109,7 +110,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-3">
-            <img src={brand.logo} alt={brand.name} className="w-12 h-12 rounded-2xl object-cover" style={{ background: "rgba(255,255,255,0.08)" }} />
+            <img src={assetUrl(brand.logo)} alt={brand.name} className="w-12 h-12 rounded-2xl object-cover" style={{ background: "rgba(255,255,255,0.08)" }} />
           </div>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 26, color: "white", letterSpacing: "0.04em" }}>
             {brand.name}

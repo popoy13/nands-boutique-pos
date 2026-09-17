@@ -198,6 +198,21 @@ CREATE TABLE app_settings (
 );
 
 -- ----------------------------------------------------------------------------
+-- EXPENSES (pengeluaran / pembelian barang, mis. pembelian stok harian)
+-- ----------------------------------------------------------------------------
+CREATE TABLE expenses (
+    id              TEXT PRIMARY KEY,
+    store_id        TEXT NOT NULL,
+    store_name      TEXT NOT NULL DEFAULT '',
+    amount          NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+    description     TEXT NOT NULL DEFAULT '',
+    photo           TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    expense_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ----------------------------------------------------------------------------
 -- INDEXES untuk query umum
 -- ----------------------------------------------------------------------------
 CREATE INDEX idx_product_variants_product ON product_variants(product_id);
@@ -213,3 +228,5 @@ CREATE INDEX idx_attendance_date         ON attendance_records(attendance_date);
 CREATE INDEX idx_attendance_employee     ON attendance_records(employee_id);
 CREATE INDEX idx_attendance_store        ON attendance_records(store_id);
 CREATE INDEX idx_attendance_store_date   ON attendance_records(store_id, attendance_date);
+CREATE INDEX idx_expenses_store          ON expenses(store_id);
+CREATE INDEX idx_expenses_date           ON expenses(expense_date);

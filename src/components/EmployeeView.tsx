@@ -4,6 +4,7 @@ import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
+import { assetUrl } from "../lib/assets";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -258,7 +259,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white shrink-0" style={{ background: "var(--foreground)" }}>
                 {editing.photo
-                  ? <img src={editing.photo} alt="Foto" className="w-full h-full object-cover" />
+                  ? <img src={assetUrl(editing.photo)} alt="Foto" className="w-full h-full object-cover" />
                   : <span>{editing.name.charAt(0) || "?"}</span>}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -531,7 +532,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                 >
                   {/* Avatar */}
                   {emp.photo ? (
-                    <img src={emp.photo} alt={emp.name}
+                    <img src={assetUrl(emp.photo)} alt={emp.name}
                       className="w-10 h-10 rounded-full object-cover shrink-0"
                       style={{ filter: emp.status === "inactive" ? "grayscale(1)" : "none" }} />
                   ) : (

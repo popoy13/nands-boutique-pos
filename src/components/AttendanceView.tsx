@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AttendanceRecord, Employee } from "../data/types";
 import { compressImage } from "../lib/compressImage";
 import { todayISO } from "../lib/dates";
+import { assetUrl } from "../lib/assets";
 
 interface Props {
   records: AttendanceRecord[];
@@ -173,7 +174,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const photoArea = (
     <div className="mb-3">
       {photo ? (
-        <img src={photo} alt="Foto absensi" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1.5px solid var(--border)" }} />
+        <img src={assetUrl(photo)} alt="Foto absensi" className="w-full aspect-video object-cover rounded-xl" style={{ border: "1.5px solid var(--border)" }} />
       ) : usingFile ? (
         <div className="text-xs py-8 text-center rounded-xl" style={{ background: "var(--background)", border: "1.5px dashed var(--border)", color: "var(--muted-foreground)" }}>
           Kamera tidak tersedia. Pilih foto dari perangkat, atau coba kamera kembali.
@@ -235,7 +236,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
           <div className="p-5">
             <div className="flex items-center gap-3 mb-4">
               {currentUser.photo ? (
-                <img src={currentUser.photo} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
+                <img src={assetUrl(currentUser.photo)} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
               ) : (
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--foreground)" }}>{currentUser.name.charAt(0)}</div>
               )}

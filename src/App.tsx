@@ -25,6 +25,7 @@ import { todayISO } from "./lib/dates";
 import { getTier } from "./data/members";
 import { defaultSettings } from "./data/settings";
 import type { BrandSettings } from "./data/settings";
+import { assetUrl } from "./lib/assets";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -45,7 +46,7 @@ function MenuLoading({ image, name, description }: { image: string; name: string
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
       <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "var(--secondary)" }}>
-        <img src={image} alt={name} className="w-16 h-16 object-cover" />
+        <img src={assetUrl(image)} alt={name} className="w-16 h-16 object-cover" />
         <div className="swipe-sweep" />
       </div>
       <div className="text-xs animate-pulse" style={{ color: "var(--muted-foreground)" }}>{description}</div>
@@ -66,6 +67,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     deletedTransactions, setDeletedTransactions,
     settings, setSettings,
     categories, setCategories,
+    expenses, setExpenses,
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -343,7 +345,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--background)" }}>
         <div className="swipe-card relative w-16 h-16 rounded-2xl overflow-hidden shrink-0" style={{ background: "rgba(124,58,237,0.12)" }}>
-          <img src={brandCache.loadingImage} alt={brandCache.name} className="w-16 h-16 object-cover" />
+          <img src={assetUrl(brandCache.loadingImage)} alt={brandCache.name} className="w-16 h-16 object-cover" />
           <div className="swipe-sweep" />
         </div>
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>{brandCache.name}</div>

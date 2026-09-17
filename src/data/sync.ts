@@ -35,6 +35,14 @@ function first<T>(r: QueryResult<T>): T[] {
   return r.data ?? []
 }
 
+function optional<T>(r: QueryResult<T>): T[] {
+  if (r.error) {
+    console.warn("[sync] tabel opsional gagal dibaca:", r.error)
+    return []
+  }
+  return r.data ?? []
+}
+
 /* ---------------- stores ---------------- */
 
 export const storeFromDB = (r: Record<string, unknown>): Store => ({
@@ -661,7 +669,7 @@ export async function loadAll(): Promise<LoadResult> {
         members: first(memR).map(memFromDB),
         discounts: first(discR).map(discFromDB),
         attendance: first(attR).map(attFromDB),
-        expenses: first(expR).map(expFromDB),
+        expenses: optional(expR).map(expFromDB),
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(first(setR)),

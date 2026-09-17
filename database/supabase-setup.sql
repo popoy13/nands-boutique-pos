@@ -198,6 +198,21 @@ CREATE TABLE app_settings (
 );
 
 -- ----------------------------------------------------------------------------
+-- EXPENSES (pengeluaran / pembelian barang, mis. pembelian stok harian)
+-- ----------------------------------------------------------------------------
+CREATE TABLE expenses (
+    id              TEXT PRIMARY KEY,
+    store_id        TEXT NOT NULL,
+    store_name      TEXT NOT NULL DEFAULT '',
+    amount          NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+    description     TEXT NOT NULL DEFAULT '',
+    photo           TEXT,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    expense_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ----------------------------------------------------------------------------
 -- INDEXES untuk query umum
 -- ----------------------------------------------------------------------------
 CREATE INDEX idx_product_variants_product ON product_variants(product_id);
@@ -213,6 +228,8 @@ CREATE INDEX idx_attendance_date         ON attendance_records(attendance_date);
 CREATE INDEX idx_attendance_employee     ON attendance_records(employee_id);
 CREATE INDEX idx_attendance_store        ON attendance_records(store_id);
 CREATE INDEX idx_attendance_store_date   ON attendance_records(store_id, attendance_date);
+CREATE INDEX idx_expenses_store          ON expenses(store_id);
+CREATE INDEX idx_expenses_date           ON expenses(expense_date);
 
 -- ============================================================================
 -- NAND'S BOUTIQUE - POS Seed Data (PostgreSQL)
@@ -399,7 +416,7 @@ INSERT INTO transactions (id, transaction_date, store_id, store_name, cashier_id
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['stores','categories','products','product_variants','store_stocks','employees','members','discounts','transactions','deleted_transactions','attendance_records','app_settings'] LOOP
+  FOREACH t IN ARRAY ARRAY['stores','categories','products','product_variants','store_stocks','employees','members','discounts','transactions','deleted_transactions','attendance_records','app_settings','expenses'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS p_all_anon ON %I', t);
     EXECUTE format('CREATE POLICY p_all_anon ON %I FOR ALL TO anon USING (true) WITH CHECK (true)', t);
@@ -413,7 +430,7 @@ END $$;
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE stores, categories, products, product_variants, store_stocks, employees, members, discounts, transactions, deleted_transactions, attendance_records, app_settings;
+  ALTER PUBLICATION supabase_realtime ADD TABLE stores, categories, products, product_variants, store_stocks, employees, members, discounts, transactions, deleted_transactions, attendance_records, app_settings, expenses;
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'realtime publication skipped: %', SQLERRM;
 END $$;

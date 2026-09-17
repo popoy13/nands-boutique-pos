@@ -35,7 +35,8 @@ jobs:
         env:
           FIGMA_PUBLIC_URL: https://popoy13.github.io/nands-boutique-pos
       - run: pnpm exec cap sync android
-      - run: android/gradlew assembleDebug
+      - run: ./gradlew assembleDebug
+        working-directory: android
       - run: mkdir -p dist/downloads && cp android/app/build/outputs/apk/debug/app-debug.apk dist/downloads/nands-boutique-pos.apk
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

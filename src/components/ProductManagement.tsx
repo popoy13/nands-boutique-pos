@@ -636,11 +636,11 @@ export default function ProductManagement({ products, stores, categories, onUpda
 
       {/* Product List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Produk</div>
             {(canExport || canImport || canCategory || canManageSizes || canBulk || canAdd) && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {canExport && (
                   <button onClick={handleExport}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold"
@@ -692,7 +692,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
               </div>
             )}
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 180 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input type="text" placeholder="Cari produk / kode..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}

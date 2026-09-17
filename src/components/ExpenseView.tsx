@@ -5,6 +5,7 @@ import { validateImageFile } from "../lib/imageFile";
 import type { Expense } from "../data/types";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
+import DateRangeFilter from "./DateRangeFilter";
 import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
@@ -157,7 +158,7 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
       )}
 
       {editing && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-full max-w-lg rounded-2xl overflow-hidden my-6 mx-4" style={{ background: "var(--card)" }}>
             <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }}>
@@ -238,7 +239,7 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
       )}
 
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Pengeluaran</div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -265,22 +266,20 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
             </select>
-            <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-              className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "var(--muted)", color: "var(--foreground)", border: "1px solid var(--border)" }} />
-            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>s/d</span>
-            <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-              className="px-3 py-2 rounded-xl text-xs font-medium outline-none" style={{ background: "var(--muted)", color: "var(--foreground)", border: "1px solid var(--border)" }} />
-            {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
-                className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "#fef2f2", color: "#ef4444" }}>Reset Tanggal</button>
-            )}
+            <DateRangeFilter
+              showPresets
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onChangeFrom={v => { setDateFrom(v); setPage(1); }}
+              onChangeTo={v => { setDateTo(v); setPage(1); }}
+            />
             <span className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
               {filtered.length} catatan · Total {fmt(totalAmount)}
             </span>
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto p-5">
+        <div className="lg:flex-1 lg:overflow-y-auto p-4 sm:p-6">
           <div className="flex flex-col gap-3">
             {pageItems.length === 0 && (
               <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>

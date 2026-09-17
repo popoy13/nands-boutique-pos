@@ -225,7 +225,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
       )}
 
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Diskon & Voucher</div>
             {canAdd && (
@@ -237,7 +237,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
               </button>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["all", "percent", "amount", "voucher"].map(t => (
               <button key={t} onClick={() => { setFilterType(t); resetPage(); }}
                 className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
@@ -248,7 +248,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto p-5">
+        <div className="lg:flex-1 lg:overflow-y-auto p-4 sm:p-6">
           <div className="flex flex-col gap-3">
             {pageItems.map(d => {
               const expired = isExpired(d);

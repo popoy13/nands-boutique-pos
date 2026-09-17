@@ -273,7 +273,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
 
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }} className="mb-3">Riwayat Transaksi</div>
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
@@ -299,7 +299,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {pageItems.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada transaksi</div>
           ) : (

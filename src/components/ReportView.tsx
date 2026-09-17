@@ -351,7 +351,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
   };
 
   return (
-    <div className="h-full overflow-y-auto px-5 py-5">
+    <div className="h-full overflow-y-auto px-4 sm:px-6 py-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Laporan Penjualan</div>
@@ -381,7 +381,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
         {statCards.map(c => (
           <div key={c.label} className="p-4 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
             <div className="text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>

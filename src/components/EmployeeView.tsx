@@ -477,7 +477,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+        <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Karyawan</div>
@@ -532,7 +532,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
           </div>
         </div>
 
-        <div className="lg:flex-1 lg:overflow-y-auto px-4 py-3">
+        <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada karyawan ditemukan</div>
           ) : (

@@ -115,11 +115,12 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       case "attendance_records": await writeAttendance(payload as Record<string, unknown>[]); break;
       case "settings": await saveSettingsRows(payload as Record<string, unknown>[]); break;
       case "expenses": {
-        try {
-          await writeExpenses(payload as Record<string, unknown>[]);
-        } catch (e) {
-          console.warn("[sync] tabel expenses tidak ada, simpan via app_settings:", e);
-          await saveExpensesJson(payload as Record<string, unknown>[]);
+        const rows = payload as Record<string, unknown>[];
+        // Selalu simpan ke app_settings (works walau array kosong / tabel belum ada),
+        // lalu upsert best-effort ke tabel dedicated bila sudah dibuat.
+        await saveExpensesJson(rows);
+        try { await writeExpenses(rows); } catch (e) {
+          console.warn("[sync] tabel expenses belum tersedia:", e);
         }
         break;
       }

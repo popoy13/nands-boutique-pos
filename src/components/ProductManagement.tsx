@@ -1,5 +1,6 @@
 ﻿import { useState, useMemo, useRef, useEffect } from "react";
 import type { ChangeEvent } from "react";
+import JsBarcode from "jsbarcode";
 import type { Product, ProductVariant, Size } from "../data/types";
 import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
 import { compressImage } from "../lib/compressImage";
@@ -30,6 +31,77 @@ interface Props {
 }
 
 const SIZES: Size[] = ["XS", "S", "M", "L", "XL", "XXL"];
+
+function BarcodeModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const [variantIdx, setVariantIdx] = useState(0);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const variant = product.variants[variantIdx];
+
+  useEffect(() => {
+    if (!svgRef.current || !variant?.sku) return;
+    try {
+      JsBarcode(svgRef.current, variant.sku, {
+        format: "CODE128",
+        displayValue: true,
+        font: "monospace",
+        fontSize: 14,
+        margin: 10,
+        height: 72,
+        width: 2,
+        lineColor: "#111827",
+        background: "#ffffff",
+      });
+    } catch {
+      // SKU validation is handled before saving; keep the dialog usable if a
+      // legacy SKU cannot be encoded by the barcode library.
+      svgRef.current.innerHTML = "";
+    }
+  }, [variant?.sku]);
+
+  const printBarcode = () => {
+    if (!variant) return;
+    const svg = svgRef.current?.outerHTML ?? "";
+    const popup = window.open("", "_blank", "width=480,height=420");
+    if (!popup) return;
+    popup.document.write(`<!doctype html><html><head><title>Barcode ${variant.sku}</title>
+      <style>body{font-family:Arial,sans-serif;text-align:center;padding:24px;color:#111827}svg{max-width:100%}.name{font-weight:700;margin-bottom:4px}.variant{font-size:13px;color:#4b5563;margin-bottom:12px}@media print{button{display:none}}</style>
+      </head><body><div class="name">${product.name.replace(/[<>&"]/g, "")}</div><div class="variant">${variant.color} / ${variant.size}</div>${svg}<button onclick="window.print()">Cetak</button></body></html>`);
+    popup.document.close();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.55)" }}>
+      <div className="w-full max-w-lg rounded-2xl p-5 shadow-2xl" style={{ background: "var(--card)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <div className="font-semibold text-sm">Buat Barcode SKU</div>
+            <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{product.name}</div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <label className="block text-xs font-semibold mt-4 mb-1.5" style={{ color: "var(--muted-foreground)" }}>PILIH VARIAN / SKU</label>
+        <select value={variantIdx} onChange={e => setVariantIdx(Number(e.target.value))}
+          className="w-full px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+          {product.variants.map((v, i) => <option key={`${v.sku}-${i}`} value={i}>{v.color} / {v.size} — {v.sku}</option>)}
+        </select>
+        <div className="mt-4 rounded-xl bg-white p-4 text-center overflow-x-auto" style={{ border: "1px solid var(--border)" }}>
+          <svg ref={svgRef} aria-label={`Barcode ${variant?.sku ?? ""}`} />
+          {variant?.sku && <div className="mt-1 text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>{variant.sku}</div>}
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button onClick={printBarcode} disabled={!variant?.sku} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white disabled:opacity-50" style={{ background: "var(--foreground)" }}>
+            Cetak Barcode
+          </button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const emptyProduct = (storeIds: string[], defaultCategory: string): Product => ({
   id: `p-${Date.now()}`,
@@ -155,6 +227,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("Semua");
   const [editing, setEditing] = useState<Product | null>(null);
+  const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     if (!editing) return;
@@ -693,6 +766,9 @@ export default function ProductManagement({ products, stores, categories, onUpda
                   <td className="px-4 py-3">
                     {!bulkMode && (canEdit || canDelete) && (
                       <div className="flex items-center gap-1.5">
+                        <button onClick={() => setBarcodeProduct(p)} title="Buat barcode SKU" className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.12)", color: "var(--accent)" }}>
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg>
+                        </button>
                         {canEdit && (
                           <button onClick={() => { setEditing({ ...p, variants: p.variants.map(v => ({ ...v, stocks: [...v.stocks] })) }); setIsNew(false); setActiveVariantIdx(0); }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--secondary)" }}>
@@ -866,6 +942,8 @@ export default function ProductManagement({ products, stores, categories, onUpda
           </div>
         </div>
       )}
+
+      {barcodeProduct && <BarcodeModal product={barcodeProduct} onClose={() => setBarcodeProduct(null)} />}
 
       {/* Edit Panel - desktop */}
       {editBody && (

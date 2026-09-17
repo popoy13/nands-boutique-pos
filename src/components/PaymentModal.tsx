@@ -60,6 +60,8 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
   const [method, setMethod] = useState<string>(() => activeMethods[0]?.id ?? "");
   const [payment, setPayment] = useState(total);
   const [success, setSuccess] = useState(false);
+  const [whatsappPhone, setWhatsappPhone] = useState("");
+  const [whatsappError, setWhatsappError] = useState("");
   const [receiptData, setReceiptData] = useState<{
     txId: string; txDate: Date; cart: CartItem[];
     subtotal: number; discountAmt: number; tax: number; total: number;
@@ -135,6 +137,42 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
     w.print();
   };
 
+  const sendReceiptToWhatsApp = () => {
+    const r = receiptData;
+    const digits = whatsappPhone.replace(/\D/g, "");
+    if (!r) return;
+    if (digits.length < 8) {
+      setWhatsappError("Masukkan nomor WhatsApp yang valid.");
+      return;
+    }
+    const phone = digits.startsWith("0") ? `62${digits.slice(1)}` : digits;
+    const items = r.cart
+      .map((item) => `- ${item.name}${item.size || item.color ? ` (${[item.color, item.size].filter(Boolean).join(" / ")})` : ""} x${item.quantity}: ${fmtNum(item.subtotal)}`)
+      .join("\n");
+    const message = [
+      `*${r.brandName}*`,
+      r.storeName.replace("NAND'S BOUTIQUE - ", ""),
+      "",
+      `No. Transaksi: ${r.txId}`,
+      `Tanggal: ${r.txDate.toLocaleDateString("id-ID")} ${r.txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`,
+      `Kasir: ${r.cashierName}`,
+      "",
+      "*Detail Belanja*",
+      items,
+      "",
+      `Subtotal: ${fmt(r.subtotal)}`,
+      ...(r.discountAmt > 0 ? [`Diskon: -${fmt(r.discountAmt)}`] : []),
+      `Pajak: ${fmt(r.tax)}`,
+      `*TOTAL: ${fmt(r.total)}*`,
+      `Bayar (${methodLabel(r.method)}): ${fmt(r.payment)}`,
+      ...(r.cash && r.change > 0 ? [`Kembalian: ${fmt(r.change)}`] : []),
+      "",
+      printer.footerText || "Terima kasih telah berbelanja!",
+    ].join("\n");
+    setWhatsappError("");
+    window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 overflow-hidden" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }}>
       <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl sheet-up flex flex-col" style={{ background: "var(--card)", maxHeight: "92dvh" }}>
@@ -154,6 +192,27 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               Cetak Struk
             </button>
+            <div className="w-full mt-4 rounded-2xl p-3" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: "#15803d" }}>Kirim struk ke WhatsApp</div>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="Contoh: 08123456789"
+                  value={whatsappPhone}
+                  onChange={e => { setWhatsappPhone(e.target.value); setWhatsappError(""); }}
+                  className="min-w-0 flex-1 px-3 py-2.5 rounded-xl text-xs outline-none"
+                  style={{ background: "white", border: "1px solid #bbf7d0" }}
+                />
+                <button onClick={sendReceiptToWhatsApp}
+                  className="px-3 py-2.5 rounded-xl text-xs font-semibold text-white shrink-0"
+                  style={{ background: "#16a34a" }}>
+                  WhatsApp
+                </button>
+              </div>
+              {whatsappError && <div className="text-[11px] mt-1.5" style={{ color: "#dc2626" }}>{whatsappError}</div>}
+              <div className="text-[10px] mt-1.5" style={{ color: "#4d7c5a" }}>WhatsApp akan dibuka dengan pesan struk siap dikirim.</div>
+            </div>
             <div className="flex gap-3 w-full mt-3">
               <button onClick={onFinish}
                 className="flex-1 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-150"

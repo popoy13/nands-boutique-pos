@@ -123,7 +123,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     ${printer?.showCashier !== false ? `<div>Kasir: ${escapeHtml(t.cashierName ?? "")}</div>` : ""}
     ${t.memberName ? `<div>Member: ${escapeHtml(t.memberName)}</div>` : ""}
     <hr>
-    ${t.items.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
+    ${t.items.map(i => `<div>${escapeHtml(i.name)}${[i.color, i.size].filter(Boolean).length ? ` (${escapeHtml([i.color, i.size].filter(Boolean).join("/"))})` : ""}</div><div class="row"><span>${i.quantity}x${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
     <div class="row"><span>Subtotal</span><span>${fmtNum(t.subtotal)}</span></div>
     ${t.discount > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span></div>` : ""}
@@ -175,7 +175,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
               <img src={item.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold truncate">{item.name}</div>
-                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.color} / {item.size} · ×{item.quantity}</div>
+                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{[item.color, item.size].filter(Boolean).join(" / ") || "Tanpa varian"} · ×{item.quantity}</div>
               </div>
               <div className="font-mono text-xs font-bold shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
             </div>

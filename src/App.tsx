@@ -373,6 +373,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canProductImport = has("product", "import");
   const canProductBulk = has("product", "bulk");
   const canProductCategory = has("product", "category");
+  const canProductSize = has("product", "size");
   const canProductAdd = has("product", "add");
   const canProductEdit = has("product", "edit");
   const canProductDelete = has("product", "delete");
@@ -469,11 +470,14 @@ const canExpenseDelete = has("expense", "delete");
             stores={stores}
             categories={categories}
             onUpdateCategories={setCategories}
+            sizes={settings.sizes}
+            onUpdateSizes={next => setSettings(s => ({ ...s, sizes: next }))}
             onSave={setProducts}
             canExport={canProductExport}
             canImport={canProductImport}
             canBulk={canProductBulk}
             canCategory={canProductCategory}
+            canSize={canProductSize}
             canAdd={canProductAdd}
             canEdit={canProductEdit}
             canDelete={canProductDelete}

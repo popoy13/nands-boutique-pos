@@ -124,8 +124,8 @@ export function parseProductsCsv(raw: string, storeIds: string[], existing: Prod
     const category = get("category");
     const price = parseNumber(get("price"));
     const image = get("image");
-    const size = get("size") || "M";
-    const color = get("color") || "Standar";
+    const size = get("size");
+    const color = get("color");
     let sku = get("sku");
 
     let stocks: { storeId: string; quantity: number }[] = [];

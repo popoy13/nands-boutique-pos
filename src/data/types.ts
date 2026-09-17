@@ -1,4 +1,4 @@
-export type Size = "XS" | "S" | "M" | "L" | "XL" | "XXL";
+export type Size = string;
 export type PaymentMethod = "cash" | "debit" | "qris";
 export type UserRole = "admin" | "manager" | "manager_operasional" | "kasir" | "staff";
 export type MemberTier = "bronze" | "silver" | "gold" | "platinum";

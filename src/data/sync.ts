@@ -189,8 +189,8 @@ const sanitizeItems = (raw: unknown): Transaction["items"] => {
       variantSku: s(row.variantSku) || s(row.variant_sku),
       name: s(row.name),
       brand: s(row.brand),
-      size: (s(row.size) || "M") as Transaction["items"][number]["size"],
-      color: s(row.color) || "Standar",
+      size: (s(row.size) || "") as Transaction["items"][number]["size"],
+      color: s(row.color) || "",
       price,
       quantity,
       subtotal,
@@ -435,6 +435,7 @@ export const settingsFromDB = (
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
   const payments = (obj.payments ?? {}) as Partial<AppSettings["payments"]>
+  const sizesArr = Array.isArray(obj.sizes) ? obj.sizes.map(s => String(s)).filter(Boolean) : []
   // Migrasi branding lama "NET R" -> default baru (NANDS BOUTIQUE)
   if (brand.name === "NET R") brand.name = defaultSettings.brand.name
   return {
@@ -451,6 +452,7 @@ export const settingsFromDB = (
       tax: { ...defaultSettings.payments.tax, ...(payments.tax ?? {}) },
       rounding: { ...defaultSettings.payments.rounding, ...(payments.rounding ?? {}) },
     },
+    sizes: sizesArr.length ? sizesArr : defaultSettings.sizes,
   }
 }
 export const settingsToDB = (st: AppSettings) => [
@@ -459,6 +461,7 @@ export const settingsToDB = (st: AppSettings) => [
   { key: "roles", value: st.roles },
   { key: "barcode", value: st.barcode },
   { key: "payments", value: st.payments },
+  { key: "sizes", value: st.sizes },
 ]
 export async function saveSettingsRows(
   rows: Record<string, unknown>[],

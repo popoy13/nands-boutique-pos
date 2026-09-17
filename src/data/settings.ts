@@ -64,6 +64,7 @@ export interface AppSettings {
   roles: Record<string, RoleConfig>;
   barcode: BarcodeSettings;
   payments: PaymentSettings;
+  sizes: string[];
 }
 
 export const defaultSettings: AppSettings = {
@@ -80,4 +81,5 @@ export const defaultSettings: AppSettings = {
     tax: { enabled: true, rate: 10, label: "Pajak 10%" },
     rounding: { enabled: false, step: 500 },
   },
+  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
 };

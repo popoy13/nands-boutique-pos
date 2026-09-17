@@ -108,7 +108,7 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
     ${printer.showCashier !== false ? `<div>Kasir: ${escapeHtml(r.cashierName)}</div>` : ""}
     ${r.memberName ? `<div>Member: ${escapeHtml(r.memberName)}${r.pointsEarned ? ` (+${r.pointsEarned} pts)` : ""}</div>` : ""}
     <hr>
-    ${r.cart.map(i => `<div>${escapeHtml(i.name)} (${escapeHtml(i.color)}/${escapeHtml(i.size)})</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
+    ${r.cart.map(i => `<div>${escapeHtml(i.name)}${[i.color, i.size].filter(Boolean).length ? ` (${escapeHtml([i.color, i.size].filter(Boolean).join("/"))})` : ""}</div><div class="row"><span>${i.quantity} x ${fmtNum(i.price)}</span><span>${fmtNum(i.subtotal)}</span></div>`).join("")}
     <hr>
     <div class="row"><span>Subtotal</span><span>${fmtNum(r.subtotal)}</span></div>
     ${r.discountAmt > 0 ? `<div class="row"><span>Diskon</span><span>-${fmtNum(r.discountAmt)}</span></div>` : ""}

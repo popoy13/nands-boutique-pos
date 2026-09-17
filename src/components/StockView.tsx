@@ -187,9 +187,9 @@ export default function StockView({ products, stores, categories, activeStore, o
                     <td className="px-4 py-2.5">
                       <span className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--muted-foreground)" }}>{variant.sku}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs">{variant.color}</td>
+                    <td className="px-4 py-2.5 text-xs">{variant.color || <span style={{ color: "var(--muted-foreground)" }}>—</span>}</td>
                     <td className="px-4 py-2.5">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{variant.size}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{variant.size || "—"}</span>
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <span className="font-mono text-xs font-medium" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</span>

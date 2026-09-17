@@ -60,7 +60,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
   expense: ["add", "edit", "delete"],
-  product: ["export", "import", "bulk", "category", "add", "edit", "delete"],
+  product: ["export", "import", "bulk", "category", "size", "add", "edit", "delete"],
   employee: ["import", "export", "add"],
   store: ["add", "edit", "delete"],
   discount: ["add", "edit", "delete"],
@@ -78,6 +78,7 @@ export const ACTION_LABELS: Record<string, Record<string, string>> = {
     import: "Import produk",
     bulk: "Edit banyak",
     category: "Kelola kategori",
+    size: "Kelola ukuran",
     add: "Tambah produk",
     edit: "Edit produk",
     delete: "Hapus produk",
@@ -164,6 +165,11 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
     if (Array.isArray(perms.expense) && perms.expense.length > 0) {
       perms.expense = [...new Set([...perms.expense, "edit"])];
+    }
+    // Migrasi: role yang punya aksi kelola kategori produk otomatis mendapat
+    // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.
+    if (Array.isArray(perms.product) && perms.product.includes("category")) {
+      perms.product = [...new Set([...perms.product, "size"])];
     }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).

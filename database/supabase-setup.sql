@@ -290,21 +290,21 @@ INSERT INTO products (id, name, brand, category_id, base_price, image) VALUES
 
 -- ----------------------------------------------------------------------------
 -- EMPLOYEES (PIN plain-text: KHUSUS PROTOTYPE saja)
--- Akun demo: Admin Utama PIN 0000 Â· Rina Marlina PIN 1212 Â· Budi Santoso PIN 2222
+-- Akun demo (PIN sudah di-hash PBKDF2): Admin Utama 0000 - Rina Marlina 1212 - Budi Santoso 2222
 -- ----------------------------------------------------------------------------
 INSERT INTO employees (id, name, role, store_id, phone, email, join_date, salary, status, pin) VALUES
-    ('e0',  'Admin Utama',      'admin',               's1', '08100000000', 'admin@nandsboutique.id',  '2020-01-01', 15000000, 'active',   '0000'),
-    ('e1',  'Andi Prasetyo',    'manager',             's1', '08123456789', 'andi.p@nandsboutique.id', '2021-03-15', 8500000,  'active',   '1111'),
-    ('e1b', 'Rina Marlina',     'manager_operasional', 's1', '08134567891', 'rina.m@nandsboutique.id', '2021-05-20', 8000000,  'active',   '1212'),
-    ('e2',  'Budi Santoso',     'kasir',               's1', '08234567890', 'budi.s@nandsboutique.id', '2022-01-10', 4800000,  'active',   '2222'),
-    ('e3',  'Citra Dewi',       'kasir',               's1', '08345678901', 'citra.d@nandsboutique.id', '2022-06-01', 4800000,  'active',   '3333'),
-    ('e4',  'Dian Rahayu',      'staff',               's1', '08456789012', 'dian.r@nandsboutique.id', '2023-02-20', 3500000,  'active',   '4444'),
-    ('e5',  'Eko Wijaya',       'manager',             's2', '08567890123', 'eko.w@nandsboutique.id',  '2021-07-05', 8500000,  'active',   '5555'),
-    ('e6',  'Fitri Handayani',  'kasir',               's2', '08678901234', 'fitri.h@nandsboutique.id','2022-09-15', 4800000,  'active',   '6666'),
-    ('e7',  'Galih Permana',    'staff',               's2', '08789012345', 'galih.p@nandsboutique.id','2023-04-01', 3500000,  'active',   '7777'),
-    ('e8',  'Hana Safitri',     'manager',             's3', '08890123456', 'hana.s@nandsboutique.id', '2022-03-10', 8500000,  'active',   '8888'),
-    ('e9',  'Ivan Kurniawan',   'kasir',               's3', '08901234567', 'ivan.k@nandsboutique.id', '2023-01-08', 4800000,  'active',   '9999'),
-    ('e10', 'Julia Sari',       'staff',               's3', '08112345678', 'julia.s@nandsboutique.id','2023-07-15', 3500000,  'inactive', '1010');
+    ('e0',  'Admin Utama',      'admin',               's1', '08100000000', 'admin@nandsboutique.id',  '2020-01-01', 15000000, 'active',   'pbkdf2$96965c578d099000$600000$861dc37b1505d7a40ac4e8ce913c0e857ea404637afbf206f1d0f95dd27da7e7'),
+    ('e1',  'Andi Prasetyo',    'manager',             's1', '08123456789', 'andi.p@nandsboutique.id', '2021-03-15', 8500000,  'active',   'pbkdf2$9014e90374496000$600000$38d9da8c43a8f3d910e706e860d8e88a87cd254f9b3b4543d74a9ce2b9898a0f'),
+    ('e1b', 'Rina Marlina',     'manager_operasional', 's1', '08134567891', 'rina.m@nandsboutique.id', '2021-05-20', 8000000,  'active',   'pbkdf2$87674703cbe26000$600000$e734612e80b8e4861c8f8c76d5f6d8db0c8eb9c2b55716308e33eb9270f59145'),
+    ('e2',  'Budi Santoso',     'kasir',               's1', '08234567890', 'budi.s@nandsboutique.id', '2022-01-10', 4800000,  'active',   'pbkdf2$7d587ed457b69800$600000$a7fb9af5ea0bc1ac61123c61c8a9fb7c6db3e75a898b17be64d7da17c7859667'),
+    ('e3',  'Citra Dewi',       'kasir',               's1', '08345678901', 'citra.d@nandsboutique.id', '2022-06-01', 4800000,  'active',   'pbkdf2$ae8dd4a96520f800$600000$a4364e0040792a84f5669071b0251353376729ad5454ad78a0cc00dfcec7c0b5'),
+    ('e4',  'Dian Rahayu',      'staff',               's1', '08456789012', 'dian.r@nandsboutique.id', '2023-02-20', 3500000,  'active',   'pbkdf2$500b1d07bdbd7000$600000$5f6cf3d20de1bd779fb81951b9a1d5e3fbc1825b105d8231b1732a53d0643112'),
+    ('e5',  'Eko Wijaya',       'manager',             's2', '08567890123', 'eko.w@nandsboutique.id',  '2021-07-05', 8500000,  'active',   'pbkdf2$00f965fcffa60800$600000$659855d998aa160b474f79aae74150a8daa101d17a4a99545e0dcf4038bc138a'),
+    ('e6',  'Fitri Handayani',  'kasir',               's2', '08678901234', 'fitri.h@nandsboutique.id','2022-09-15', 4800000,  'active',   'pbkdf2$dbce511678032800$600000$85b1101db7de3f6f35c0f5330aee75150c33d69d75c92806f483c0498a825bf7'),
+    ('e7',  'Galih Permana',    'staff',               's2', '08789012345', 'galih.p@nandsboutique.id','2023-04-01', 3500000,  'active',   'pbkdf2$da07900261928800$600000$011f02eda9ed3a4f11e773a2c5df8a59d7ec79202edb6bc9f1e34d81481571f6'),
+    ('e8',  'Hana Safitri',     'manager',             's3', '08890123456', 'hana.s@nandsboutique.id', '2022-03-10', 8500000,  'active',   'pbkdf2$450bca8984169800$600000$9177e2090daec83f5912a0abde76c92778536eef4c863243a07a36e4787a5365'),
+    ('e9',  'Ivan Kurniawan',   'kasir',               's3', '08901234567', 'ivan.k@nandsboutique.id', '2023-01-08', 4800000,  'active',   'pbkdf2$295f696ca6f8e000$600000$6dc147da1a02178d5b60d2e6c74f72f178863eb48d760e622561546eae2a94bf'),
+    ('e10', 'Julia Sari',       'staff',               's3', '08112345678', 'julia.s@nandsboutique.id','2023-07-15', 3500000,  'inactive', 'pbkdf2$20003e98a956b800$600000$dc1d00f004423cca544a335d1e6342e03ab58eac9b0bd2b66574947287bcce34');
 
 -- ----------------------------------------------------------------------------
 -- MEMBERS

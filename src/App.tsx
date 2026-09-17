@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, lazy, Suspense } from "react";
+﻿import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import LoginView from "./components/LoginView";
 import Sidebar, { MobileBottomNav } from "./components/Sidebar";
 
@@ -27,6 +27,7 @@ import { getTier } from "./data/members";
 import { defaultSettings } from "./data/settings";
 import type { BrandSettings } from "./data/settings";
 import { assetUrl } from "./lib/assets";
+import { hashPin, isHashedPin } from "./lib/auth";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -110,6 +111,20 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     if (!fresh) return;
     setCurrentUser(fresh);
   }, [ready, employees]);
+
+  // Migrasi PIN lama (masih plaintext) ke hash PBKDF2 terkini.
+  const pinMigratedRef = useRef(false);
+  useEffect(() => {
+    if (!ready || pinMigratedRef.current) return;
+    if (!employees.some(e => e.pin && !isHashedPin(e.pin))) return;
+    pinMigratedRef.current = true;
+    void (async () => {
+      const next = await Promise.all(
+        employees.map(async e => (e.pin && !isHashedPin(e.pin) ? { ...e, pin: await hashPin(e.pin) } : e)),
+      );
+      setEmployees(next);
+    })();
+  }, [ready, employees, setEmployees]);
 
   // Idle timeout: logout otomatis setelah 30 menit tanpa aktivitas.
   useEffect(() => {

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { supabase } from "../lib/supabase";
 import {
@@ -22,6 +22,13 @@ import { seedTransactions } from "../data/transactions";
 import { seedAttendance } from "../data/attendance";
 
 const DEBOUNCE_MS = 350;
+
+const KNOWN_TABLES = new Set([
+  "products", "stores", "employees", "members", "discounts",
+  "attendance_records", "transactions", "deleted_transactions",
+  "settings", "categories", "expenses", "deposits",
+]);
+const MAX_REMOTE_ROWS = 50000;
 
 export interface SyncedStore {
   ready: boolean;
@@ -88,7 +95,7 @@ const onAttendanceFail = (again: unknown) => {
 const propagate = (table: string, rows: unknown) => {
   pendingRef.current[table] = rows;
   if (table === "attendance_records") {
-    // Attendance is critical & low-frequency â€” flush immediately (no debounce
+    // Attendance is critical & low-frequency - flush immediately (no debounce
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
@@ -284,7 +291,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   }, []);
 
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
-    if (!payload || !Array.isArray(payload.rows)) return;
+    if (!payload || typeof payload.table !== "string" || !KNOWN_TABLES.has(payload.table)) return;
+    if (!Array.isArray(payload.rows) || payload.rows.length > MAX_REMOTE_ROWS) return;
     const rows = payload.rows as Record<string, unknown>[];
     switch (payload.table) {
       case "products": {
@@ -341,7 +349,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setExpensesState(d.expenses);
         setDepositsState(d.deposits);
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
-      } else {        console.warn("[sync] Supabase belum disetup â€” jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
+      } else {
+        console.warn("[sync] Supabase belum disetup - jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
       }
       setReady(true);
     })();

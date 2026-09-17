@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import type { Product, ProductVariant } from "../data/types";
 import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
 import { compressImage } from "../lib/compressImage";
+import { validateImageFile } from "../lib/imageFile";
 import { verifyPin } from "../lib/auth";
 import Pagination from "./Pagination";
 
@@ -315,7 +316,8 @@ export default function ProductManagement({ products, stores, categories, onUpda
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setToast("File harus berupa gambar."); return; }
+    const fileErr = validateImageFile(file);
+    if (fileErr) { setToast(fileErr); return; }
     setPhotoBusy(true);
     try {
       const dataUrl = await compressImage(file, 800, 0.7);

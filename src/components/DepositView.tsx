@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
+import { validateImageFile } from "../lib/imageFile";
 import type { CashDeposit } from "../data/types";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
@@ -94,6 +96,8 @@ export default function DepositView({ deposits, stores, employees = [], banks, o
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr); return; }
     setOcrBusy(true);
     setOcrError("");
     setOcrCodes([]);
@@ -149,7 +153,7 @@ export default function DepositView({ deposits, stores, employees = [], banks, o
       "Dibuat Oleh": e.createdByName ?? "",
       "Bukti Foto": e.photo ? "Ada" : "-",
     })).sort((a, b) => String(a.Tanggal).localeCompare(String(b.Tanggal)) * -1);
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Setor Tunai");
     XLSX.writeFile(wb, `nands-boutique-setor-tunai-${new Date().toISOString().slice(0, 10)}.xlsx`);

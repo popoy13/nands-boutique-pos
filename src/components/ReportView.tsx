@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
 import type { Transaction, DeletedTransaction, Expense } from "../data/types";
 import type { PaymentSettings } from "../data/settings";
 import { todayISO } from "../lib/dates";
@@ -279,7 +280,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       { "Periode": periodLabel, "Toko": filterStore === "all" ? "Semua Toko" : stores.find(s => s.id === filterStore)?.name ?? filterStore },
       { "Total Pendapatan": stats.revenue, "Jumlah Transaksi": stats.count, "Rata-rata": Math.round(stats.avg), "Item Terjual": stats.itemsSold, "Pendapatan Hari Ini": stats.todayRevenue, "Transaksi Hari Ini": stats.todayCount },
     ];
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    const wsSummary = XLSX.utils.json_to_sheet(safeRows(summaryRows));
 
     const txRows = filtered.map(t => ({
       "Tanggal": t.date.toLocaleDateString("id-ID"),
@@ -295,10 +296,10 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       "Metode Bayar": paymentLabel[t.paymentMethod],
       "Catatan": t.note,
     }));
-    const wsTx = XLSX.utils.json_to_sheet(txRows);
+    const wsTx = XLSX.utils.json_to_sheet(safeRows(txRows));
 
     const productRows = topProducts.map((p, i) => ({ "Peringkat": i + 1, "Produk": p.name, "Qty": p.qty, "Pendapatan": p.revenue }));
-    const wsProducts = XLSX.utils.json_to_sheet(productRows);
+    const wsProducts = XLSX.utils.json_to_sheet(safeRows(productRows));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
@@ -317,7 +318,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         "Waktu Hapus": fmtDateSafe(d.deletedAt),
         "Alasan": d.reason,
       }));
-      const wsDeleted = XLSX.utils.json_to_sheet(deletedRows);
+      const wsDeleted = XLSX.utils.json_to_sheet(safeRows(deletedRows));
       XLSX.utils.book_append_sheet(wb, wsDeleted, "Transaksi Dihapus");
     }
 
@@ -330,11 +331,11 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         "Dibuat Oleh": e.createdByName ?? "",
         "Bukti Foto": e.photo ? "Ada" : "-",
       }));
-      const wsExpenses = XLSX.utils.json_to_sheet(expenseRows);
+      const wsExpenses = XLSX.utils.json_to_sheet(safeRows(expenseRows));
       XLSX.utils.book_append_sheet(wb, wsExpenses, "Pengeluaran");
     }
 
-    const wsSummary2 = XLSX.utils.json_to_sheet([{
+    const wsSummary2 = XLSX.utils.json_to_sheet(safeRows([{
       "Total Pengeluaran": expenseTotal,
       "Bersih Periode": periodNet,
       "Pendapatan Minggu Ini": weekStats.revenue,
@@ -343,7 +344,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       "Pendapatan Tunai Hari Ini": cashStats.todayCash,
       "Pengeluaran Hari Ini": cashStats.todayExpense,
       "Tunai Bersih Hari Ini": cashStats.netCashToday,
-    }]);
+    }]));
     XLSX.utils.book_append_sheet(wb, wsSummary2, "Ringkasan Tunai");
 
     XLSX.writeFile(wb, `nands-boutique-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);

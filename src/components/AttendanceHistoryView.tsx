@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
 import type { AttendanceRecord, Employee } from "../data/types";
 import type { RoleConfig } from "../data/roles";
 import { getRoleLabel } from "../data/roles";
@@ -14,7 +15,16 @@ const fmtDate = (d: string) => {
   return `${day}-${m}-${y}`;
 };
 
-const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "").slice(0, 5) > (openHour || "08:00");
+const padHM = (t: string): string => {
+  const m = String(t ?? "").match(/(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+};
+
+const isLateFor = (clockIn: string, openHour?: string) => {
+  const a = padHM(clockIn);
+  if (!a) return false;
+  return a > (padHM(openHour ?? "") || "08:00");
+};
 
 interface Props {
   records: AttendanceRecord[];
@@ -86,7 +96,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       "Status": r.clockOut ? (isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : "Hadir") : r.date < todayISO() ? "Tidak Catat Pulang" : "Menunggu Pulang",
       "Catatan": r.note ?? "",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Absensi");
     XLSX.writeFile(wb, `nands-boutique-absensi-${new Date().toISOString().slice(0, 10)}.xlsx`);

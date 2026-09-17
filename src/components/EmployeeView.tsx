@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
+import { validateImageFile } from "../lib/imageFile";
 import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
@@ -77,7 +79,8 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { showToast("File harus berupa gambar"); return; }
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr, false); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       setEditing(prev => prev ? { ...prev, photo: ev.target?.result as string } : null);
@@ -177,7 +180,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       "Gaji": e.salary,
       "Status": e.status === "active" ? "Aktif" : "Tidak Aktif",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Karyawan");
     XLSX.writeFile(wb, `nands-boutique-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -196,24 +199,30 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws) as any[];
 
-        const imported: Employee[] = rows.map((row: any) => {
+        const imported: Employee[] = rows.map((row: any): Employee => {
           const storeMatch = stores.find(s => s.name === row["Toko"]);
           const jabatan = String(row["Jabatan"] ?? "").trim();
           const labelToKey = new Map(roleOptions.map(([k, c]) => [c.label, k]));
           const roleKey = labelToKey.get(jabatan) ?? allRoleByLabel(jabatan) ?? "staff";
+          const rawName = String(row["Nama"] ?? "").trim().slice(0, 80);
+          const rawEmail = String(row["Email"] ?? "").trim().slice(0, 120);
+          const rawPhone = String(row["No. HP"] ?? "").trim().slice(0, 25);
+          const rawId = String(row["ID"] ?? "").replace(/[^\w.-]/g, "").slice(0, 64);
+          const rawJoin = String(row["Tanggal Bergabung"] ?? "").trim().slice(0, 10);
+          const salary = Math.min(Math.max(Number(row["Gaji"]) || 0, 0), 1000000000000);
           return {
-            id: row["ID"] || `e-${Date.now()}-${Math.random()}`,
-            name: row["Nama"] || "",
+            id: rawId || `e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: rawName,
             role: roleKey,
             storeId: storeMatch?.id ?? "s1",
-            phone: row["No. HP"] || "",
-            email: row["Email"] || "",
-            joinDate: row["Tanggal Bergabung"] || "",
-            salary: Number(row["Gaji"]) || 0,
+            phone: /^[+\d][\d\s()-]{5,}$/.test(rawPhone) ? rawPhone : "",
+            email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : "",
+            joinDate: /^\d{4}-\d{2}-\d{2}$/.test(rawJoin) ? rawJoin : "",
+            salary,
             status: row["Status"] === "Aktif" ? "active" : "inactive",
             pin: /^\d{4}$/.test(String(row["PIN"] ?? "").trim()) ? String(row["PIN"]).trim() : "",
           };
-        });
+        }).filter(imp => imp.name.length > 0);
 
         void (async () => {
           const merged = [...employees];
@@ -230,7 +239,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             }
           }
           onSave(merged);
-          showToast(`${rows.length} karyawan berhasil diimpor`);
+          showToast(`${imported.length} karyawan berhasil diimpor`);
         })();
       } catch {
         showToast("Gagal membaca file Excel");

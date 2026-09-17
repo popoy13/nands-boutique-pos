@@ -1,5 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
+import { validateImageFile } from "../lib/imageFile";
 import type { Expense } from "../data/types";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
@@ -78,6 +80,8 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr); return; }
     const reader = new FileReader();
     reader.onload = () => setEditing(prev => prev ? { ...prev, photo: String(reader.result) } : null);
     reader.readAsDataURL(file);
@@ -114,7 +118,7 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
       "Dibuat Oleh": e.createdByName ?? "",
       "Bukti Foto": e.photo ? "Ada" : "-",
     })).sort((a, b) => String(a.Tanggal).localeCompare(String(b.Tanggal)) * -1);
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pengeluaran");
     XLSX.writeFile(wb, `nands-boutique-pengeluaran-${new Date().toISOString().slice(0, 10)}.xlsx`);

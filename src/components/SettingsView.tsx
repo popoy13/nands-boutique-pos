@@ -4,6 +4,7 @@ import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings }
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
+import { validateImageFile } from "../lib/imageFile";
 import { assetUrl } from "../lib/assets";
 import type { ResetResult } from "../data/sync";
 
@@ -463,6 +464,8 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
                     try {
                       const dataUrl = await compressImage(file, 320, 0.8);
                       setDraftPrinter(p => ({ ...p, receiptLogo: dataUrl }));
@@ -969,6 +972,8 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
                     try {
                       const dataUrl = await compressImage(file, 512, 0.82);
                       setDraftBrand(b => ({ ...b, logo: dataUrl }));
@@ -1009,6 +1014,8 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const imgErr = validateImageFile(file);
+                    if (imgErr) { showToast(imgErr, false); e.target.value = ""; return; }
                     try {
                       const dataUrl = await compressImage(file, 1024, 0.85);
                       setDraftBrand(b => ({ ...b, loadingImage: dataUrl }));

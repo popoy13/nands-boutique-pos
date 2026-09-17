@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { safeRows } from "../lib/safeExport";
 import type { Product } from "../data/types";
 import type { Category } from "../data/sync";
 import Pagination from "./Pagination";
@@ -78,7 +79,7 @@ export default function StockView({ products, stores, categories, activeStore, o
         rows.push(row);
       });
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(safeRows(rows));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stok Produk");
     XLSX.writeFile(wb, `nands-boutique-stok-${new Date().toISOString().slice(0, 10)}.xlsx`);

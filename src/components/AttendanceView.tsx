@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AttendanceRecord, Employee } from "../data/types";
 import { compressImage } from "../lib/compressImage";
+import { validateImageFile } from "../lib/imageFile";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
 
@@ -25,7 +26,16 @@ const fmtTime = () => {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
-const isLateFor = (clockIn: string, openHour?: string) => (clockIn || "").slice(0, 5) > (openHour || "08:00");
+const padHM = (t: string): string => {
+  const m = String(t ?? "").match(/(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+};
+
+const isLateFor = (clockIn: string, openHour?: string) => {
+  const a = padHM(clockIn);
+  if (!a) return false;
+  return a > (padHM(openHour ?? "") || "08:00");
+};
 
 function CameraCapture({ onCapture, onNeedFallback }: { onCapture: (dataUrl: string) => void; onNeedFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -128,12 +138,13 @@ export default function AttendanceView({ records, stores, employees, currentUser
   const liveTime = now.toLocaleTimeString("en-GB", { hour12: false });
 
   const todayStr = todayISO();
-  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr);
+  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { showToast("File harus berupa gambar"); return; }
+    const fileErr = validateImageFile(file);
+    if (fileErr) { showToast(fileErr); return; }
     try {
       const compressed = await compressImage(file);
       setPhoto(compressed);

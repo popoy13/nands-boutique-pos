@@ -28,6 +28,7 @@ import { defaultSettings } from "./data/settings";
 import type { BrandSettings } from "./data/settings";
 import { assetUrl } from "./lib/assets";
 import { hashPin, isHashedPin } from "./lib/auth";
+import { checkForAppUpdate, type AppUpdate } from "./lib/appUpdate";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -75,6 +76,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [brandCache] = useState(loadBrandCache);
+  const [availableUpdate, setAvailableUpdate] = useState<AppUpdate | null>(null);
   const page = menu;
   const [activeStore, setActiveStore] = useState(() => {
     try { return localStorage.getItem("nands-active-store") || "s1"; } catch { return "s1"; }
@@ -88,6 +90,11 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     if (!ready) return;
     try { localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(settings.brand)); } catch { /* ignore */ }
   }, [ready, settings.brand]);
+
+  useEffect(() => {
+    if (!ready) return;
+    void checkForAppUpdate().then(setAvailableUpdate);
+  }, [ready]);
 
   // Restore session dari {id} saja (tanpa PIN tersimpan),
   // validasi terhadap data karyawan terkini + batas sesi.
@@ -423,7 +430,24 @@ const canDepositBank = has("deposit", "bank");
   const safeTab = allowed.includes(page) ? page : allowed[0];
 
   return (
-    <div className="flex flex-col md:flex-row h-full overflow-hidden" style={{ background: "var(--background)" }}>
+    <div className="relative flex flex-col md:flex-row h-full overflow-hidden" style={{ background: "var(--background)" }}>
+      {availableUpdate && (
+        <div className="absolute top-3 left-3 right-3 md:left-auto md:right-5 md:w-96 z-[55] rounded-2xl p-4 shadow-xl" style={{ background: "var(--card)", border: "1px solid var(--accent)" }}>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(124,58,237,0.12)", color: "var(--accent)" }}>
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold">Pembaruan tersedia</div>
+              <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Versi {availableUpdate.version} siap diunduh. Setelah selesai, buka APK dan tekan Install.</div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => { window.location.href = availableUpdate.apkUrl; }} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--accent)" }}>Unduh update</button>
+                <button onClick={() => setAvailableUpdate(null)} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--muted)" }}>Nanti</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <Sidebar
         activeTab={safeTab}
         activeStore={activeStore}

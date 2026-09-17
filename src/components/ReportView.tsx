@@ -85,6 +85,19 @@ export default function ReportView({ transactions, deletedTransactions, expenses
 
   const expenseTotal = filteredExpenses.reduce((s, e) => s + e.amount, 0);
 
+  const weekStats = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 6);
+    const end = new Date(); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 1);
+    const weekTx = filtered.filter(t => t.date >= start && t.date < end);
+    const weekExp = filteredExpenses.filter(e => {
+      const d = new Date(`${String(e.date ?? "").slice(0, 10)}T00:00:00`);
+      return d >= start && d < end;
+    });
+    const revenue = weekTx.reduce((s, t) => s + t.total, 0);
+    const expense = weekExp.reduce((s, e) => s + e.amount, 0);
+    return { revenue, count: weekTx.length, expense, net: revenue - expense };
+  }, [filtered, filteredExpenses]);
+
   const cashStats = useMemo(() => {
     const today = todayISO();
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -109,6 +122,8 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       itemsSold: filtered.reduce((s, t) => s + t.items.reduce((a, i) => a + i.quantity, 0), 0),
     };
   }, [filtered]);
+
+  const periodNet = stats.revenue - expenseTotal;
 
   // Daily buckets for chart — align with selected period/custom range
   // (daily bars for <= 31 days, weekly bars otherwise)
@@ -187,12 +202,13 @@ export default function ReportView({ transactions, deletedTransactions, expenses
   }, [filtered]);
 
   const storeBreakdown = useMemo(() =>
-    stores.map(s => ({
-      ...s,
-      revenue: filtered.filter(t => t.storeId === s.id).reduce((sum, t) => sum + t.total, 0),
-      count: filtered.filter(t => t.storeId === s.id).length,
-    })).sort((a, b) => b.revenue - a.revenue),
-  [filtered, stores]);
+    stores.map(s => {
+      const stx = filtered.filter(t => t.storeId === s.id);
+      const revenue = stx.reduce((sum, t) => sum + t.total, 0);
+      const expense = filteredExpenses.filter(e => e.storeId === s.id).reduce((sum, e) => sum + e.amount, 0);
+      return { ...s, revenue, expense, net: revenue - expense, count: stx.length };
+    }).sort((a, b) => b.revenue - a.revenue),
+  [filtered, filteredExpenses, stores]);
 
   const storeBreakdownMax = storeBreakdown[0]?.revenue ?? 0;
 
@@ -219,6 +235,9 @@ export default function ReportView({ transactions, deletedTransactions, expenses
 
   const statCards = [
     { label: "Total Pendapatan", value: fmt(stats.revenue), sub: `${stats.count} transaksi`, color: "var(--accent)" },
+    { label: "Bersih Periode", value: fmt(periodNet), sub: `Pendapatan − Pengeluaran ${fmt(expenseTotal)}`, color: "#16a34a" },
+    { label: "Minggu Ini", value: fmt(weekStats.revenue), sub: `${weekStats.count} transaksi · Pglr ${fmt(weekStats.expense)}`, color: "#3b82f6" },
+    { label: "Bersih Minggu Ini", value: fmt(weekStats.net), sub: `Pendapatan − Pengeluaran 7 hari`, color: "#0d9488" },
     { label: "Hari Ini", value: fmt(stats.todayRevenue), sub: `${stats.todayCount} transaksi`, color: "#16a34a" },
     { label: "Tunai Bersih Hari Ini", value: fmt(cashStats.netCashToday), sub: `Tunai ${fmt(cashStats.todayCash)} − Pengeluaran ${fmt(cashStats.todayExpense)}`, color: "#0d9488" },
     { label: "Pengeluaran", value: fmt(expenseTotal), sub: `${filteredExpenses.length} catatan`, color: "#db2777" },
@@ -299,7 +318,16 @@ export default function ReportView({ transactions, deletedTransactions, expenses
       XLSX.utils.book_append_sheet(wb, wsExpenses, "Pengeluaran");
     }
 
-    const wsSummary2 = XLSX.utils.json_to_sheet([{ "Total Pengeluaran": expenseTotal, "Pendapatan Tunai Hari Ini": cashStats.todayCash, "Pengeluaran Hari Ini": cashStats.todayExpense, "Tunai Bersih Hari Ini": cashStats.netCashToday }]);
+    const wsSummary2 = XLSX.utils.json_to_sheet([{
+      "Total Pengeluaran": expenseTotal,
+      "Bersih Periode": periodNet,
+      "Pendapatan Minggu Ini": weekStats.revenue,
+      "Pengeluaran Minggu Ini": weekStats.expense,
+      "Bersih Minggu Ini": weekStats.net,
+      "Pendapatan Tunai Hari Ini": cashStats.todayCash,
+      "Pengeluaran Hari Ini": cashStats.todayExpense,
+      "Tunai Bersih Hari Ini": cashStats.netCashToday,
+    }]);
     XLSX.utils.book_append_sheet(wb, wsSummary2, "Ringkasan Tunai");
 
     XLSX.writeFile(wb, `nands-boutique-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -434,7 +462,9 @@ export default function ReportView({ transactions, deletedTransactions, expenses
                 <div className="w-full h-1.5 rounded-full mb-1" style={{ background: "var(--muted)" }}>
                   <div className="h-1.5 rounded-full" style={{ width: `${storeBreakdownMax > 0 ? (s.revenue / storeBreakdownMax) * 100 : 0}%`, background: i === 0 ? "#7c3aed" : i === 1 ? "#3b82f6" : "#7c3aed" }} />
                 </div>
-                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{s.count} transaksi</div>
+                <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  {s.count} transaksi · Pglr {fmt(s.expense)} · Bersih <b style={{ color: s.net >= 0 ? "#16a34a" : "#db2777" }}>{fmt(s.net)}</b>
+                </div>
               </div>
             ))}
           </div>

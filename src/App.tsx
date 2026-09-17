@@ -451,7 +451,7 @@ const canExpenseDelete = has("expense", "delete");
           />
         )}
         {safeTab === "report" && (
-          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} />
+          <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} expenses={expenses} />
         )}
         {safeTab === "inventory" && (
           <StockView
@@ -546,6 +546,8 @@ const canExpenseDelete = has("expense", "delete");
           <ExpenseView
             expenses={expenses}
             stores={stores}
+            employees={employees}
+            currentUser={currentUser}
             onSave={setExpenses}
             canAdd={canExpenseAdd}
             canEdit={canExpenseEdit}

@@ -1,7 +1,9 @@
 ﻿import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import type { Transaction, DeletedTransaction } from "../data/types";
+import type { Transaction, DeletedTransaction, Expense } from "../data/types";
 import type { PaymentSettings } from "../data/settings";
+import { todayISO } from "../lib/dates";
+import { assetUrl } from "../lib/assets";
 import DateRangeFilter from "./DateRangeFilter";
 
 const fmt = (n: number) =>
@@ -21,13 +23,14 @@ const fmtK = (n: number) => {
 interface Props {
   transactions: Transaction[];
   deletedTransactions: DeletedTransaction[];
+  expenses: Expense[];
   stores: { id: string; name: string }[];
   payments?: PaymentSettings;
 }
 
 const PAY_COLORS = ["#7c3aed", "#3b82f6", "#0d9488", "#ea580c", "#db2777", "#ca8a04", "#16a34a", "#4f46e5"];
 
-export default function ReportView({ transactions, deletedTransactions, stores, payments }: Props) {
+export default function ReportView({ transactions, deletedTransactions, expenses = [], stores, payments }: Props) {
   const [filterStore, setFilterStore] = useState("all");
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("7d");
   const [dateFrom, setDateFrom] = useState("");
@@ -63,6 +66,36 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
       return true;
     });
   }, [deletedTransactions, filterStore, period, dateFrom, dateTo, customRange]);
+
+  const filteredExpenses = useMemo(() => {
+    const now = new Date();
+    const cutoff = period === "7d" ? new Date(now.getTime() - 7 * 86400000)
+      : period === "30d" ? new Date(now.getTime() - 30 * 86400000)
+      : new Date(0);
+    const cutoffISO = cutoff.toLocaleDateString("en-CA");
+    return expenses.filter(e => {
+      if (filterStore !== "all" && e.storeId !== filterStore) return false;
+      const day = String(e.date ?? "").slice(0, 10);
+      if (!customRange && day < cutoffISO) return false;
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      return true;
+    });
+  }, [expenses, filterStore, period, dateFrom, dateTo, customRange]);
+
+  const expenseTotal = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+
+  const cashStats = useMemo(() => {
+    const today = todayISO();
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayCash = filtered
+      .filter(t => t.paymentMethod === "cash" && t.date >= todayStart)
+      .reduce((s, t) => s + t.total, 0);
+    const todayExpense = filteredExpenses
+      .filter(e => String(e.date ?? "").slice(0, 10) === today)
+      .reduce((s, e) => s + e.amount, 0);
+    return { todayCash, todayExpense, netCashToday: todayCash - todayExpense };
+  }, [filtered, filteredExpenses]);
 
   const stats = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -130,9 +163,15 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
     }
     return buckets.map(b => {
       const dayTx = filtered.filter(t => t.date >= b.start && t.date < b.end);
-      return { label: b.label, revenue: dayTx.reduce((s, t) => s + t.total, 0), count: dayTx.length };
+      const dayExp = filteredExpenses.filter(e => {
+        const dt = new Date(`${String(e.date ?? "").slice(0, 10)}T00:00:00`);
+        return dt >= b.start && dt < b.end;
+      });
+      const revenue = dayTx.reduce((s, t) => s + t.total, 0);
+      const expense = dayExp.reduce((s, e) => s + e.amount, 0);
+      return { label: b.label, revenue, expense, netCash: revenue - expense, count: dayTx.length };
     });
-  }, [filtered, period, dateFrom, dateTo, customRange]);
+  }, [filtered, filteredExpenses, period, dateFrom, dateTo, customRange]);
 
   const maxRevenue = Math.max(...dailyData.map(d => d.revenue), 1);
 
@@ -181,6 +220,8 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
   const statCards = [
     { label: "Total Pendapatan", value: fmt(stats.revenue), sub: `${stats.count} transaksi`, color: "var(--accent)" },
     { label: "Hari Ini", value: fmt(stats.todayRevenue), sub: `${stats.todayCount} transaksi`, color: "#16a34a" },
+    { label: "Tunai Bersih Hari Ini", value: fmt(cashStats.netCashToday), sub: `Tunai ${fmt(cashStats.todayCash)} − Pengeluaran ${fmt(cashStats.todayExpense)}`, color: "#0d9488" },
+    { label: "Pengeluaran", value: fmt(expenseTotal), sub: `${filteredExpenses.length} catatan`, color: "#db2777" },
     { label: "Rata-rata Transaksi", value: fmt(Math.round(stats.avg)), sub: "per transaksi", color: "#3b82f6" },
     { label: "Item Terjual", value: stats.itemsSold.toString(), sub: "pcs produk", color: "#7c3aed" },
     { label: "Transaksi Dihapus", value: filteredDeleted.length.toString(), sub: `Nominal ${fmt(filteredDeleted.reduce((s, d) => s + (d.transaction?.total ?? 0), 0))}`, color: "#ef4444" },
@@ -192,7 +233,7 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
   };
 
   const handleExport = () => {
-    if (filtered.length === 0 && filteredDeleted.length === 0) return;
+    if (filtered.length === 0 && filteredDeleted.length === 0 && filteredExpenses.length === 0) return;
 
     const fmtPick = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-";
     const periodLabel = customRange
@@ -244,6 +285,22 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
       const wsDeleted = XLSX.utils.json_to_sheet(deletedRows);
       XLSX.utils.book_append_sheet(wb, wsDeleted, "Transaksi Dihapus");
     }
+
+    if (filteredExpenses.length > 0) {
+      const expenseRows = filteredExpenses.map(e => ({
+        "Tanggal": String(e.date ?? "").slice(0, 10),
+        "Toko": (e.storeName ?? "").replace("NAND'S BOUTIQUE - ", ""),
+        "Jumlah": e.amount,
+        "Keterangan": e.description ?? "",
+        "Dibuat Oleh": e.createdByName ?? "",
+        "Bukti Foto": e.photo ? "Ada" : "-",
+      }));
+      const wsExpenses = XLSX.utils.json_to_sheet(expenseRows);
+      XLSX.utils.book_append_sheet(wb, wsExpenses, "Pengeluaran");
+    }
+
+    const wsSummary2 = XLSX.utils.json_to_sheet([{ "Total Pengeluaran": expenseTotal, "Pendapatan Tunai Hari Ini": cashStats.todayCash, "Pengeluaran Hari Ini": cashStats.todayExpense, "Tunai Bersih Hari Ini": cashStats.netCashToday }]);
+    XLSX.utils.book_append_sheet(wb, wsSummary2, "Ringkasan Tunai");
 
     XLSX.writeFile(wb, `nands-boutique-laporan-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
@@ -303,7 +360,7 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
                 )}
                 <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{ height: d.revenue > 0 ? `${Math.max(3, (d.revenue / maxRevenue) * 100)}px` : "2px", background: d.revenue > 0 ? "var(--accent)" : "var(--muted)", opacity: d.revenue > 0 ? 1 : 0.35 }}>
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" style={{ background: "var(--foreground)", fontSize: 10 }}>
-                    {fmt(d.revenue)}<br />{d.count} trx
+                    {fmt(d.revenue)}<br />{d.count} trx<br />Pengeluaran {fmt(d.expense)}<br />Bersih <b>{fmt(d.netCash)}</b>
                   </div>
                 </div>
                 {dailyData.length <= 14 && (
@@ -420,6 +477,49 @@ export default function ReportView({ transactions, deletedTransactions, stores, 
                     <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#ef4444" }}>{fmt(d.transaction?.total ?? 0)}</div>
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>oleh {d.deletedBy}</div>
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{fmtDateSafe(d.deletedAt)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    {/* Pengeluaran */}
+      <div className="p-5 rounded-2xl mt-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }}>Pengeluaran</div>
+          <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span>{filteredExpenses.length} catatan</span>
+            <span className="font-mono font-semibold" style={{ color: "#db2777", fontFamily: "'JetBrains Mono', monospace" }}>
+              Total {fmt(expenseTotal)}
+            </span>
+          </div>
+        </div>
+        {filteredExpenses.length === 0 ? (
+          <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada pengeluaran pada periode ini</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {[...filteredExpenses].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? ""))).map(e => (
+              <div key={e.id} className="p-3 rounded-xl" style={{ background: "var(--background)" }}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase" style={{ background: "#fdf2f8", color: "#db2777" }}>Pengeluaran</span>
+                      <span className="text-sm">{String(e.date ?? "").slice(0, 10)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#f3f4f6", color: "#6b7280" }}>{(e.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")}</span>
+                    </div>
+                    {e.description && (
+                      <div className="text-xs mt-1.5" style={{ color: "var(--muted-foreground)" }}>{e.description}</div>
+                    )}
+                    {e.createdByName && (
+                      <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Oleh {e.createdByName}</div>
+                    )}
+                    {e.photo && (
+                      <img src={assetUrl(e.photo)} alt="Bukti" className="mt-2 w-12 h-12 rounded-lg object-cover" style={{ border: "1px solid var(--border)" }} />
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#db2777" }}>{fmt(e.amount)}</div>
                   </div>
                 </div>
               </div>

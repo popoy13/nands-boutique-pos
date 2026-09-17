@@ -7,6 +7,7 @@ import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
 import { assetUrl } from "../lib/assets";
+import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -51,6 +52,8 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!editing) return;
@@ -95,6 +98,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
     (filterRole === "all" || e.role === filterRole) &&
     (e.name.toLowerCase().includes(search.toLowerCase()) || (e.email ?? "").toLowerCase().includes(search.toLowerCase()))
   );
+
+  const resetPage = () => setPage(1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSaveEmployee = async () => {
     if (savingRef.current) return;
@@ -508,15 +516,15 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
           <div className="flex gap-2 flex-wrap">
             <div className="relative" style={{ minWidth: 180 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input type="text" placeholder="Cari nama atau email..." value={search} onChange={e => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari nama atau email..." value={search} onChange={e => { setSearch(e.target.value); resetPage(); }}
                 className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }} />
             </div>
-            <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
+            <select value={filterStore} onChange={e => { setFilterStore(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+            <select value={filterRole} onChange={e => { setFilterRole(e.target.value); resetPage(); }}
               className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <option value="all">Semua Jabatan</option>
               {roleOptions.map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
@@ -529,7 +537,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada karyawan ditemukan</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {filtered.map(emp => (
+              {pageItems.map(emp => (
                 <div
                   key={emp.id}
                   className="p-4 rounded-xl flex items-center gap-4 transition-all"
@@ -603,6 +611,15 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             </div>
           )}
         </div>
+
+        <Pagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          rowLabel="karyawan"
+        />
       </div>
 
       {/* Edit Panel - desktop */}

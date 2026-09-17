@@ -586,11 +586,16 @@ export const expensesFromSettings = (
 
 export async function deleteExpense(id: string): Promise<void> {
   if (!id) return
-  const { error } = await supabase
-    .from("expenses")
-    .delete()
-    .eq("id", id)
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "expenses")
+    .maybeSingle()
   if (error) throw error
+  const rows = Array.isArray(data?.value)
+    ? (data.value as Record<string, unknown>[]).filter((row) => s(row.id) !== id)
+    : []
+  await saveExpensesJson(rows)
 }
 
 /* ---------------- cash deposits (setor tunai) ---------------- */
@@ -727,7 +732,6 @@ export async function loadAll(): Promise<LoadResult> {
       memR,
       discR,
       attR,
-      expR,
       depR,
       trxR,
       delR,
@@ -742,7 +746,6 @@ export async function loadAll(): Promise<LoadResult> {
       supabase.from("members").select("*"),
       supabase.from("discounts").select("*"),
       supabase.from("attendance_records").select("*"),
-      supabase.from("expenses").select("*"),
       supabase.from("cash_deposits").select("*"),
       supabase.from("transactions").select("*"),
       supabase.from("deleted_transactions").select("*"),
@@ -760,10 +763,7 @@ export async function loadAll(): Promise<LoadResult> {
     setCategoriesCache(catMap)
 
     const settingsRows = first(setR)
-    const expensesFromTable = expR.error ? [] : (expR.data ?? []).map(expFromDB)
-    const expenses = expensesFromTable.length
-      ? expensesFromTable
-      : expensesFromSettings(settingsRows)
+    const expenses = expensesFromSettings(settingsRows)
     const depoesFromTable = depR.error ? [] : (depR.data ?? []).map(depFromDB)
     const deposits = depoesFromTable.length
       ? depoesFromTable

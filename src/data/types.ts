@@ -151,5 +151,5 @@ export interface Expense {
   description: string;
   photo?: string;
   createdByName: string;
-  date: Date;
+  date: string;
 }

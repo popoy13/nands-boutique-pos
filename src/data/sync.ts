@@ -13,6 +13,7 @@ import type {
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
+import { isoDay } from "../lib/dates"
 
 /* ---------------- helpers ---------------- */
 
@@ -523,7 +524,7 @@ export const expFromDB = (r: Record<string, unknown>): Expense => ({
   description: s(r.description),
   photo: s(r.photo) || undefined,
   createdByName: s(r.created_by_name),
-  date: d(r.expense_date) ?? new Date(),
+  date: isoDay(d(r.expense_date) ?? new Date()),
 })
 
 export const expToDB = (x: Expense) => ({
@@ -534,8 +535,7 @@ export const expToDB = (x: Expense) => ({
   description: x.description,
   photo: x.photo ?? null,
   created_by_name: x.createdByName,
-  expense_date:
-    x.date instanceof Date ? x.date.toISOString() : String(x.date),
+  expense_date: x.date instanceof Date ? x.date.toISOString() : String(x.date),
 })
 
 export async function writeExpenses(

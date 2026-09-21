@@ -18,6 +18,7 @@ interface ChatMessage {
   latitude?: number | null;
   longitude?: number | null;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -44,6 +45,7 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
+  const [busyMessageId, setBusyMessageId] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set([currentUser.id]));
   const bottomRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -62,7 +64,15 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
         .limit(500);
       if (cancelled) return;
       if (loadError) setError(`Chat belum siap: ${loadError.message}. Jalankan database/chat.sql di Supabase.`);
-      else setMessages((data ?? []) as ChatMessage[]);
+      else {
+        const { data: deleted, error: deletedError } = await supabase
+          .from("chat_message_deletions")
+          .select("message_id")
+          .eq("employee_id", currentUser.id);
+        if (deletedError) setError(`Chat belum siap: ${deletedError.message}. Jalankan database/chat.sql di Supabase.`);
+        const deletedIds = new Set((deleted ?? []).map(row => String(row.message_id)));
+        setMessages((data ?? []).filter(row => !deletedIds.has(String(row.id))) as ChatMessage[]);
+      }
       setLoading(false);
       setTimeout(scrollToBottom, 50);
     };
@@ -76,6 +86,12 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, payload => {
         setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new as ChatMessage]);
         setTimeout(scrollToBottom, 50);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages" }, payload => {
+        setMessages(prev => prev.map(message => message.id === payload.new.id ? payload.new as ChatMessage : message));
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_message_deletions", filter: `employee_id=eq.${currentUser.id}` }, payload => {
+        setMessages(prev => prev.filter(message => message.id !== payload.new.message_id));
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState<{ user_id: string }>();
@@ -201,6 +217,39 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
     }, { enableHighAccuracy: true, timeout: 10000 });
   };
 
+  const recallMessage = async (message: ChatMessage) => {
+    if (message.sender_id !== currentUser.id || message.deleted_at) return;
+    if (!window.confirm("Tarik pesan ini untuk semua karyawan?")) return;
+    setBusyMessageId(message.id);
+    setError("");
+    const { data, error: recallError } = await supabase.from("chat_messages").update({
+      kind: "text",
+      body: "Pesan ditarik",
+      attachment_url: null,
+      attachment_name: null,
+      attachment_mime: null,
+      latitude: null,
+      longitude: null,
+      deleted_at: new Date().toISOString(),
+    }).eq("id", message.id).eq("sender_id", currentUser.id).select().single();
+    if (recallError) setError(`Pesan gagal ditarik: ${recallError.message}`);
+    else if (data) setMessages(prev => prev.map(item => item.id === message.id ? data as ChatMessage : item));
+    setBusyMessageId(null);
+  };
+
+  const deleteForMe = async (message: ChatMessage) => {
+    if (!window.confirm("Hapus pesan ini dari tampilan Anda?")) return;
+    setBusyMessageId(message.id);
+    setError("");
+    const { error: deleteError } = await supabase.from("chat_message_deletions").insert({
+      message_id: message.id,
+      employee_id: currentUser.id,
+    });
+    if (deleteError) setError(`Pesan gagal dihapus: ${deleteError.message}`);
+    else setMessages(prev => prev.filter(item => item.id !== message.id));
+    setBusyMessageId(null);
+  };
+
   const renderAttachment = (message: ChatMessage) => {
     if (!message.attachment_url) return null;
     if (message.kind === "image") return <img src={message.attachment_url} alt={message.attachment_name ?? "Foto"} className="max-w-full max-h-64 rounded-xl object-cover" />;
@@ -228,11 +277,17 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
               <div className={`max-w-[88%] md:max-w-[65%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
                 {!mine && <span className="text-[10px] font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>{message.sender_name}</span>}
                 <div className="rounded-2xl px-3 py-2 text-sm" style={{ background: mine ? "var(--accent)" : "var(--card)", color: mine ? "white" : "var(--foreground)", border: mine ? "none" : "1px solid var(--border)", borderBottomRightRadius: mine ? 5 : 18, borderBottomLeftRadius: mine ? 18 : 5 }}>
-                  {renderAttachment(message)}
-                  {message.body && <div className={message.attachment_url ? "mt-2" : ""}>{message.body}</div>}
-                  {message.kind === "location" && message.latitude != null && message.longitude != null && <a href={`https://www.google.com/maps?q=${message.latitude},${message.longitude}`} target="_blank" rel="noreferrer" className="underline text-xs">Buka di Google Maps</a>}
+                  {message.deleted_at ? <div className="italic opacity-75">Pesan ditarik</div> : <>
+                    {renderAttachment(message)}
+                    {message.body && <div className={message.attachment_url ? "mt-2" : ""}>{message.body}</div>}
+                    {message.kind === "location" && message.latitude != null && message.longitude != null && <a href={`https://www.google.com/maps?q=${message.latitude},${message.longitude}`} target="_blank" rel="noreferrer" className="underline text-xs">Buka di Google Maps</a>}
+                  </>}
                 </div>
                 <span className="text-[9px] mt-1" style={{ color: "var(--muted-foreground)" }}>{formatTime(message.created_at)}</span>
+                {mine && !message.deleted_at && <div className="flex gap-1 mt-1">
+                  <button onClick={() => void recallMessage(message)} disabled={busyMessageId === message.id} className="text-[10px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ color: "var(--accent)", background: "var(--secondary)" }}>Tarik</button>
+                  <button onClick={() => void deleteForMe(message)} disabled={busyMessageId === message.id} className="text-[10px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus</button>
+                </div>}
               </div>
             </div>
           </div>;

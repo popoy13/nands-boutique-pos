@@ -46,6 +46,7 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
   const [busyMessageId, setBusyMessageId] = useState<string | null>(null);
+  const [openMessageMenu, setOpenMessageMenu] = useState<string | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set([currentUser.id]));
   const bottomRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -284,9 +285,12 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
                   </>}
                 </div>
                 <span className="text-[9px] mt-1" style={{ color: "var(--muted-foreground)" }}>{formatTime(message.created_at)}</span>
-                {mine && !message.deleted_at && <div className="flex gap-1 mt-1">
-                  <button onClick={() => void recallMessage(message)} disabled={busyMessageId === message.id} className="text-[10px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ color: "var(--accent)", background: "var(--secondary)" }}>Tarik</button>
-                  <button onClick={() => void deleteForMe(message)} disabled={busyMessageId === message.id} className="text-[10px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus</button>
+                {mine && <div className="relative mt-1">
+                  <button onClick={() => setOpenMessageMenu(openMessageMenu === message.id ? null : message.id)} disabled={busyMessageId === message.id} className="w-7 h-6 rounded-lg flex items-center justify-center disabled:opacity-50" style={{ color: "var(--muted-foreground)", background: "var(--secondary)" }} title="Aksi pesan">•••</button>
+                  {openMessageMenu === message.id && <div className="absolute right-0 bottom-7 z-10 min-w-32 rounded-xl p-1 shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    {!message.deleted_at && <button onClick={() => { setOpenMessageMenu(null); void recallMessage(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "var(--accent)" }}>Tarik untuk semua</button>}
+                    <button onClick={() => { setOpenMessageMenu(null); void deleteForMe(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "#dc2626" }}>Hapus dari saya</button>
+                  </div>}
                 </div>}
               </div>
             </div>

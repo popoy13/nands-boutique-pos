@@ -55,6 +55,12 @@ create policy "chat_attachments_insert" on storage.objects
 do $$
 begin
   alter publication supabase_realtime add table public.chat_messages;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
   alter publication supabase_realtime add table public.chat_message_deletions;
 exception
   when duplicate_object then null;

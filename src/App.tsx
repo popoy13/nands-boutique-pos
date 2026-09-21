@@ -30,6 +30,8 @@ import type { BrandSettings } from "./data/settings";
 import { assetUrl } from "./lib/assets";
 import { hashPin, isHashedPin } from "./lib/auth";
 import { checkForAppUpdate, type AppUpdate } from "./lib/appUpdate";
+import { notifyUser, requestNotificationPermission } from "./lib/notifications";
+import { supabase } from "./lib/supabase";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -96,6 +98,22 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     if (!ready) return;
     void checkForAppUpdate().then(setAvailableUpdate);
   }, [ready]);
+
+  useEffect(() => {
+    if (!ready || !currentUser) return;
+    void requestNotificationPermission();
+    const channel = supabase.channel(`nands-notifications-${currentUser.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, payload => {
+        if (payload.new.sender_id === currentUser.id) return;
+        void notifyUser(`Chat dari ${payload.new.sender_name}`, payload.new.body || "Mengirim lampiran", "chat.html");
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "transactions" }, payload => {
+        if (payload.new.cashier_id === currentUser.id) return;
+        void notifyUser("Transaksi baru", `${payload.new.store_name || "Toko"} · Rp ${Number(payload.new.total || 0).toLocaleString("id-ID")}`, "transaksi.html");
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [ready, currentUser]);
 
   // Restore session dari {id} saja (tanpa PIN tersimpan),
   // validasi terhadap data karyawan terkini + batas sesi.

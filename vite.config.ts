@@ -38,6 +38,15 @@ export default defineConfig(({ mode }) => {
       minify: !emitSourcemaps,
       rollupOptions: {
         input: MENU_PAGE_FILES,
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('@supabase')) return 'vendor-supabase'
+            if (id.includes('xlsx')) return 'vendor-spreadsheets'
+            if (id.includes('react')) return 'vendor-react'
+            return 'vendor'
+          },
+        },
       },
     },
     plugins: [
@@ -148,6 +157,10 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
         result = replaceHtmlCommentSlot(result, 'figma:body-end', bodyEnd)
 
         const tags: HtmlTagDescriptor[] = []
+        tags.push(
+          { tag: 'link', attrs: { rel: 'preconnect', href: 'https://tbvutqehssdwyqescteb.supabase.co' }, injectTo: 'head' },
+          { tag: 'link', attrs: { rel: 'dns-prefetch', href: 'https://tbvutqehssdwyqescteb.supabase.co' }, injectTo: 'head' },
+        )
         if (description) {
           tags.push({ tag: 'meta', attrs: { name: 'description', content: description }, injectTo: 'head' })
         }

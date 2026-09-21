@@ -157,6 +157,11 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
         result = replaceHtmlCommentSlot(result, 'figma:body-end', bodyEnd)
 
         const tags: HtmlTagDescriptor[] = []
+        tags.push({
+          tag: 'link',
+          attrs: { rel: 'manifest', href: './manifest.webmanifest' },
+          injectTo: 'head',
+        })
         tags.push(
           { tag: 'link', attrs: { rel: 'preconnect', href: 'https://tbvutqehssdwyqescteb.supabase.co' }, injectTo: 'head' },
           { tag: 'link', attrs: { rel: 'dns-prefetch', href: 'https://tbvutqehssdwyqescteb.supabase.co' }, injectTo: 'head' },

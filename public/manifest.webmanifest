@@ -1,0 +1,25 @@
+{
+  "name": "NANDS Boutique POS",
+  "short_name": "NANDS POS",
+  "description": "Aplikasi kasir dan manajemen toko NANDS Boutique",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#7c3aed",
+  "background_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "./favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

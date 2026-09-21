@@ -37,7 +37,19 @@ const icon = (kind: MessageKind) => {
   return "";
 };
 
-export default function ChatView({ currentUser, employees, canDeleteAll = false }: { currentUser: Employee; employees: Employee[]; canDeleteAll?: boolean }) {
+export default function ChatView({
+  currentUser,
+  employees,
+  canDeleteAll = false,
+  canRecallAll = false,
+  canDeleteForMe = false,
+}: {
+  currentUser: Employee;
+  employees: Employee[];
+  canDeleteAll?: boolean;
+  canRecallAll?: boolean;
+  canDeleteForMe?: boolean;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -277,7 +289,7 @@ export default function ChatView({ currentUser, employees, canDeleteAll = false 
 
   const bulkDeleteForMe = async () => {
     const ids = [...selectedMessageIds];
-    if (!ids.length || !window.confirm(`Hapus ${ids.length} pesan dari tampilan Anda?`)) return;
+    if (!canDeleteForMe || !ids.length || !window.confirm(`Hapus ${ids.length} pesan dari tampilan Anda?`)) return;
     setBulkDeleting(true);
     setError("");
     const rows = ids.map(messageId => ({ message_id: messageId, employee_id: currentUser.id }));
@@ -292,7 +304,7 @@ export default function ChatView({ currentUser, employees, canDeleteAll = false 
 
   const bulkDeleteForEveryone = async () => {
     const ids = [...selectedMessageIds];
-    if (!ids.length || !window.confirm(`Tarik ${ids.length} pesan untuk semua karyawan?`)) return;
+    if (!canRecallAll || !ids.length || !window.confirm(`Tarik ${ids.length} pesan untuk semua karyawan?`)) return;
     setBulkDeleting(true);
     setError("");
     const { data, error: recallError } = await supabase.from("chat_messages").update({
@@ -359,8 +371,8 @@ export default function ChatView({ currentUser, employees, canDeleteAll = false 
           {selectedMessageIds.size === messages.length && messages.length > 0 ? "Batal pilih semua" : "Pilih semua"}
         </button>
         <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>{selectedMessageIds.size} pesan dipilih</span>
-        <button onClick={() => void bulkDeleteForMe()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus dari saya</button>
-        {canDeleteAll && <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Hapus untuk semua</button>}
+        {canDeleteForMe && <button onClick={() => void bulkDeleteForMe()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus semua dari saya</button>}
+        {canRecallAll && <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Tarik semua pesan</button>}
       </div>}
       {error && <div className="mx-5 mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "#b91c1c", background: "#fee2e2" }}>{error}</div>}
       <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8">

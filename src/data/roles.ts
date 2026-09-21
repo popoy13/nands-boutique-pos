@@ -54,7 +54,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
-  chat: ["delete_all"],
+  chat: ["recall_all", "delete_for_me", "delete_all"],
   expense: ["add", "edit", "delete"],
   deposit: ["add", "edit", "delete", "bank"],
   product: ["export", "import", "bulk", "category", "size", "add", "edit", "delete"],
@@ -69,7 +69,11 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
-  chat: { delete_all: "Hapus semua data chat" },
+  chat: {
+    recall_all: "Tarik semua pesan",
+    delete_for_me: "Hapus semua dari saya",
+    delete_all: "Hapus semua data chat",
+  },
   expense: { add: "Tambah pengeluaran", edit: "Edit pengeluaran", delete: "Hapus pengeluaran" },
   deposit: { add: "Catat setor tunai", edit: "Edit setor tunai", delete: "Hapus setor tunai", bank: "Kelola daftar bank" },
   product: {
@@ -149,7 +153,10 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     out[key] = { ...DEFAULT_ROLES[key], permissions: { ...DEFAULT_ROLES[key].permissions } };
   }
   for (const [k, v] of Object.entries(roles ?? {})) {
-    let perms: Record<string, string[]> = { ...(v.permissions ?? {}) };
+    let perms: Record<string, string[]> = {
+      ...(DEFAULT_ROLES[k]?.permissions ?? {}),
+      ...(v.permissions ?? {}),
+    };
     const menus = v.menus ?? DEFAULT_ROLES[k]?.menus ?? [];
     // Migrasi: role yang punya akses Setelan otomatis mendapat tab setelan baru
     // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.

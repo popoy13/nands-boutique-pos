@@ -360,7 +360,7 @@ export default function ChatView({ currentUser, employees, canDeleteAll = false 
         </button>
         <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>{selectedMessageIds.size} pesan dipilih</span>
         <button onClick={() => void bulkDeleteForMe()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus dari saya</button>
-        <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Hapus untuk semua</button>
+        {canDeleteAll && <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Hapus untuk semua</button>}
       </div>}
       {error && <div className="mx-5 mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "#b91c1c", background: "#fee2e2" }}>{error}</div>}
       <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8">

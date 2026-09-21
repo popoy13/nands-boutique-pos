@@ -374,21 +374,23 @@ export default function ChatView({ currentUser, employees, canDeleteAll = false 
               {!mine && <Avatar src={message.sender_photo ?? undefined} name={message.sender_name} role="" className="w-8 h-8 text-[10px] shrink-0" />}
               <div className={`max-w-[88%] md:max-w-[65%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
                 {!mine && <span className="text-[10px] font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>{message.sender_name}</span>}
-                <div className="rounded-2xl px-3 py-2 text-sm" style={{ background: mine ? "var(--accent)" : "var(--card)", color: mine ? "white" : "var(--foreground)", border: mine ? "none" : "1px solid var(--border)", borderBottomRightRadius: mine ? 5 : 18, borderBottomLeftRadius: mine ? 18 : 5 }}>
-                  {message.deleted_at ? <div className="italic opacity-75">Pesan ditarik</div> : <>
-                    {renderAttachment(message)}
-                    {message.body && <div className={message.attachment_url ? "mt-2" : ""}>{message.body}</div>}
-                    {message.kind === "location" && message.latitude != null && message.longitude != null && <a href={`https://www.google.com/maps?q=${message.latitude},${message.longitude}`} target="_blank" rel="noreferrer" className="underline text-xs">Buka di Google Maps</a>}
-                  </>}
+                <div className={`flex items-end gap-1 ${mine ? "flex-row-reverse" : ""}`}>
+                  <div className="rounded-2xl px-3 py-2 text-sm" style={{ background: mine ? "var(--accent)" : "var(--card)", color: mine ? "white" : "var(--foreground)", border: mine ? "none" : "1px solid var(--border)", borderBottomRightRadius: mine ? 5 : 18, borderBottomLeftRadius: mine ? 18 : 5 }}>
+                    {message.deleted_at ? <div className="italic opacity-75">Pesan ditarik</div> : <>
+                      {renderAttachment(message)}
+                      {message.body && <div className={message.attachment_url ? "mt-2" : ""}>{message.body}</div>}
+                      {message.kind === "location" && message.latitude != null && message.longitude != null && <a href={`https://www.google.com/maps?q=${message.latitude},${message.longitude}`} target="_blank" rel="noreferrer" className="underline text-xs">Buka di Google Maps</a>}
+                    </>}
+                  </div>
+                  {mine && <div className="relative shrink-0">
+                    <button onClick={() => setOpenMessageMenu(openMessageMenu === message.id ? null : message.id)} disabled={busyMessageId === message.id} className="w-7 h-7 rounded-full flex items-center justify-center text-base leading-none disabled:opacity-50" style={{ color: "var(--muted-foreground)", background: "var(--secondary)" }} title="Aksi pesan" aria-label="Aksi pesan">⋮</button>
+                    {openMessageMenu === message.id && <div className="absolute right-0 bottom-8 z-10 min-w-40 rounded-xl p-1 shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                      {!message.deleted_at && <button onClick={() => { setOpenMessageMenu(null); void recallMessage(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "var(--accent)" }}>Tarik untuk semua</button>}
+                      <button onClick={() => { setOpenMessageMenu(null); void deleteForMe(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "#dc2626" }}>Hapus dari saya</button>
+                    </div>}
+                  </div>}
                 </div>
                 <span className="text-[9px] mt-1" style={{ color: "var(--muted-foreground)" }}>{formatTime(message.created_at)}</span>
-                {mine && <div className="relative mt-1">
-                  <button onClick={() => setOpenMessageMenu(openMessageMenu === message.id ? null : message.id)} disabled={busyMessageId === message.id} className="w-7 h-6 rounded-lg flex items-center justify-center disabled:opacity-50" style={{ color: "var(--muted-foreground)", background: "var(--secondary)" }} title="Aksi pesan">•••</button>
-                  {openMessageMenu === message.id && <div className="absolute right-0 bottom-7 z-10 min-w-32 rounded-xl p-1 shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                    {!message.deleted_at && <button onClick={() => { setOpenMessageMenu(null); void recallMessage(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "var(--accent)" }}>Tarik untuk semua</button>}
-                    <button onClick={() => { setOpenMessageMenu(null); void deleteForMe(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "#dc2626" }}>Hapus dari saya</button>
-                  </div>}
-                </div>}
               </div>
             </div>
           </div>;

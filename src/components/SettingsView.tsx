@@ -305,7 +305,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const toggleAction = (roleKey: string, menu: string, action: string) => {
     const cfg = draftRoles[roleKey];
     if (!cfg) return;
-    const locked = roleKey === "admin" && menu === "settings";
+    const locked = roleKey === "admin" && menu === "settings" && menu !== "chat";
     if (locked) return;
     const permissions = { ...(cfg.permissions ?? {}) };
     const acts = permissions[menu] ? [...permissions[menu]] : [...(ACTION_ITEMS[menu] ?? [])];
@@ -846,7 +846,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   {MENU_ITEMS.filter(m => draftRoles[editingRole].menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0).map(menu => {
                     const acts = draftRoles[editingRole].permissions?.[menu.id];
                     const actList = ACTION_ITEMS[menu.id];
-                    const locked = editingRole === "admin" && menu.id === "settings";
+                    const locked = editingRole === "admin" && menu.id === "settings" && menu.id !== "chat";
                     const enabledCount = actList.filter(a => acts?.includes(a) ?? true).length;
                     return (
                       <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", opacity: locked ? 0.7 : 1 }}>

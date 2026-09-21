@@ -25,15 +25,7 @@ const BUILTIN_COLORS: Record<string, string> = {
 };
 
 export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] => {
-  const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
-  if (role in DEFAULT_ROLES && !menus.includes("chat")) menus.push("chat");
-  // Migrasi: role yang punya akses Transaksi otomatis mendapat menu Pengeluaran.
-  if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
-  // Migrasi: role yang punya menu Pengeluaran otomatis mendapat menu Setor Tunai.
-  if (menus.includes("expense") && !menus.includes("deposit")) menus.push("deposit");
-  // Migrasi: role yang punya akses Absensi otomatis mendapat menu Riwayat Absensi.
-  if (menus.includes("attendance") && !menus.includes("attendanceHistory")) menus.push("attendanceHistory");
-  return menus;
+  return [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
 };
 
 export const getRoleLabel = (role: string, roles?: Record<string, RoleConfig>): string =>
@@ -158,39 +150,22 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
   }
   for (const [k, v] of Object.entries(roles ?? {})) {
     let perms: Record<string, string[]> = { ...(v.permissions ?? {}) };
-    const menus = k in DEFAULT_ROLES && DEFAULT_ROLES[k].menus.includes("chat")
-      ? [...new Set([...(v.menus ?? []), "chat"])]
-      : v.menus;
-    // Migrasi: role bawaan yang seharusnya bisa melihat absensi semua karyawan
-    // tetap mendapat aksi ini meski tersimpan di DB sebelum aksi tersebut ada.
-    if (k in DEFAULT_ROLES && DEFAULT_ROLES[k].permissions?.attendance?.includes("view_all")) {
-      perms.attendance = [...new Set([...(perms.attendance ?? []), "view_all"])];
-    }
+    const menus = v.menus ?? DEFAULT_ROLES[k]?.menus ?? [];
     // Migrasi: role yang punya akses Setelan otomatis mendapat tab setelan baru
     // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.
-    if (Array.isArray(perms.settings) && perms.settings.length > 0) {
-      perms.settings = [...new Set([...perms.settings, ...(ACTION_ITEMS.settings ?? [])])];
-    }
+    // Explicit role settings are authoritative; do not restore unchecked actions.
     // Migrasi: role yang punya aksi pengeluaran (add/delete) otomatis
     // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
-    if (Array.isArray(perms.expense) && perms.expense.length > 0) {
-      perms.expense = [...new Set([...perms.expense, "edit"])];
-    }
+    
     // Migrasi: role yang punya aksi setor tunai (add/delete) otomatis
     // mendapat aksi edit setor tunai walau tersimpan sebelum aksi ini ada.
-    if (Array.isArray(perms.deposit) && perms.deposit.length > 0) {
-      perms.deposit = [...new Set([...perms.deposit, "edit"])];
-    }
+    
     // Migrasi: role bawaan (mis. admin/manager) yang tersimpan sebelum menu Setor
     // Tunai ada otomatis mendapat aksi default setor tunai bila menunya tersedia.
-    if (k in DEFAULT_ROLES && (DEFAULT_ROLES[k].permissions?.deposit?.length ?? 0) > 0) {
-      perms.deposit = [...new Set([...(perms.deposit ?? []), ...(DEFAULT_ROLES[k].permissions?.deposit ?? [])])];
-    }
+    
     // Migrasi: role yang punya aksi kelola kategori produk otomatis mendapat
     // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.
-    if (Array.isArray(perms.product) && perms.product.includes("category")) {
-      perms.product = [...new Set([...perms.product, "size"])];
-    }
+    
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).
     if (!(k in DEFAULT_ROLES) && Array.isArray(v.menus)) {

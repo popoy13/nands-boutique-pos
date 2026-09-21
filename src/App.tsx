@@ -4,6 +4,7 @@ import Sidebar, { MobileBottomNav } from "./components/Sidebar";
 
 const POSView = lazy(() => import("./components/POSView"));
 const HistoryView = lazy(() => import("./components/HistoryView"));
+const ChatView = lazy(() => import("./components/ChatView"));
 const ReportView = lazy(() => import("./components/ReportView"));
 const StockView = lazy(() => import("./components/StockView"));
 const EmployeeView = lazy(() => import("./components/EmployeeView"));
@@ -495,6 +496,9 @@ const canDepositBank = has("deposit", "bank");
             payments={settings.payments}
             currentUser={currentUser}
           />
+        )}
+        {safeTab === "chat" && (
+          <ChatView currentUser={currentUser} employees={employees} />
         )}
         {safeTab === "report" && (
           <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} expenses={expenses} />

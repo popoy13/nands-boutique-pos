@@ -26,6 +26,7 @@ const BUILTIN_COLORS: Record<string, string> = {
 
 export const getAllowedMenus = (role: string, roles?: Record<string, RoleConfig>): string[] => {
   const menus = [...((roles?.[role] ?? DEFAULT_ROLES[role])?.menus ?? [])];
+  if (role in DEFAULT_ROLES && !menus.includes("chat")) menus.push("chat");
   // Migrasi: role yang punya akses Transaksi otomatis mendapat menu Pengeluaran.
   if (menus.includes("history") && !menus.includes("expense")) menus.push("expense");
   // Migrasi: role yang punya menu Pengeluaran otomatis mendapat menu Setor Tunai.
@@ -44,6 +45,7 @@ export const getRoleColor = (role: string, roles?: Record<string, RoleConfig>): 
 export const MENU_ITEMS: { id: string; label: string }[] = [
   { id: "pos", label: "Kasir" },
   { id: "history", label: "Transaksi" },
+  { id: "chat", label: "Chat Karyawan" },
   { id: "expense", label: "Pengeluaran" },
   { id: "deposit", label: "Setor Tunai" },
   { id: "report", label: "Laporan" },
@@ -154,6 +156,9 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
   }
   for (const [k, v] of Object.entries(roles ?? {})) {
     let perms: Record<string, string[]> = { ...(v.permissions ?? {}) };
+    const menus = k in DEFAULT_ROLES && DEFAULT_ROLES[k].menus.includes("chat")
+      ? [...new Set([...(v.menus ?? []), "chat"])]
+      : v.menus;
     // Migrasi: role bawaan yang seharusnya bisa melihat absensi semua karyawan
     // tetap mendapat aksi ini meski tersimpan di DB sebelum aksi tersebut ada.
     if (k in DEFAULT_ROLES && DEFAULT_ROLES[k].permissions?.attendance?.includes("view_all")) {
@@ -189,7 +194,7 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     if (!(k in DEFAULT_ROLES) && Array.isArray(v.menus)) {
       perms = { ...defaultPermissionsForMenus(v.menus), ...perms };
     }
-    out[k] = { ...v, permissions: perms };
+    out[k] = { ...v, menus, permissions: perms };
   }
   return out;
 };

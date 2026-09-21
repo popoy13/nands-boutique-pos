@@ -1,6 +1,7 @@
 export const MENU_PAGES: Record<string, string> = {
   pos: "kasir.html",
   history: "transaksi.html",
+  chat: "chat.html",
   expense: "pengeluaran.html",
   deposit: "setor.html",
   report: "laporan.html",

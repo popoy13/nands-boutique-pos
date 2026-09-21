@@ -861,7 +861,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2" style={{ background: "var(--card)" }}>
                           {actList.map(action => {
-                            const actionLocked = locked || (menu.id === "chat" && action === "delete_all");
+                            const actionLocked = locked;
                             const on = acts?.includes(action) ?? true;
                             return (
                               <button key={action} onClick={() => toggleAction(editingRole, menu.id, action)} disabled={actionLocked}
@@ -872,7 +872,6 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                                   {on && <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                 </span>
                                 <span className="flex-1 truncate">{ACTION_LABELS[menu.id]?.[action] ?? action}</span>
-                                {menu.id === "chat" && action === "delete_all" && <span className="text-[9px] font-bold" style={{ color: "var(--muted-foreground)" }}>{editingRole === "admin" ? "Admin" : "Khusus Admin"}</span>}
                               </button>
                             );
                           })}

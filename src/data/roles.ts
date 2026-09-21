@@ -191,12 +191,11 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     if (Array.isArray(perms.product) && perms.product.includes("category")) {
       perms.product = [...new Set([...perms.product, "size"])];
     }
-    // Penghapusan seluruh chat adalah hak khusus Admin dan tidak boleh
-    // terbawa dari konfigurasi role yang tersimpan sebelumnya.
+    // Admin selalu memiliki izin penghapusan seluruh chat. Konfigurasi role
+    // lain tetap dapat diatur dari Setelan, namun runtime tetap membatasi
+    // aksi penghapusan seluruh data chat kepada Admin.
     if (k === "admin") {
       perms.chat = [...new Set([...(perms.chat ?? []), "delete_all"])];
-    } else {
-      perms.chat = (perms.chat ?? []).filter(action => action !== "delete_all");
     }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).

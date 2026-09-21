@@ -106,6 +106,9 @@ export default function ChatView({
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages" }, payload => {
         setMessages(prev => prev.map(message => message.id === payload.new.id ? payload.new as ChatMessage : message));
       })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_messages" }, payload => {
+        setMessages(prev => prev.filter(message => message.id !== payload.old.id));
+      })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_message_deletions", filter: `employee_id=eq.${currentUser.id}` }, payload => {
         setMessages(prev => prev.filter(message => message.id !== payload.new.message_id));
       })

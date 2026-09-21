@@ -429,6 +429,14 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       setAttendance(prev => prev.filter(r => !ids.includes(r.id)));
     });
 
+  const handleResetChat = (): Promise<ResetResult> =>
+    runReset(async () => {
+      const { error: messageError } = await supabase.from("chat_messages").delete().not("id", "is", null);
+      if (messageError) throw messageError;
+      const { error: deletionError } = await supabase.from("chat_message_deletions").delete().not("message_id", "is", null);
+      if (deletionError) throw deletionError;
+    });
+
   const handleResetEmployees = (): Promise<ResetResult> =>
     runReset(async () => {
       if (!currentUser) return;
@@ -765,6 +773,7 @@ const canDepositBank = has("deposit", "bank");
             onResetEmployees={handleResetEmployees}
             onResetTransactions={handleResetTransactions}
             onResetAttendance={handleResetAttendance}
+            onResetChat={handleResetChat}
           />
         )}
         </Suspense>

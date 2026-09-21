@@ -29,6 +29,7 @@ interface Props {
   onResetEmployees: () => Promise<ResetResult>;
   onResetTransactions: (ids: string[]) => Promise<ResetResult>;
   onResetAttendance: (ids: string[]) => Promise<ResetResult>;
+  onResetChat: () => Promise<ResetResult>;
 }
 
 type Tab = "printer" | "attendance" | "pembayaran" | "brand" | "roles" | "barcode" | "reset";
@@ -112,7 +113,7 @@ function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; bran
   );
 }
 
-export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance }: Props) {
+export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance, onResetChat }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
@@ -1119,6 +1120,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               { label: "Member", count: members.length, desc: "Data pelanggan", fn: () => resetOne("Semua member", onResetMembers), disabled: members.length === 0 },
               { label: "Diskon & Voucher", count: discounts.length, desc: "Semua promosi", fn: () => resetOne("Semua diskon", onResetDiscounts), disabled: discounts.length === 0 },
               { label: "Toko", count: stores.length, desc: "Data cabang", fn: () => resetOne("Semua toko", onResetStores), disabled: stores.length === 0 },
+              { label: "Chat Karyawan", count: "—", desc: "Hapus seluruh isi percakapan", fn: () => resetOne("Seluruh isi chat", onResetChat), disabled: false },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: "var(--background)", opacity: item.disabled ? 0.4 : 1 }}>
                 <div>

@@ -543,6 +543,7 @@ const canDepositBank = has("deposit", "bank");
   const canViewAttendanceAll = has("attendance", "view_all");
   const canViewAttHistoryAll = has("attendanceHistory", "view_all") || has("attendance", "view_all");
   const canDeleteAttHistory = has("attendanceHistory", "delete") || has("attendance", "delete");
+  const canViewDeletedHistory = has("history", "deleted");
   const canDeleteAllChat = role === "admin" && has("chat", "delete_all");
   const canRecallAllChat = has("chat", "recall_all");
   const canDeleteChatForMe = has("chat", "delete_for_me");
@@ -611,6 +612,8 @@ const canDepositBank = has("deposit", "bank");
             activeStore={activeStore}
             canDelete={canHistoryDelete}
             canPrint={canHistoryPrint}
+            canViewDeleted={canViewDeletedHistory}
+            deletedTransactions={deletedTransactions}
             onDelete={canHistoryDelete ? (id, reason) => handleDeleteTransaction(id, reason, currentUser.name) : undefined}
             onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
             brandName={settings.brand.name}

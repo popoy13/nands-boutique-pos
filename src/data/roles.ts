@@ -53,7 +53,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 ];
 
 export const ACTION_ITEMS: Record<string, string[]> = {
-  history: ["delete", "print"],
+  history: ["delete", "print", "deleted"],
   chat: ["recall_all", "delete_for_me", "delete_all"],
   expense: ["add", "edit", "delete"],
   deposit: ["add", "edit", "delete", "bank"],
@@ -68,7 +68,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 };
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
-  history: { delete: "Hapus transaksi", print: "Cetak struk" },
+  history: { delete: "Hapus transaksi", print: "Cetak struk", deleted: "Lihat riwayat transaksi dihapus" },
   chat: {
     recall_all: "Tarik semua pesan",
     delete_for_me: "Hapus semua dari saya",

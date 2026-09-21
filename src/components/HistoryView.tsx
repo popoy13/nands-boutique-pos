@@ -1,5 +1,5 @@
 ﻿import { useState, useMemo, useRef } from "react";
-import type { Transaction } from "../data/types";
+import type { Transaction, DeletedTransaction } from "../data/types";
 import type { PrinterSettings, PaymentSettings } from "../data/settings";
 import DateRangeFilter, { todayISO } from "./DateRangeFilter";
 import { escapeHtml } from "../lib/sanitize";
@@ -18,6 +18,8 @@ interface Props {
   activeStore: string;
   canDelete?: boolean;
   canPrint?: boolean;
+  canViewDeleted?: boolean;
+  deletedTransactions?: DeletedTransaction[];
   onDelete?: (id: string, reason: string) => void;
   onUpdate?: (t: Transaction) => void;
   brandName?: string;
@@ -37,8 +39,10 @@ const labelOf = (m: string, payments?: PaymentSettings) =>
 const colorOf = (m: string, payments?: PaymentSettings) =>
   BUILTIN_COLORS[m] ?? { bg: "#f3f4f6", text: "#4b5563" };
 
-export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, onDelete, onUpdate, brandName, printer, payments, currentUser }: Props) {
+export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, canViewDeleted = false, deletedTransactions = [], onDelete, onUpdate, brandName, printer, payments, currentUser }: Props) {
+  const [tab, setTab] = useState<"active" | "deleted">("active");
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [selDeleted, setSelDeleted] = useState<DeletedTransaction | null>(null);
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterMethod, setFilterMethod] = useState("all");
@@ -55,6 +59,14 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
   const [pageSize, setPageSize] = useState(10);
 
   const resetPage = () => setPage(1);
+
+  const switchTab = (next: "active" | "deleted") => {
+    if (next === tab) return;
+    setTab(next);
+    setSelected(null);
+    setSelDeleted(null);
+    resetPage();
+  };
 
   const deletingRef = useRef(false);
 
@@ -101,9 +113,24 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     });
   }, [transactions, filterStore, filterMethod, search, dateFrom, dateTo]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = useMemo(() => filtered.slice((safePage - 1) * pageSize, safePage * pageSize), [filtered, safePage, pageSize]);
+  const filteredDeleted = useMemo(() => {
+    return [...deletedTransactions].reverse().filter(d => {
+      const t = d.transaction;
+      if (filterStore !== "all" && t.storeId !== filterStore) return false;
+      if (search && !t.id.toLowerCase().includes(search.toLowerCase()) && !(t.cashierName ?? "").toLowerCase().includes(search.toLowerCase())) return false;
+      if (dateFrom) { const from = new Date(dateFrom); from.setHours(0,0,0,0); if (d.deletedAt < from) return false; }
+      if (dateTo) { const to = new Date(dateTo); to.setHours(23,59,59,999); if (d.deletedAt > to) return false; }
+      return true;
+    });
+  }, [deletedTransactions, filterStore, search, dateFrom, dateTo]);
+
+  const activeTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const activeSafePage = Math.min(page, activeTotalPages);
+  const pageItems = useMemo(() => filtered.slice((activeSafePage - 1) * pageSize, activeSafePage * pageSize), [filtered, activeSafePage, pageSize]);
+
+  const deletedTotalPages = Math.max(1, Math.ceil(filteredDeleted.length / pageSize));
+  const deletedSafePage = Math.min(page, deletedTotalPages);
+  const deletedPageItems = useMemo(() => filteredDeleted.slice((deletedSafePage - 1) * pageSize, deletedSafePage * pageSize), [filteredDeleted, deletedSafePage, pageSize]);
 
   const totalShown = filtered.reduce((s, t) => s + t.total, 0);
 
@@ -137,6 +164,28 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     w.document.close();
     w.print();
   };
+
+  const totalsBlock = (t: Transaction) => (
+    <div className="border-t pt-3 flex flex-col gap-1.5" style={{ borderColor: "var(--border)" }}>
+      <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Subtotal</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.subtotal)}</span></div>
+      {t.discount > 0 && (
+        <div className="flex justify-between text-xs">
+          <span style={{ color: "var(--muted-foreground)" }}>Diskon {t.discountLabel || ""} {t.discountType === "percent" ? `${t.discount}%` : ""}</span>
+          <span className="font-mono" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>-{fmt(t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount)}</span>
+        </div>
+      )}
+      <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>{payments?.tax?.enabled !== false ? `Pajak (${payments?.tax?.rate ?? 10}%)` : "Pajak"}</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.tax)}</span></div>
+      {(() => { const rd = t.total - (t.subtotal - (t.discountType === "percent" ? Math.round(t.subtotal * t.discount / 100) : t.discount) + t.tax); return rd !== 0 ? (
+        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Pembulatan</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>+{fmt(rd)}</span></div>
+      ) : null; })()}
+      <div className="flex justify-between font-bold pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+        <span>Total</span>
+        <span className="font-mono" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.total)}</span>
+      </div>
+      <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({labelOf(t.paymentMethod, payments)})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.payment)}</span></div>
+      {t.change > 0 && <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Kembalian</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.change)}</span></div>}
+    </div>
+  );
 
   const detailBody = selected && (
     <div className="flex flex-col">
@@ -183,25 +232,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
         </div>
       </div>
 
-      <div className="border-t pt-3 flex flex-col gap-1.5" style={{ borderColor: "var(--border)" }}>
-        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Subtotal</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.subtotal)}</span></div>
-        {selected.discount > 0 && (
-          <div className="flex justify-between text-xs">
-            <span style={{ color: "var(--muted-foreground)" }}>Diskon {selected.discountLabel || ""} {selected.discountType === "percent" ? `${selected.discount}%` : ""}</span>
-            <span className="font-mono" style={{ color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>-{fmt(selected.discountType === "percent" ? Math.round(selected.subtotal * selected.discount / 100) : selected.discount)}</span>
-          </div>
-        )}
-        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>{payments?.tax?.enabled !== false ? `Pajak (${payments?.tax?.rate ?? 10}%)` : "Pajak"}</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.tax)}</span></div>
-        {(() => { const rd = selected.total - (selected.subtotal - (selected.discountType === "percent" ? Math.round(selected.subtotal * selected.discount / 100) : selected.discount) + selected.tax); return rd !== 0 ? (
-          <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Pembulatan</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>+{fmt(rd)}</span></div>
-        ) : null; })()}
-        <div className="flex justify-between font-bold pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-          <span>Total</span>
-          <span className="font-mono" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.total)}</span>
-        </div>
-        <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Bayar ({labelOf(selected.paymentMethod, payments)})</span><span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.payment)}</span></div>
-        {selected.change > 0 && <div className="flex justify-between text-xs"><span style={{ color: "var(--muted-foreground)" }}>Kembalian</span><span className="font-mono" style={{ color: "#16a34a", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(selected.change)}</span></div>}
-      </div>
+      {totalsBlock(selected)}
 
       {canDelete && (
         <div className="mt-4">
@@ -223,6 +254,52 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       )}
     </div>
   );
+
+  const deletedBody = selDeleted && (() => {
+    const t = selDeleted.transaction;
+    return (
+      <div className="flex flex-col">
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Riwayat Transaksi Dihapus</div>
+          <button onClick={() => setSelDeleted(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--muted)" }}>
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="p-3 rounded-xl mb-4" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+          <div className="font-mono text-xs font-bold mb-1" style={{ color: "#b91c1c", fontFamily: "'JetBrains Mono', monospace" }}>{t.id}</div>
+          <div className="text-xs mb-0.5" style={{ color: "#7f1d1d" }}>Dihapus: {fmtDate(selDeleted.deletedAt)}</div>
+          <div className="text-xs mb-0.5" style={{ color: "#7f1d1d" }}>Oleh: {selDeleted.deletedBy}</div>
+          <div className="text-xs" style={{ color: "#7f1d1d" }}>Alasan: {selDeleted.reason || "—"}</div>
+        </div>
+
+        <div className="p-3 rounded-xl mb-4" style={{ background: "var(--background)" }}>
+          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Transaksi: {fmtDate(t.date)}</div>
+          <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{t.storeName}</div>
+          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Kasir: {t.cashierName}</div>
+          {t.memberName && <div className="text-xs mt-0.5" style={{ color: "#ca8a04" }}>Member: {t.memberName} {t.pointsEarned ? `(+${t.pointsEarned} pts)` : ""}</div>}
+        </div>
+
+        <div className="mb-4">
+          <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>ITEM PEMBELIAN</div>
+          <div className="flex flex-col gap-2">
+            {t.items.map(item => (
+              <div key={item.variantSku} className="flex gap-3 p-2.5 rounded-lg" style={{ background: "var(--background)" }}>
+                <img src={item.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold truncate">{item.name}</div>
+                  <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{[item.color, item.size].filter(Boolean).join(" / ") || "Tanpa varian"} · ×{item.quantity}</div>
+                </div>
+                <div className="font-mono text-xs font-bold shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {totalsBlock(t)}
+      </div>
+    );
+  })();
 
   return (
     <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
@@ -274,7 +351,23 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       {/* List */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:overflow-hidden">
         <div className="px-4 sm:px-6 py-4 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }} className="mb-3">Riwayat Transaksi</div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Riwayat Transaksi</div>
+            {canViewDeleted && (
+              <div className="flex rounded-xl p-1 gap-1" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <button onClick={() => switchTab("active")}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: tab === "active" ? "var(--foreground)" : "transparent", color: tab === "active" ? "white" : "var(--muted-foreground)" }}>
+                  Aktif ({filtered.length})
+                </button>
+                <button onClick={() => switchTab("deleted")}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: tab === "deleted" ? "#b91c1c" : "transparent", color: tab === "deleted" ? "white" : "var(--muted-foreground)" }}>
+                  Terhapus ({filteredDeleted.length})
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1" style={{ minWidth: 160 }}>
               <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -285,26 +378,30 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
               <option value="all">Semua Toko</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ","")}</option>)}
             </select>
-            <select value={filterMethod} onChange={e => { setFilterMethod(e.target.value); resetPage(); }} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-              <option value="all">Semua Metode</option>
-              {(payments?.methods ?? [{ id: "cash", label: "Tunai" }, { id: "debit", label: "Debit" }, { id: "qris", label: "QRIS" }]).map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
+            {tab === "active" && (
+              <select value={filterMethod} onChange={e => { setFilterMethod(e.target.value); resetPage(); }} className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <option value="all">Semua Metode</option>
+                {(payments?.methods ?? [{ id: "cash", label: "Tunai" }, { id: "debit", label: "Debit" }, { id: "qris", label: "QRIS" }]).map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            )}
             <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChangeFrom={v => { setDateFrom(v); resetPage(); }} onChangeTo={v => { setDateTo(v); resetPage(); }} />
           </div>
           <div className="flex items-center gap-4 mt-2.5">
-            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{filtered.length} transaksi</span>
-            <span className="text-xs font-mono font-semibold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>Total: {fmt(totalShown)}</span>
+            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{tab === "active" ? filtered.length : filteredDeleted.length} {tab === "active" ? "transaksi" : "transaksi terhapus"}</span>
+            {tab === "active" && (
+              <span className="text-xs font-mono font-semibold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>Total: {fmt(totalShown)}</span>
+            )}
           </div>
         </div>
 
         <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
-          {pageItems.length === 0 ? (
-            <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada transaksi</div>
+          {(tab === "active" ? pageItems : deletedPageItems).length === 0 ? (
+            <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>{tab === "active" ? "Tidak ada transaksi" : "Tidak ada transaksi terhapus"}</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {pageItems.map(t => (
+              {tab === "active" ? pageItems.map(t => (
                 <button key={t.id} onClick={() => setSelected(t)}
                   className="w-full text-left p-4 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
                   style={{ background: selected?.id === t.id ? "rgba(124,58,237,0.05)" : "var(--card)", border: `1.5px solid ${selected?.id === t.id ? "var(--accent)" : "var(--border)"}` }}>
@@ -323,14 +420,36 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                     </div>
                   </div>
                 </button>
-              ))}
+              )) : deletedPageItems.map(d => {
+                const t = d.transaction;
+                return (
+                  <button key={d.id} onClick={() => setSelDeleted(d)}
+                    className="w-full text-left p-4 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
+                    style={{ background: selDeleted?.id === d.id ? "rgba(239,68,68,0.05)" : "var(--card)", border: `1.5px solid ${selDeleted?.id === d.id ? "#b91c1c" : "var(--border)"}` }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-xs font-semibold mb-1" style={{ color: "#b91c1c", fontFamily: "'JetBrains Mono', monospace" }}>{t.id}</div>
+                        <div className="text-xs mb-0.5" style={{ color: "var(--muted-foreground)" }}>Transaksi: {fmtDate(t.date)} · Dihapus: {fmtDate(d.deletedAt)}</div>
+                        <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                          {t.storeName.replace("NAND'S BOUTIQUE - ","")} · Kasir {t.cashierName} · oleh {d.deletedBy}
+                        </div>
+                        <div className="text-xs mt-1 truncate" style={{ color: "#b91c1c" }}>Alasan: {d.reason || "—"}</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <div className="font-mono font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(t.total)}</div>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#fee2e2", color: "#b91c1c" }}>Dihapus</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
         <Pagination
-          total={filtered.length}
-          page={safePage}
+          total={tab === "active" ? filtered.length : filteredDeleted.length}
+          page={tab === "active" ? activeSafePage : deletedSafePage}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
@@ -340,7 +459,18 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
 
       {/* Detail - desktop sidebar */}
       <div className="hidden lg:flex shrink-0 flex-col overflow-hidden w-[340px]" style={{ background: "var(--card)", borderLeft: "1px solid var(--border)" }}>
-        {selected ? (
+        {tab === "deleted" ? (
+          selDeleted ? (
+            <div className="flex flex-col h-full overflow-y-auto p-5">
+              {deletedBody}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 h-full py-12">
+              <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="#fca5a5" strokeWidth={1.2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Pilih transaksi terhapus untuk detail</p>
+            </div>
+          )
+        ) : selected ? (
           <div className="flex flex-col h-full overflow-y-auto p-5">
             {detailBody}
           </div>
@@ -353,12 +483,12 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       </div>
 
       {/* Detail - mobile floating overlay */}
-      {selected && (
-        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setSelected(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
+      {(tab === "deleted" ? selDeleted : selected) && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => tab === "deleted" ? setSelDeleted(null) : setSelected(null)} style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden flex flex-col" style={{ background: "var(--card)", boxShadow: "0 -8px 30px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mt-2.5 shrink-0" style={{ background: "var(--border)" }} />
             <div className="flex flex-col max-h-[85vh] overflow-y-auto p-5">
-              {detailBody}
+              {tab === "deleted" ? deletedBody : detailBody}
             </div>
           </div>
         </div>

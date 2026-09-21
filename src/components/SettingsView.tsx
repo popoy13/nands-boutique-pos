@@ -292,9 +292,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const toggleMenu = (roleKey: string, menu: string) => {
     const cfg = draftRoles[roleKey];
     if (!cfg) return;
-    const locked = roleKey === "admin" && (menu === "settings" || menu === "employee");
     const has = cfg.menus.includes(menu);
-    if (locked) return;
     const permissions = { ...(cfg.permissions ?? {}) };
     if (!has && !permissions[menu] && (ACTION_ITEMS[menu]?.length ?? 0) > 0) {
       permissions[menu] = [...ACTION_ITEMS[menu]];
@@ -305,8 +303,6 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const toggleAction = (roleKey: string, menu: string, action: string) => {
     const cfg = draftRoles[roleKey];
     if (!cfg) return;
-    const locked = roleKey === "admin" && menu === "settings" && !(menu === "chat" && action === "delete_all");
-    if (locked) return;
     const permissions = { ...(cfg.permissions ?? {}) };
     const acts = permissions[menu] ? [...permissions[menu]] : [...(ACTION_ITEMS[menu] ?? [])];
     const has = acts.includes(action);
@@ -823,17 +819,15 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-4">
               {MENU_ITEMS.map(menu => {
                 const on = draftRoles[editingRole].menus.includes(menu.id);
-                const locked = editingRole === "admin" && (menu.id === "settings" || menu.id === "employee");
                 return (
-                  <div key={menu.id} onClick={locked ? undefined : () => toggleMenu(editingRole, menu.id)}
+                  <div key={menu.id} onClick={() => toggleMenu(editingRole, menu.id)}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all select-none"
-                    style={{ cursor: locked ? "not-allowed" : "pointer", background: on ? `${draftRoles[editingRole].color}14` : "var(--background)", border: `1px solid ${on ? draftRoles[editingRole].color : "var(--border)"}`, opacity: locked ? 0.75 : 1 }}>
+                    style={{ cursor: "pointer", background: on ? `${draftRoles[editingRole].color}14` : "var(--background)", border: `1px solid ${on ? draftRoles[editingRole].color : "var(--border)"}` }}>
                     <span className="w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0"
                       style={{ background: on ? draftRoles[editingRole].color : "var(--card)", border: `1.5px solid ${on ? draftRoles[editingRole].color : "var(--border)"}` }}>
                       {on && <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                     </span>
                     <span className="flex-1 text-[12px] font-semibold" style={{ color: on ? draftRoles[editingRole].color : "var(--foreground)" }}>{menu.label}</span>
-                    {locked && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Wajib</span>}
                   </div>
                 );
               })}
@@ -846,26 +840,24 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   {MENU_ITEMS.filter(m => draftRoles[editingRole].menus.includes(m.id) && (ACTION_ITEMS[m.id]?.length ?? 0) > 0).map(menu => {
                     const acts = draftRoles[editingRole].permissions?.[menu.id];
                     const actList = ACTION_ITEMS[menu.id];
-                    const locked = editingRole === "admin" && menu.id === "settings";
                     const enabledCount = actList.filter(a => acts?.includes(a) ?? true).length;
                     return (
-                      <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", opacity: locked ? 0.7 : 1 }}>
+                      <div key={menu.id} className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
                         <div className="flex items-center justify-between px-3 py-2" style={{ background: `${draftRoles[editingRole].color}10` }}>
                           <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: draftRoles[editingRole].color }}>
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: draftRoles[editingRole].color }} />
                             <span className="uppercase">{menu.label}</span>
                           </div>
-                          <span className="text-[9px] font-semibold" style={{ color: locked ? "var(--muted-foreground)" : draftRoles[editingRole].color }}>
-                            {locked ? "Wajib" : `${enabledCount}/${actList.length}`}
+                          <span className="text-[9px] font-semibold" style={{ color: draftRoles[editingRole].color }}>
+                            {enabledCount}/{actList.length}
                           </span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2" style={{ background: "var(--card)" }}>
                           {actList.map(action => {
-                            const actionLocked = locked && !(menu.id === "chat" && action === "delete_all");
                             const on = acts?.includes(action) ?? true;
                             return (
-                              <button key={action} onClick={() => toggleAction(editingRole, menu.id, action)} disabled={actionLocked}
-                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[11px] font-medium text-left transition-all select-none disabled:cursor-not-allowed"
+                              <button key={action} onClick={() => toggleAction(editingRole, menu.id, action)}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[11px] font-medium text-left transition-all select-none"
                                 style={{ background: on ? `${draftRoles[editingRole].color}12` : "var(--background)", border: `1px solid ${on ? draftRoles[editingRole].color : "var(--border)"}`, color: on ? draftRoles[editingRole].color : "var(--muted-foreground)" }}>
                                 <span className="w-4 h-4 rounded flex items-center justify-center shrink-0"
                                   style={{ background: on ? draftRoles[editingRole].color : "transparent", border: `1.5px solid ${on ? draftRoles[editingRole].color : "var(--border)"}` }}>

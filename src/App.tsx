@@ -53,24 +53,24 @@ function loadUnreadCounts(): { chat: number; history: number } {
   } catch {
     return { chat: 0, history: 0 };
   }
+}
 
-  function loadReadAt(): { chat: string; history: string } {
-    try {
-      const raw = localStorage.getItem(READ_AT_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return { chat: parsed.chat || new Date(0).toISOString(), history: parsed.history || new Date(0).toISOString() };
-    } catch {
-      return { chat: new Date(0).toISOString(), history: new Date(0).toISOString() };
-    }
+function loadReadAt(): { chat: string; history: string } {
+  try {
+    const raw = localStorage.getItem(READ_AT_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return { chat: parsed.chat || new Date(0).toISOString(), history: parsed.history || new Date(0).toISOString() };
+  } catch {
+    return { chat: new Date(0).toISOString(), history: new Date(0).toISOString() };
   }
+}
 
-  function saveUnreadCounts(next: { chat: number; history: number }) {
-    try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  }
+function saveUnreadCounts(next: { chat: number; history: number }) {
+  try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+}
 
-  function saveReadAt(next: { chat: string; history: string }) {
-    try { localStorage.setItem(READ_AT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  }
+function saveReadAt(next: { chat: string; history: string }) {
+  try { localStorage.setItem(READ_AT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
 }
 
 function loadBrandCache(): BrandSettings {

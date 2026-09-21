@@ -268,6 +268,13 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
     setSelectedMessageIds(new Set());
   };
 
+  const toggleSelectAll = () => {
+    setSelectedMessageIds(prev => {
+      if (prev.size === messages.length) return new Set();
+      return new Set(messages.map(message => message.id));
+    });
+  };
+
   const bulkDeleteForMe = async () => {
     const ids = [...selectedMessageIds];
     if (!ids.length || !window.confirm(`Hapus ${ids.length} pesan dari tampilan Anda?`)) return;
@@ -326,6 +333,9 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
         </div>
       </header>
       {selectionMode && <div className="px-4 py-2 md:px-8 flex items-center gap-2 border-b text-xs" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <button onClick={toggleSelectAll} disabled={!messages.length || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ background: "var(--secondary)", color: "var(--foreground)" }}>
+          {selectedMessageIds.size === messages.length && messages.length > 0 ? "Batal pilih semua" : "Pilih semua"}
+        </button>
         <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>{selectedMessageIds.size} pesan dipilih</span>
         <button onClick={() => void bulkDeleteForMe()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus dari saya</button>
         <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Hapus untuk semua</button>

@@ -47,6 +47,9 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
   const [error, setError] = useState("");
   const [busyMessageId, setBusyMessageId] = useState<string | null>(null);
   const [openMessageMenu, setOpenMessageMenu] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set([currentUser.id]));
   const bottomRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -251,6 +254,59 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
     setBusyMessageId(null);
   };
 
+  const toggleMessageSelection = (id: string) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const cancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedMessageIds(new Set());
+  };
+
+  const bulkDeleteForMe = async () => {
+    const ids = [...selectedMessageIds];
+    if (!ids.length || !window.confirm(`Hapus ${ids.length} pesan dari tampilan Anda?`)) return;
+    setBulkDeleting(true);
+    setError("");
+    const rows = ids.map(messageId => ({ message_id: messageId, employee_id: currentUser.id }));
+    const { error: deleteError } = await supabase.from("chat_message_deletions").upsert(rows, { onConflict: "message_id,employee_id", ignoreDuplicates: true });
+    if (deleteError) setError(`Pesan gagal dihapus: ${deleteError.message}`);
+    else {
+      setMessages(prev => prev.filter(message => !selectedMessageIds.has(message.id)));
+      cancelSelection();
+    }
+    setBulkDeleting(false);
+  };
+
+  const bulkDeleteForEveryone = async () => {
+    const ids = [...selectedMessageIds];
+    if (!ids.length || !window.confirm(`Tarik ${ids.length} pesan untuk semua karyawan?`)) return;
+    setBulkDeleting(true);
+    setError("");
+    const { data, error: recallError } = await supabase.from("chat_messages").update({
+      kind: "text",
+      body: "Pesan ditarik",
+      attachment_url: null,
+      attachment_name: null,
+      attachment_mime: null,
+      latitude: null,
+      longitude: null,
+      deleted_at: new Date().toISOString(),
+    }).in("id", ids).select();
+    if (recallError) setError(`Pesan gagal ditarik: ${recallError.message}`);
+    else {
+      const recalled = new Map((data ?? []).map(row => [String(row.id), row as ChatMessage]));
+      setMessages(prev => prev.map(message => recalled.get(message.id) ?? message));
+      cancelSelection();
+    }
+    setBulkDeleting(false);
+  };
+
   const renderAttachment = (message: ChatMessage) => {
     if (!message.attachment_url) return null;
     if (message.kind === "image") return <img src={message.attachment_url} alt={message.attachment_name ?? "Foto"} className="max-w-full max-h-64 rounded-xl object-cover" />;
@@ -263,9 +319,17 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
       <header className="px-5 py-4 md:px-8 shrink-0 border-b" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <div className="flex items-center justify-between gap-3">
           <div><h1 className="text-xl font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>Chat Karyawan</h1><p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Komunikasi realtime antar karyawan</p></div>
-          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{onlineIds.size} online · {employees.filter(e => e.status === "active").length} karyawan</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs hidden sm:block" style={{ color: "var(--muted-foreground)" }}>{onlineIds.size} online · {employees.filter(e => e.status === "active").length} karyawan</div>
+            <button onClick={selectionMode ? cancelSelection : () => setSelectionMode(true)} className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: selectionMode ? "var(--accent)" : "var(--secondary)", color: selectionMode ? "white" : "var(--foreground)" }}>{selectionMode ? "Batal" : "Pilih"}</button>
+          </div>
         </div>
       </header>
+      {selectionMode && <div className="px-4 py-2 md:px-8 flex items-center gap-2 border-b text-xs" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>{selectedMessageIds.size} pesan dipilih</span>
+        <button onClick={() => void bulkDeleteForMe()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold disabled:opacity-40" style={{ color: "#dc2626", background: "#fee2e2" }}>Hapus dari saya</button>
+        <button onClick={() => void bulkDeleteForEveryone()} disabled={!selectedMessageIds.size || bulkDeleting} className="rounded-lg px-2.5 py-2 font-semibold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>Hapus untuk semua</button>
+      </div>}
       {error && <div className="mx-5 mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "#b91c1c", background: "#fee2e2" }}>{error}</div>}
       <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8">
         {loading ? <div className="h-full flex items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>Memuat chat...</div> : messages.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-center"><div className="text-4xl mb-3">💬</div><div className="font-semibold">Belum ada pesan</div><div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Mulai percakapan dengan tim Anda.</div></div> : messages.map((message, index) => {
@@ -274,6 +338,7 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
           return <div key={message.id}>
             {showDate && <div className="text-center text-[10px] my-3" style={{ color: "var(--muted-foreground)" }}>{formatDate(message.created_at)}</div>}
             <div className={`flex gap-2 mb-3 ${mine ? "justify-end" : "justify-start"}`}>
+              {selectionMode && <input type="checkbox" checked={selectedMessageIds.has(message.id)} onChange={() => toggleMessageSelection(message.id)} className="mt-6 w-4 h-4 accent-[var(--accent)]" aria-label={`Pilih pesan ${message.sender_name}`} />}
               {!mine && <Avatar src={message.sender_photo ?? undefined} name={message.sender_name} role="" className="w-8 h-8 text-[10px] shrink-0" />}
               <div className={`max-w-[88%] md:max-w-[65%] ${mine ? "items-end" : "items-start"} flex flex-col`}>
                 {!mine && <span className="text-[10px] font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>{message.sender_name}</span>}

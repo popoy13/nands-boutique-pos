@@ -16,6 +16,7 @@ interface Props {
   brand: { logo: string; name: string; tagline: string };
   roles?: Record<string, RoleConfig>;
   allowed: string[];
+  unreadCounts?: { chat: number; history: number };
 }
 
 export const ALL_NAV = [
@@ -36,7 +37,7 @@ export const ALL_NAV = [
   { id: "settings", label: "Setelan",       icon: <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
 ];
 
-export default function Sidebar({ activeTab, activeStore, setActiveStore, stores, currentUser, onLogout, brand, roles, allowed }: Props) {
+export default function Sidebar({ activeTab, activeStore, setActiveStore, stores, currentUser, onLogout, brand, roles, allowed, unreadCounts = { chat: 0, history: 0 } }: Props) {
   const navItems = ALL_NAV.filter(n => allowed.includes(n.id));
   const [confirming, setConfirming] = useState(false);
 
@@ -111,7 +112,12 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-underline"
               style={{ background: active ? "rgba(124,58,237,0.15)" : "transparent", color: active ? "var(--accent)" : "var(--sidebar-fg)" }}>
               <span style={{ color: active ? "var(--accent)" : "rgba(156,163,175,0.55)", flexShrink: 0 }}>{item.icon}</span>
-              {item.label}
+              <span className="flex-1 min-w-0">{item.label}</span>
+              {(item.id === "chat" ? unreadCounts.chat : item.id === "history" ? unreadCounts.history : 0) > 0 && (
+                <span className="min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "#ef4444" }}>
+                  {Math.min(99, item.id === "chat" ? unreadCounts.chat : unreadCounts.history)}
+                </span>
+              )}
             </a>
           );
         })}
@@ -165,7 +171,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
   );
 }
 
-export function MobileBottomNav({ allowed, activeTab }: { allowed: string[]; activeTab: string }) {
+export function MobileBottomNav({ allowed, activeTab, unreadCounts = { chat: 0, history: 0 } }: { allowed: string[]; activeTab: string; unreadCounts?: { chat: number; history: number } }) {
   const [open, setOpen] = useState(false);
   const items = ALL_NAV.filter(n => allowed.includes(n.id));
   const primary = items.slice(0, 4);
@@ -183,7 +189,14 @@ export function MobileBottomNav({ allowed, activeTab }: { allowed: string[]; act
           ? { color: active ? "var(--accent)" : "rgba(156,163,175,0.7)", borderTop: `2px solid ${active ? "var(--accent)" : "transparent"}`, background: active ? "rgba(124,58,237,0.08)" : "transparent" }
           : { background: active ? "rgba(124,58,237,0.1)" : "var(--background)", border: `1.5px solid ${active ? "var(--accent)" : "var(--border)"}`, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
         <span style={{ color: active ? "var(--accent)" : "rgba(156,163,175,0.6)" }}>{item.icon}</span>
-        <span className={compact ? "text-[9px] font-medium truncate w-full text-center" : "text-[10px] font-semibold"}>{item.label}</span>
+        <span className="relative">
+          <span className={compact ? "text-[9px] font-medium truncate w-full text-center" : "text-[10px] font-semibold"}>{item.label}</span>
+          {(item.id === "chat" ? unreadCounts.chat : item.id === "history" ? unreadCounts.history : 0) > 0 && (
+            <span className="absolute -top-2 -right-3 min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: "#ef4444" }}>
+              {Math.min(99, item.id === "chat" ? unreadCounts.chat : unreadCounts.history)}
+            </span>
+          )}
+        </span>
       </a>
     );
   };

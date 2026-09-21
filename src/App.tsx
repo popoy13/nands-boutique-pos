@@ -39,6 +39,20 @@ const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as
 const SESSION_KEY = "nands-current-user-id";
 const SESSION_EXPIRY_KEY = "nands-session-expiry";
 const BRAND_CACHE_KEY = "nands-brand-cache";
+const UNREAD_COUNTS_KEY = "nands-unread-counts";
+
+function loadUnreadCounts(): { chat: number; history: number } {
+  try {
+    const raw = localStorage.getItem(UNREAD_COUNTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return {
+      chat: Number.isFinite(parsed.chat) ? Math.max(0, parsed.chat) : 0,
+      history: Number.isFinite(parsed.history) ? Math.max(0, parsed.history) : 0,
+    };
+  } catch {
+    return { chat: 0, history: 0 };
+  }
+}
 
 function loadBrandCache(): BrandSettings {
   try {
@@ -80,6 +94,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [brandCache] = useState(loadBrandCache);
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdate | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState(loadUnreadCounts);
   const page = menu;
   const [activeStore, setActiveStore] = useState(() => {
     try { return localStorage.getItem("nands-active-store") || "s1"; } catch { return "s1"; }
@@ -101,14 +116,35 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
 
   useEffect(() => {
     if (!ready || !currentUser) return;
+    if (page === "chat" || page === "history") {
+      setUnreadCounts(prev => {
+        const next = { ...prev, ...(page === "chat" ? { chat: 0 } : { history: 0 }) };
+        try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
+    }
+  }, [ready, currentUser, page]);
+
+  useEffect(() => {
+    if (!ready || !currentUser) return;
     void requestNotificationPermission();
     const channel = supabase.channel(`nands-notifications-${currentUser.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, payload => {
         if (payload.new.sender_id === currentUser.id) return;
+        setUnreadCounts(prev => {
+          const next = { ...prev, chat: prev.chat + 1 };
+          try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          return next;
+        });
         void notifyUser(`Chat dari ${payload.new.sender_name}`, payload.new.body || "Mengirim lampiran", "chat.html");
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "transactions" }, payload => {
         if (payload.new.cashier_id === currentUser.id) return;
+        setUnreadCounts(prev => {
+          const next = { ...prev, history: prev.history + 1 };
+          try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          return next;
+        });
         void notifyUser("Transaksi baru", `${payload.new.store_name || "Toko"} · Rp ${Number(payload.new.total || 0).toLocaleString("id-ID")}`, "transaksi.html");
       })
       .subscribe();
@@ -477,6 +513,7 @@ const canDepositBank = has("deposit", "bank");
         brand={settings.brand}
         roles={settings.roles}
         allowed={allowed}
+        unreadCounts={unreadCounts}
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -671,6 +708,7 @@ const canDepositBank = has("deposit", "bank");
       <MobileBottomNav
         allowed={allowed}
         activeTab={safeTab}
+        unreadCounts={unreadCounts}
       />
     </div>
   );

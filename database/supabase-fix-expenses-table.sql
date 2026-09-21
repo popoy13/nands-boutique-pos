@@ -60,5 +60,5 @@ SELECT
 FROM app_settings
 CROSS JOIN LATERAL jsonb_array_elements(value) AS e(value)
 WHERE key = 'expenses'
-  AND jsonb_typeof(value) = 'array'
+  AND jsonb_typeof(e.value) = 'array'
 ON CONFLICT (id) DO NOTHING;

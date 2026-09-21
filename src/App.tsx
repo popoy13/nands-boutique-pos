@@ -40,6 +40,7 @@ const SESSION_KEY = "nands-current-user-id";
 const SESSION_EXPIRY_KEY = "nands-session-expiry";
 const BRAND_CACHE_KEY = "nands-brand-cache";
 const UNREAD_COUNTS_KEY = "nands-unread-counts";
+const READ_AT_KEY = "nands-read-at";
 
 function loadUnreadCounts(): { chat: number; history: number } {
   try {
@@ -51,6 +52,24 @@ function loadUnreadCounts(): { chat: number; history: number } {
     };
   } catch {
     return { chat: 0, history: 0 };
+  }
+
+  function loadReadAt(): { chat: string; history: string } {
+    try {
+      const raw = localStorage.getItem(READ_AT_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return { chat: parsed.chat || new Date(0).toISOString(), history: parsed.history || new Date(0).toISOString() };
+    } catch {
+      return { chat: new Date(0).toISOString(), history: new Date(0).toISOString() };
+    }
+  }
+
+  function saveUnreadCounts(next: { chat: number; history: number }) {
+    try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  function saveReadAt(next: { chat: string; history: string }) {
+    try { localStorage.setItem(READ_AT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   }
 }
 
@@ -117,12 +136,49 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   useEffect(() => {
     if (!ready || !currentUser) return;
     if (page === "chat" || page === "history") {
+      const readAt = loadReadAt();
+      const now = new Date().toISOString();
+      saveReadAt({ ...readAt, [page === "chat" ? "chat" : "history"]: now });
       setUnreadCounts(prev => {
         const next = { ...prev, ...(page === "chat" ? { chat: 0 } : { history: 0 }) };
-        try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+        saveUnreadCounts(next);
         return next;
       });
     }
+  }, [ready, currentUser, page]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== UNREAD_COUNTS_KEY || !event.newValue) return;
+      try { setUnreadCounts(JSON.parse(event.newValue)); } catch { /* ignore */ }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !currentUser) return;
+    const readAt = loadReadAt();
+    let cancelled = false;
+    const loadUnreadFromDatabase = async () => {
+      const [chatResult, transactionResult] = await Promise.all([
+        supabase.from("chat_messages").select("id", { count: "exact", head: true })
+          .neq("sender_id", currentUser.id).gt("created_at", readAt.chat).is("deleted_at", null),
+        supabase.from("transactions").select("id", { count: "exact", head: true })
+          .neq("cashier_id", currentUser.id).gt("created_at", readAt.history),
+      ]);
+      if (cancelled) return;
+      setUnreadCounts(prev => {
+        const next = {
+          chat: page === "chat" ? 0 : (chatResult.error ? prev.chat : chatResult.count ?? 0),
+          history: page === "history" ? 0 : (transactionResult.error ? prev.history : transactionResult.count ?? 0),
+        };
+        saveUnreadCounts(next);
+        return next;
+      });
+    };
+    void loadUnreadFromDatabase();
+    return () => { cancelled = true; };
   }, [ready, currentUser, page]);
 
   useEffect(() => {
@@ -133,7 +189,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
         if (payload.new.sender_id === currentUser.id) return;
         setUnreadCounts(prev => {
           const next = { ...prev, chat: prev.chat + 1 };
-          try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          saveUnreadCounts(next);
           return next;
         });
         void notifyUser(`Chat dari ${payload.new.sender_name}`, payload.new.body || "Mengirim lampiran", "chat.html");
@@ -142,7 +198,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
         if (payload.new.cashier_id === currentUser.id) return;
         setUnreadCounts(prev => {
           const next = { ...prev, history: prev.history + 1 };
-          try { localStorage.setItem(UNREAD_COUNTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          saveUnreadCounts(next);
           return next;
         });
         void notifyUser("Transaksi baru", `${payload.new.store_name || "Toko"} · Rp ${Number(payload.new.total || 0).toLocaleString("id-ID")}`, "transaksi.html");

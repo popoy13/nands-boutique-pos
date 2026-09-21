@@ -158,6 +158,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     let lastKeyAt = 0;
     const onKeyDown = (e: KeyboardEvent) => {
       const now = performance.now();
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
       if (e.key === "Enter") {
         const code = buf;
         buf = "";
@@ -479,6 +481,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input ref={searchInputRef} type="text" placeholder="Cari produk, brand, atau kode..." value={search} onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { const r = handleScanResult(search); if (r.ok) setSearch(""); playScanFeedback(r.ok, barcode); } }}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }} />
             </div>
             <button onClick={() => setShowScanner(true)} title="Scan Barcode"

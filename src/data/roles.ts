@@ -153,30 +153,16 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     out[key] = { ...DEFAULT_ROLES[key], permissions: { ...DEFAULT_ROLES[key].permissions } };
   }
   for (const [k, v] of Object.entries(roles ?? {})) {
-    let perms: Record<string, string[]> = {
-      ...(DEFAULT_ROLES[k]?.permissions ?? {}),
-      ...(v.permissions ?? {}),
-    };
     const menus = v.menus ?? DEFAULT_ROLES[k]?.menus ?? [];
-    // Migrasi: role yang punya akses Setelan otomatis mendapat tab setelan baru
-    // (mis. Pembayaran) meski tersimpan di DB sebelum aksi tersebut ada.
-    // Explicit role settings are authoritative; do not restore unchecked actions.
-    // Migrasi: role yang punya aksi pengeluaran (add/delete) otomatis
-    // mendapat aksi edit pengeluaran walau tersimpan sebelum aksi ini ada.
-    
-    // Migrasi: role yang punya aksi setor tunai (add/delete) otomatis
-    // mendapat aksi edit setor tunai walau tersimpan sebelum aksi ini ada.
-    
-    // Migrasi: role bawaan (mis. admin/manager) yang tersimpan sebelum menu Setor
-    // Tunai ada otomatis mendapat aksi default setor tunai bila menunya tersedia.
-    
-    // Migrasi: role yang punya aksi kelola kategori produk otomatis mendapat
-    // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.
-    
-    // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
-    // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).
-    if (!(k in DEFAULT_ROLES) && Array.isArray(v.menus)) {
-      perms = { ...defaultPermissionsForMenus(v.menus), ...perms };
+    const stored = v.permissions;
+    const customized = !!stored && Object.keys(stored).length > 0;
+    let perms: Record<string, string[]>;
+    if (customized) {
+      perms = { ...stored };
+    } else if (!(k in DEFAULT_ROLES)) {
+      perms = { ...defaultPermissionsForMenus(menus) };
+    } else {
+      perms = { ...(DEFAULT_ROLES[k].permissions ?? {}) };
     }
     out[k] = { ...v, menus, permissions: perms };
   }

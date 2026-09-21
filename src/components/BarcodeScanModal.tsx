@@ -71,7 +71,8 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
           controlsRef.current = controls;
           streamRef.current = (video.srcObject as MediaStream | null) ?? null;
           const track = streamRef.current?.getVideoTracks()[0];
-          setCanUseTorch(Boolean(track?.getCapabilities?.().torch));
+          const torch = (track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined)?.torch;
+          setCanUseTorch(Boolean(torch));
           setStatus("ready");
         } else {
           controls.stop();
@@ -87,7 +88,8 @@ function CameraScanner({ onResult, onDone, onRetry }: { onResult: (code: string)
             controlsRef.current = controls;
             streamRef.current = (video.srcObject as MediaStream | null) ?? null;
             const track = streamRef.current?.getVideoTracks()[0];
-            setCanUseTorch(Boolean(track?.getCapabilities?.().torch));
+            const torch = (track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined)?.torch;
+            setCanUseTorch(Boolean(torch));
             setStatus("ready");
           } else {
             controls.stop();

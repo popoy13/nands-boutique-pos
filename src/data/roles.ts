@@ -62,6 +62,7 @@ export const MENU_ITEMS: { id: string; label: string }[] = [
 
 export const ACTION_ITEMS: Record<string, string[]> = {
   history: ["delete", "print"],
+  chat: ["delete_all"],
   expense: ["add", "edit", "delete"],
   deposit: ["add", "edit", "delete", "bank"],
   product: ["export", "import", "bulk", "category", "size", "add", "edit", "delete"],
@@ -76,6 +77,7 @@ export const ACTION_ITEMS: Record<string, string[]> = {
 
 export const ACTION_LABELS: Record<string, Record<string, string>> = {
   history: { delete: "Hapus transaksi", print: "Cetak struk" },
+  chat: { delete_all: "Hapus semua data chat" },
   expense: { add: "Tambah pengeluaran", edit: "Edit pengeluaran", delete: "Hapus pengeluaran" },
   deposit: { add: "Catat setor tunai", edit: "Edit setor tunai", delete: "Hapus setor tunai", bank: "Kelola daftar bank" },
   product: {
@@ -188,6 +190,13 @@ export const ensureRoles = (roles?: Record<string, RoleConfig>): Record<string, 
     // aksi kelola ukuran walau tersimpan sebelum aksi ini ada.
     if (Array.isArray(perms.product) && perms.product.includes("category")) {
       perms.product = [...new Set([...perms.product, "size"])];
+    }
+    // Penghapusan seluruh chat adalah hak khusus Admin dan tidak boleh
+    // terbawa dari konfigurasi role yang tersimpan sebelumnya.
+    if (k === "admin") {
+      perms.chat = [...new Set([...(perms.chat ?? []), "delete_all"])];
+    } else {
+      perms.chat = (perms.chat ?? []).filter(action => action !== "delete_all");
     }
     // Role kustom: pastikan tiap menu yang diizinkan punya daftar aksi (deny-by-default
     // di hasAction, tapi menu yang sengaja diaktifkan tetap berfungsi penuh).

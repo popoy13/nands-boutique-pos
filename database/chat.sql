@@ -27,6 +27,8 @@ create policy "chat_messages_read" on public.chat_messages for select using (tru
 create policy "chat_messages_insert" on public.chat_messages for insert with check (true);
 drop policy if exists "chat_messages_update" on public.chat_messages;
 create policy "chat_messages_update" on public.chat_messages for update using (true) with check (true);
+drop policy if exists "chat_messages_delete" on public.chat_messages;
+create policy "chat_messages_delete" on public.chat_messages for delete using (true);
 
 create table if not exists public.chat_message_deletions (
   message_id uuid not null references public.chat_messages(id) on delete cascade,

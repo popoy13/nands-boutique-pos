@@ -37,7 +37,7 @@ const icon = (kind: MessageKind) => {
   return "";
 };
 
-export default function ChatView({ currentUser, employees }: { currentUser: Employee; employees: Employee[] }) {
+export default function ChatView({ currentUser, employees, canDeleteAll = false }: { currentUser: Employee; employees: Employee[]; canDeleteAll?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -314,6 +314,27 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
     setBulkDeleting(false);
   };
 
+  const deleteAllChat = async () => {
+    if (!canDeleteAll || !window.confirm("Hapus SEMUA data chat untuk seluruh karyawan?")) return;
+    if (!window.confirm("Tindakan ini permanen dan tidak dapat dibatalkan. Lanjutkan?")) return;
+    setBulkDeleting(true);
+    setError("");
+    const { count, error: deleteError } = await supabase
+      .from("chat_messages")
+      .delete({ count: "exact" })
+      .not("id", "is", null);
+    if (deleteError) {
+      setError(`Semua data chat gagal dihapus: ${deleteError.message}`);
+    } else {
+      setMessages([]);
+      cancelSelection();
+      setOpenMessageMenu(null);
+      setError("");
+      if (count === 0) setError("Tidak ada data chat yang perlu dihapus.");
+    }
+    setBulkDeleting(false);
+  };
+
   const renderAttachment = (message: ChatMessage) => {
     if (!message.attachment_url) return null;
     if (message.kind === "image") return <img src={message.attachment_url} alt={message.attachment_name ?? "Foto"} className="max-w-full max-h-64 rounded-xl object-cover" />;
@@ -328,6 +349,7 @@ export default function ChatView({ currentUser, employees }: { currentUser: Empl
           <div><h1 className="text-xl font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>Chat Karyawan</h1><p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Komunikasi realtime antar karyawan</p></div>
           <div className="flex items-center gap-2">
             <div className="text-xs hidden sm:block" style={{ color: "var(--muted-foreground)" }}>{onlineIds.size} online · {employees.filter(e => e.status === "active").length} karyawan</div>
+            {canDeleteAll && <button onClick={() => void deleteAllChat()} disabled={bulkDeleting} className="rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ background: "#fee2e2", color: "#b91c1c" }}>Hapus semua chat</button>}
             <button onClick={selectionMode ? cancelSelection : () => setSelectionMode(true)} className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: selectionMode ? "var(--accent)" : "var(--secondary)", color: selectionMode ? "white" : "var(--foreground)" }}>{selectionMode ? "Batal" : "Pilih"}</button>
           </div>
         </div>

@@ -535,6 +535,7 @@ const canDepositBank = has("deposit", "bank");
   const canViewAttendanceAll = has("attendance", "view_all");
   const canViewAttHistoryAll = has("attendanceHistory", "view_all") || has("attendance", "view_all");
   const canDeleteAttHistory = has("attendanceHistory", "delete") || has("attendance", "delete");
+  const canDeleteAllChat = role === "admin" && has("chat", "delete_all");
   const settingsPerms = permRoles[role]?.permissions;
 
   // Guard: if current page not allowed, redirect
@@ -609,7 +610,7 @@ const canDepositBank = has("deposit", "bank");
           />
         )}
         {safeTab === "chat" && (
-          <ChatView currentUser={currentUser} employees={employees} />
+          <ChatView currentUser={currentUser} employees={employees} canDeleteAll={canDeleteAllChat} />
         )}
         {safeTab === "report" && (
           <ReportView transactions={transactions} deletedTransactions={deletedTransactions} stores={stores} payments={settings.payments} expenses={expenses} />

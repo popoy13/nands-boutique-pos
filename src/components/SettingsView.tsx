@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord } from "../data/types";
+import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord, DeletedTransaction } from "../data/types";
 import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
@@ -21,6 +21,7 @@ interface Props {
   members: Member[];
   discounts: Discount[];
   transactions: Transaction[];
+  deletedTransactions: DeletedTransaction[];
   attendance: AttendanceRecord[];
   onResetProducts: () => Promise<ResetResult>;
   onResetMembers: () => Promise<ResetResult>;
@@ -28,6 +29,7 @@ interface Props {
   onResetStores: () => Promise<ResetResult>;
   onResetEmployees: () => Promise<ResetResult>;
   onResetTransactions: (ids: string[]) => Promise<ResetResult>;
+  onResetDeletedTransactions: () => Promise<ResetResult>;
   onResetAttendance: (ids: string[]) => Promise<ResetResult>;
   onResetChat: () => Promise<ResetResult>;
 }
@@ -113,7 +115,7 @@ function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; bran
   );
 }
 
-export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetAttendance, onResetChat }: Props) {
+export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, deletedTransactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetDeletedTransactions, onResetAttendance, onResetChat }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
@@ -247,9 +249,19 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const finishReset = (res: ResetResult, okMsg: string) =>
     showToast(res.ok ? okMsg : (res.msg || "Gagal menghapus data"), res.ok);
 
-  const resetTrxAll = () =>
+  const resetTrxAll = () => {
+    if (!transactions.length && !deletedTransactions.length) { showToast("Tidak ada data transaksi untuk dihapus", false); return; }
     void onResetTransactions(transactions.map(t => t.id))
-      .then(res => finishReset(res, `Semua transaksi (${transactions.length}) dihapus`));
+      .then(res => {
+        finishReset(res, `Semua transaksi (${transactions.length}) dihapus`);
+        if (res.ok) return onResetDeletedTransactions();
+      })
+      .then(r2 => { if (r2 && !r2.ok) showToast(r2.msg || "Gagal menghapus riwayat terhapus", false); });
+  };
+
+  const resetDeletedAll = () =>
+    void onResetDeletedTransactions()
+      .then(res => finishReset(res, `Semua riwayat terhapus (${deletedTransactions.length}) dihapus permanen`));
 
   const resetTrxRange = () => {
     const from = resetTrxFrom.trim(), to = resetTrxTo.trim();
@@ -1080,6 +1092,16 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                 <input type="date" value={resetTrxTo} onChange={e => setResetTrxTo(e.target.value)} className="px-2 py-1.5 rounded-xl text-xs outline-none" style={field} />
                 <ResetButton label="Hapus Rentang" onReset={resetTrxRange} />
               </div>
+            </div>
+          </div>
+
+{/* DELETED TRANSACTIONS */}
+          <div className="px-5 pb-5" style={{ borderTop: "1.5px solid var(--border)", paddingTop: 16 }}>
+            <div className="text-sm font-semibold mb-1">Riwayat Transaksi Terhapus</div>
+            <div className="text-[11px] mb-3" style={{ color: "var(--muted-foreground)" }}>{deletedTransactions.length} riwayat terhapus tersimpan</div>
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
+              <div className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>Hapus Permanen Semua Riwayat Terhapus</div>
+              <ResetButton label="Hapus Semua" onReset={resetDeletedAll} />
             </div>
           </div>
 

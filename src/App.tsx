@@ -394,6 +394,17 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     setTransactions(prev => prev.map(tx => tx.id === t.id ? t : tx));
   };
 
+  const handlePermanentDelete = (id: string) => {
+    setDeletedTransactions(prev => prev.filter(x => x.id !== id));
+  };
+
+  const handleResetDeletedTransactions = (): Promise<ResetResult> =>
+    runReset(async () => {
+      if (!deletedTransactions.length) return;
+      await deleteRows("deleted_transactions", deletedTransactions.map(x => x.id));
+      setDeletedTransactions([]);
+    });
+
   const handleClock = (record: AttendanceRecord) => {
     setAttendance(prev => {
       const idx = prev.findIndex(r => r.id === record.id);
@@ -616,6 +627,7 @@ const canDepositBank = has("deposit", "bank");
             deletedTransactions={deletedTransactions}
             onDelete={canHistoryDelete ? (id, reason) => handleDeleteTransaction(id, reason, currentUser.name) : undefined}
             onUpdate={canHistoryDelete ? handleUpdateTransaction : undefined}
+            onPermanentDelete={canViewDeletedHistory && canHistoryDelete ? handlePermanentDelete : undefined}
             brandName={settings.brand.name}
             printer={settings.printer}
             payments={settings.payments}
@@ -768,6 +780,7 @@ const canDepositBank = has("deposit", "bank");
             members={members}
             discounts={discounts}
             transactions={transactions}
+            deletedTransactions={deletedTransactions}
             attendance={attendance}
             onResetProducts={handleResetProducts}
             onResetMembers={handleResetMembers}
@@ -775,6 +788,7 @@ const canDepositBank = has("deposit", "bank");
             onResetStores={handleResetStores}
             onResetEmployees={handleResetEmployees}
             onResetTransactions={handleResetTransactions}
+            onResetDeletedTransactions={handleResetDeletedTransactions}
             onResetAttendance={handleResetAttendance}
             onResetChat={handleResetChat}
           />

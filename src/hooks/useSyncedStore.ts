@@ -234,7 +234,10 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
   });
   const setDeletedTransactions: Dispatch<SetStateAction<DeletedTransaction[]>> = (upd) => setDeletedTransactionsState(prev => {
     const next = typeof upd === "function" ? (upd as (p: DeletedTransaction[]) => DeletedTransaction[])(prev) : upd;
-    if (next !== prev) propagate("deleted_transactions", next.map(delToDB));
+    if (next !== prev) {
+      trackRemoved("deleted_transactions", prev, next);
+      propagate("deleted_transactions", next.map(delToDB));
+    }
     return next;
   });
   const setSettings: Dispatch<SetStateAction<AppSettings>> = (upd) => setSettingsState(prev => {

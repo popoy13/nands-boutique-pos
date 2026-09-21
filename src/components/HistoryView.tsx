@@ -22,6 +22,7 @@ interface Props {
   deletedTransactions?: DeletedTransaction[];
   onDelete?: (id: string, reason: string) => void;
   onUpdate?: (t: Transaction) => void;
+  onPermanentDelete?: (id: string) => void;
   brandName?: string;
   printer?: PrinterSettings;
   payments?: PaymentSettings;
@@ -39,7 +40,7 @@ const labelOf = (m: string, payments?: PaymentSettings) =>
 const colorOf = (m: string, payments?: PaymentSettings) =>
   BUILTIN_COLORS[m] ?? { bg: "#f3f4f6", text: "#4b5563" };
 
-export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, canViewDeleted = false, deletedTransactions = [], onDelete, onUpdate, brandName, printer, payments, currentUser }: Props) {
+export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, canViewDeleted = false, deletedTransactions = [], onDelete, onUpdate, onPermanentDelete, brandName, printer, payments, currentUser }: Props) {
   const [tab, setTab] = useState<"active" | "deleted">("active");
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [selDeleted, setSelDeleted] = useState<DeletedTransaction | null>(null);
@@ -51,6 +52,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
   const [editNote, setEditNote] = useState("");
   const [editingNote, setEditingNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmPermDel, setConfirmPermDel] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [pinVerify, setPinVerify] = useState(false);
   const [pinVerifyInput, setPinVerifyInput] = useState("");
@@ -261,9 +263,16 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       <div className="flex flex-col">
         <div className="flex items-center justify-between mb-4 shrink-0">
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Riwayat Transaksi Dihapus</div>
-          <button onClick={() => setSelDeleted(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--muted)" }}>
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {canDelete && (
+              <button onClick={() => setConfirmPermDel(selDeleted.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus permanen">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            )}
+            <button onClick={() => setSelDeleted(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--muted)" }}>
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-3 rounded-xl mb-4" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
@@ -318,6 +327,20 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                 style={{ background: deleteReason.trim() ? "#ef4444" : "var(--muted)", color: deleteReason.trim() ? "white" : "var(--muted-foreground)" }}>
                 Ya, Hapus
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmPermDel && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Permanen?</div>
+            <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Riwayat transaksi terhapus ini akan dihapus selamanya dari aplikasi dan database. Tindakan ini tidak dapat dibatalkan.</div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmPermDel(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
+              <button onClick={() => { onPermanentDelete?.(confirmPermDel); setConfirmPermDel(null); setSelDeleted(null); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya, Hapus</button>
             </div>
           </div>
         </div>

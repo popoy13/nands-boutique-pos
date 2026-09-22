@@ -8,8 +8,9 @@ import {
   delFromDB, delToDB, settingsFromDB, settingsToDB, stableVariantId,
   expFromDB, expToDB, writeExpenses, saveExpensesJson,
   depFromDB, depToDB, writeDeposits, saveDepositsJson,
+  salaryConfigFromDB, salaryConfigToDB, salaryRecordFromDB, salaryRecordToDB, saveSalaryJson,
 } from "../data/sync";
-import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit } from "../data/types";
+import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit, SalaryConfig, SalaryRecord } from "../data/types";
 import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
@@ -26,7 +27,7 @@ const DEBOUNCE_MS = 350;
 const KNOWN_TABLES = new Set([
   "products", "stores", "employees", "members", "discounts",
   "attendance_records", "transactions", "deleted_transactions",
-  "settings", "categories", "expenses", "deposits",
+  "settings", "categories", "expenses", "deposits", "salary",
 ]);
 const MAX_REMOTE_ROWS = 50000;
 
@@ -44,6 +45,8 @@ export interface SyncedStore {
   categories: Category[]; setCategories: Dispatch<SetStateAction<Category[]>>;
   expenses: Expense[]; setExpenses: Dispatch<SetStateAction<Expense[]>>;
   deposits: CashDeposit[]; setDeposits: Dispatch<SetStateAction<CashDeposit[]>>;
+  salaryConfig: SalaryConfig[]; setSalaryConfig: Dispatch<SetStateAction<SalaryConfig[]>>;
+  salaryRecords: SalaryRecord[]; setSalaryRecords: Dispatch<SetStateAction<SalaryRecord[]>>;
   flush: () => Promise<void>;
 }
 
@@ -61,6 +64,9 @@ export function useSyncedStore(): SyncedStore {
   const [categories, setCategoriesState] = useState<Category[]>([]);
   const [expenses, setExpensesState] = useState<Expense[]>([]);
   const [deposits, setDepositsState] = useState<CashDeposit[]>([]);
+  const [salaryConfig, setSalaryConfigState] = useState<SalaryConfig[]>([]);
+  const [salaryRecords, setSalaryRecordsState] = useState<SalaryRecord[]>([]);
+  const salaryRef = useRef<{ config: SalaryConfig[]; records: SalaryRecord[] }>({ config: [], records: [] });
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -142,6 +148,11 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         try { await writeDeposits(rows); } catch (e) {
           console.warn("[sync] tabel cash_deposits belum tersedia:", e);
         }
+        break;
+      }
+      case "salary": {
+        const p = payload as { config: Record<string, unknown>[]; records: Record<string, unknown>[] };
+        await saveSalaryJson(p.config ?? [], p.records ?? []);
         break;
       }
       default: await saveRows(table, payload as Record<string, unknown>[]);
@@ -271,6 +282,39 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     return next;
   });
 
+  const pushSalary = () => {
+    const payload = {
+      config: salaryRef.current.config.map(salaryConfigToDB),
+      records: salaryRef.current.records.map(salaryRecordToDB),
+    };
+    pendingRef.current["salary"] = payload;
+    if (timersRef.current["salary"]) return;
+    timersRef.current["salary"] = setTimeout(async () => {
+      timersRef.current["salary"] = null;
+      const p = pendingRef.current["salary"];
+      pendingRef.current["salary"] = null;
+      if (p === undefined || p === null) return;
+      await writeTable("salary", p);
+    }, DEBOUNCE_MS);
+  };
+
+  const setSalaryConfig: Dispatch<SetStateAction<SalaryConfig[]>> = (upd) => setSalaryConfigState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: SalaryConfig[]) => SalaryConfig[])(prev) : upd;
+    if (next !== prev) {
+      salaryRef.current = { ...salaryRef.current, config: next };
+      pushSalary();
+    }
+    return next;
+  });
+  const setSalaryRecords: Dispatch<SetStateAction<SalaryRecord[]>> = (upd) => setSalaryRecordsState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: SalaryRecord[]) => SalaryRecord[])(prev) : upd;
+    if (next !== prev) {
+      salaryRef.current = { ...salaryRef.current, records: next };
+      pushSalary();
+    }
+    return next;
+  });
+
   const flush = async () => {
     const tasks: Promise<unknown>[] = [];
     for (const table of Object.keys(timersRef.current)) {
@@ -326,6 +370,15 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       case "deposits":
         setDepositsState(rows.map(depFromDB));
         break;
+      case "salary": {
+        const p = rows as { config?: Record<string, unknown>[]; records?: Record<string, unknown>[] };
+        const config = Array.isArray(p?.config) ? p.config.map(salaryConfigFromDB) : salaryRef.current.config;
+        const records = Array.isArray(p?.records) ? p.records.map(salaryRecordFromDB) : salaryRef.current.records;
+        salaryRef.current = { config, records };
+        setSalaryConfigState(config);
+        setSalaryRecordsState(records);
+        break;
+      }
     }
   };
   appliedRef.current = applyRemote;
@@ -351,6 +404,9 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setCategoriesState(d.categories);
         setExpensesState(d.expenses);
         setDepositsState(d.deposits);
+        setSalaryConfigState(d.salaryConfig);
+        setSalaryRecordsState(d.salaryRecords);
+        salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords };
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {
         console.warn("[sync] Supabase belum disetup - jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
@@ -389,6 +445,9 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setCategoriesState(d.categories);
             setExpensesState(d.expenses);
             setDepositsState(d.deposits);
+            setSalaryConfigState(d.salaryConfig);
+            setSalaryRecordsState(d.salaryRecords);
+            salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords };
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
             productsRemovedRef.current = { products: [], variants: [] };
             for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
@@ -413,6 +472,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     categories, setCategories,
     expenses, setExpenses,
     deposits, setDeposits,
+    salaryConfig, setSalaryConfig,
+    salaryRecords, setSalaryRecords,
     flush,
   };
 }

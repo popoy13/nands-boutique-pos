@@ -108,6 +108,8 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     categories, setCategories,
     expenses, setExpenses,
     deposits, setDeposits,
+    salaryConfig, setSalaryConfig,
+    salaryRecords, setSalaryRecords,
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -534,6 +536,10 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const canEmpImport = has("employee", "import");
   const canEmpExport = has("employee", "export");
   const canEmpAdd = has("employee", "add");
+  const canEmpGaji = has("employee", "gaji");
+  const canEmpGajiAdd = has("employee", "gaji_add");
+  const canEmpGajiEdit = has("employee", "gaji_edit");
+  const canEmpGajiDelete = has("employee", "gaji_delete");
   const canStoreAdd = has("store", "add");
   const canStoreEdit = has("store", "edit");
   const canStoreDelete = has("store", "delete");
@@ -687,6 +693,16 @@ const canDepositBank = has("deposit", "bank");
             canAdd={canEmpAdd}
             roles={settings.roles}
             currentUser={currentUser}
+            attendance={attendance}
+            transactions={transactions}
+            salaryConfig={salaryConfig}
+            salaryRecords={salaryRecords}
+            onSaveSalaryConfig={setSalaryConfig}
+            onSaveSalaryRecords={setSalaryRecords}
+            canGaji={canEmpGaji}
+            canGajiAdd={canEmpGajiAdd}
+            canGajiEdit={canEmpGajiEdit}
+            canGajiDelete={canEmpGajiDelete}
           />
         )}
         {safeTab === "store" && (

@@ -11,6 +11,8 @@ import type {
   AttendanceRecord,
   Expense,
   CashDeposit,
+  SalaryConfig,
+  SalaryRecord,
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
@@ -675,6 +677,92 @@ export async function deleteDeposit(id: string): Promise<void> {
   if (error) throw error
 }
 
+/* ---------------- gaji karyawan ---------------- */
+
+export const salaryConfigFromDB = (r: Record<string, unknown>): SalaryConfig => ({
+  employeeId: s(r.employee_id),
+  baseSalary: n(r.base_salary),
+  salesTarget: n(r.sales_target),
+  bonus: n(r.bonus),
+})
+
+export const salaryConfigToDB = (x: SalaryConfig): Record<string, unknown> => ({
+  employee_id: x.employeeId,
+  base_salary: x.baseSalary,
+  sales_target: x.salesTarget,
+  bonus: x.bonus,
+})
+
+export const salaryRecordFromDB = (r: Record<string, unknown>): SalaryRecord => ({
+  id: s(r.id),
+  employeeId: s(r.employee_id),
+  employeeName: s(r.employee_name),
+  storeId: s(r.store_id),
+  storeName: s(r.store_name),
+  month: s(r.month),
+  baseSalary: n(r.base_salary),
+  attendanceCount: n(r.attendance_count),
+  gross: n(r.gross),
+  salesTotal: n(r.sales_total),
+  salesTarget: n(r.sales_target),
+  bonus: n(r.bonus),
+  total: n(r.total),
+  paid: !!r.paid,
+  paidAt: r.paid_at ? String(r.paid_at) : undefined,
+})
+
+export const salaryRecordToDB = (x: SalaryRecord): Record<string, unknown> => ({
+  id: x.id,
+  employee_id: x.employeeId,
+  employee_name: x.employeeName,
+  store_id: x.storeId,
+  store_name: x.storeName,
+  month: x.month,
+  base_salary: x.baseSalary,
+  attendance_count: x.attendanceCount,
+  gross: x.gross,
+  sales_total: x.salesTotal,
+  sales_target: x.salesTarget,
+  bonus: x.bonus,
+  total: x.total,
+  paid: x.paid,
+  paid_at: x.paidAt ?? null,
+})
+
+/* Simpan gaji via app_settings (JSON) agar selalu tersimpan
+   walau tabel dedicated belum dibuat di database. */
+export async function saveSalaryJson(
+  config: Record<string, unknown>[],
+  records: Record<string, unknown>[],
+): Promise<void> {
+  const { error: e1 } = await supabase
+    .from("app_settings")
+    .upsert({ key: "salary_config", value: config }, { onConflict: "key" })
+  if (e1) throw e1
+  const { error: e2 } = await supabase
+    .from("app_settings")
+    .upsert({ key: "salary_records", value: records }, { onConflict: "key" })
+  if (e2) throw e2
+}
+
+export const salaryConfigFromSettings = (
+  rows: Record<string, unknown>[],
+): SalaryConfig[] => {
+  const row = rows.find((r) => r && r.key === "salary_config")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(salaryConfigFromDB)
+}
+
+export const salaryRecordsFromSettings = (
+  rows: Record<string, unknown>[],
+): SalaryRecord[] => {
+  const row = rows.find((r) => r && r.key === "salary_records")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(salaryRecordFromDB)
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   if (!id) return
   const { error } = await supabase.from("transactions").delete().eq("id", id)
@@ -704,6 +792,8 @@ export interface AllData {
   attendance: AttendanceRecord[]
   expenses: Expense[]
   deposits: CashDeposit[]
+  salaryConfig: SalaryConfig[]
+  salaryRecords: SalaryRecord[]
   transactions: Transaction[]
   deletedTransactions: DeletedTransaction[]
   settings: AppSettings
@@ -768,6 +858,8 @@ export async function loadAll(): Promise<LoadResult> {
     const deposits = depoesFromTable.length
       ? depoesFromTable
       : depositsFromSettings(settingsRows)
+    const salaryConfig = salaryConfigFromSettings(settingsRows)
+    const salaryRecords = salaryRecordsFromSettings(settingsRows)
 
     return {
       ok: true,
@@ -780,6 +872,8 @@ export async function loadAll(): Promise<LoadResult> {
         attendance: first(attR).map(attFromDB),
         expenses,
         deposits,
+        salaryConfig,
+        salaryRecords,
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(settingsRows),

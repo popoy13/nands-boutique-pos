@@ -2,12 +2,13 @@
 import * as XLSX from "xlsx";
 import { safeRows } from "../lib/safeExport";
 import { validateImageFile } from "../lib/imageFile";
-import type { Employee } from "../data/types";
+import type { Employee, AttendanceRecord, Transaction, SalaryConfig, SalaryRecord } from "../data/types";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
 import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
+import SalaryView from "./SalaryView";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -32,6 +33,16 @@ interface Props {
   canAdd?: boolean;
   roles?: Record<string, RoleConfig>;
   currentUser?: Employee | null;
+  attendance?: AttendanceRecord[];
+  transactions?: Transaction[];
+  salaryConfig?: SalaryConfig[];
+  salaryRecords?: SalaryRecord[];
+  onSaveSalaryConfig?: (config: SalaryConfig[]) => void;
+  onSaveSalaryRecords?: (records: SalaryRecord[]) => void;
+  canGaji?: boolean;
+  canGajiAdd?: boolean;
+  canGajiEdit?: boolean;
+  canGajiDelete?: boolean;
 }
 
 const emptyEmployee = (): Employee => ({
@@ -47,7 +58,8 @@ const emptyEmployee = (): Employee => ({
   pin: "",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser, attendance = [], transactions = [], salaryConfig = [], salaryRecords = [], onSaveSalaryConfig, onSaveSalaryRecords, canGaji = false, canGajiAdd = false, canGajiEdit = false, canGajiDelete = false }: Props) {
+  const [tab, setTab] = useState<"daftar" | "gaji">("daftar");
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
@@ -429,7 +441,41 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   ) : null;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
+      {canGaji && (
+        <div className="shrink-0 px-4 sm:px-6 py-3 border-b flex gap-1.5 flex-wrap items-center" style={{ borderColor: "var(--border)", background: "var(--background)" }}>
+          <div className="inline-flex p-0.5 rounded-xl gap-0.5" style={{ background: "var(--muted)" }}>
+            <button onClick={() => setTab("daftar")}
+              className="px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+              style={{ background: tab === "daftar" ? "var(--foreground)" : "transparent", color: tab === "daftar" ? "white" : "var(--muted-foreground)" }}>
+              Daftar Karyawan
+            </button>
+            <button onClick={() => setTab("gaji")}
+              className="px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+              style={{ background: tab === "gaji" ? "var(--foreground)" : "transparent", color: tab === "gaji" ? "white" : "var(--muted-foreground)" }}>
+              Gaji Karyawan
+            </button>
+          </div>
+        </div>
+      )}
+      {tab === "gaji" && canGaji ? (
+        <div className="flex-1 min-h-0">
+          <SalaryView
+            employees={employees}
+            stores={stores}
+            attendance={attendance}
+            transactions={transactions}
+            salaryConfig={salaryConfig}
+            salaryRecords={salaryRecords}
+            onSaveConfig={onSaveSalaryConfig ?? (() => {})}
+            onSaveRecords={onSaveSalaryRecords ?? (() => {})}
+            canAdd={canGajiAdd}
+            canEdit={canGajiEdit}
+            canDelete={canGajiDelete}
+          />
+        </div>
+      ) : (
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
@@ -637,6 +683,8 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             <div className="flex flex-col max-h-[88vh] overflow-y-auto">{editBody}</div>
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   );

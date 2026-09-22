@@ -166,3 +166,28 @@ export interface CashDeposit {
   photo?: string;
   createdByName: string;
 }
+
+export interface SalaryConfig {
+  employeeId: string;
+  baseSalary: number;
+  salesTarget: number;
+  bonus: number;
+}
+
+export interface SalaryRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  storeId: string;
+  storeName: string;
+  month: string;
+  baseSalary: number;
+  attendanceCount: number;
+  gross: number;
+  salesTotal: number;
+  salesTarget: number;
+  bonus: number;
+  total: number;
+  paid: boolean;
+  paidAt?: string;
+}

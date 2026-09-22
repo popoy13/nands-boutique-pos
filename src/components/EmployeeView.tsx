@@ -2,7 +2,7 @@
 import * as XLSX from "xlsx";
 import { safeRows } from "../lib/safeExport";
 import { validateImageFile } from "../lib/imageFile";
-import type { Employee, AttendanceRecord, Transaction, SalaryConfig, SalaryRecord } from "../data/types";
+import type { Employee, AttendanceRecord, Transaction, SalaryConfig, SalaryRecord, Kasbon } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
@@ -38,8 +38,10 @@ interface Props {
   transactions?: Transaction[];
   salaryConfig?: SalaryConfig[];
   salaryRecords?: SalaryRecord[];
+  kasbon?: Kasbon[];
   onSaveSalaryConfig?: (config: SalaryConfig[]) => void;
   onSaveSalaryRecords?: (records: SalaryRecord[]) => void;
+  onSaveKasbon?: (kasbon: Kasbon[]) => void;
   canGaji?: boolean;
   canGajiAdd?: boolean;
   canGajiEdit?: boolean;
@@ -60,7 +62,7 @@ const emptyEmployee = (): Employee => ({
   pin: "",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser, attendance = [], transactions = [], salaryConfig = [], salaryRecords = [], onSaveSalaryConfig, onSaveSalaryRecords, canGaji = false, canGajiAdd = false, canGajiEdit = false, canGajiDelete = false, settings }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser, attendance = [], transactions = [], salaryConfig = [], salaryRecords = [], kasbon = [], onSaveSalaryConfig, onSaveSalaryRecords, onSaveKasbon, canGaji = false, canGajiAdd = false, canGajiEdit = false, canGajiDelete = false, settings }: Props) {
   const [tab, setTab] = useState<"daftar" | "gaji">("daftar");
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
@@ -476,8 +478,10 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             transactions={transactions}
             salaryConfig={salaryConfig}
             salaryRecords={salaryRecords}
+            kasbon={kasbon}
             onSaveConfig={onSaveSalaryConfig ?? (() => {})}
             onSaveRecords={onSaveSalaryRecords ?? (() => {})}
+            onSaveKasbon={onSaveKasbon ?? (() => {})}
             onSyncBaseSalary={(id, base) => {
               const emp = employees.find(e => e.id === id);
               if (!emp || Math.abs((emp.salary ?? 0) - base) < 1) return;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AttendanceRecord, Employee, SalaryConfig, SalaryRecord, Transaction } from "../data/types";
+import type { AttendanceRecord, Employee, SalaryConfig, SalaryRecord, Transaction, Kasbon } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { attendanceCountFor, salesTotalFor, computeSalary, upsertRecords, currentMonth } from "../data/salary";
 import { assetUrl } from "../lib/assets";
@@ -18,8 +18,10 @@ interface Props {
   transactions: Transaction[];
   salaryConfig: SalaryConfig[];
   salaryRecords: SalaryRecord[];
+  kasbon: Kasbon[];
   onSaveConfig: (config: SalaryConfig[]) => void;
   onSaveRecords: (records: SalaryRecord[]) => void;
+  onSaveKasbon: (kasbon: Kasbon[]) => void;
   onSyncBaseSalary?: (employeeId: string, baseSalary: number) => void;
   canAdd?: boolean;
   canEdit?: boolean;
@@ -32,7 +34,7 @@ const storeNameOf = (stores: { id: string; name: string }[], id: string) =>
 
 const esc = (s: string) => s.replace(/[<>&"]/g, c => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : "&quot;"));
 
-export default function SalaryView({ employees, stores, attendance, transactions, salaryConfig, salaryRecords, onSaveConfig, onSaveRecords, onSyncBaseSalary, canAdd = false, canEdit = false, canDelete = false, settings }: Props) {
+export default function SalaryView({ employees, stores, attendance, transactions, salaryConfig, salaryRecords, kasbon, onSaveConfig, onSaveRecords, onSaveKasbon, onSyncBaseSalary, canAdd = false, canEdit = false, canDelete = false, settings }: Props) {
   const [month, setMonth] = useState(currentMonth());
   const [configDraft, setConfigDraft] = useState<Record<string, { baseSalary: number; salesTarget: number; bonus: number }>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -44,12 +46,21 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
   const [laporEmp, setLaporEmp] = useState<Employee | null>(null);
   const [slipRec, setSlipRec] = useState<SalaryRecord | null>(null);
+  const [kasbonEmp, setKasbonEmp] = useState<Employee | null>(null);
+  const [kasbonAmount, setKasbonAmount] = useState("");
+  const [kasbonDate, setKasbonDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [kasbonNote, setKasbonNote] = useState("");
+  const [confirmKasbonId, setConfirmKasbonId] = useState<string | null>(null);
 
   const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3200); };
 
   const monthRecords = salaryRecords.filter(r => r.month === month);
   const recByEmp = new Map(monthRecords.map(r => [r.employeeId, r]));
   const active = employees.filter(e => e.status === "active");
+
+  const outstandingFor = (empId: string) =>
+    kasbon.filter(k => k.employeeId === empId && !k.settled).reduce((s, k) => s + (k.amount || 0), 0);
+  const totalKasbonOutstanding = kasbon.filter(k => !k.settled).reduce((s, k) => s + (k.amount || 0), 0);
 
   const draftFor = (emp: Employee) => {
     const existing = configDraft[emp.id];
@@ -115,9 +126,16 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const togglePaid = (emp: Employee) => {
     const rec = recByEmp.get(emp.id);
     if (!rec) return;
-    const next = { ...rec, paid: !rec.paid, paidAt: !rec.paid ? new Date().toISOString().slice(0, 10) : undefined };
+    const paying = !rec.paid;
+    const today = new Date().toISOString().slice(0, 10);
+    const next = { ...rec, paid: paying, paidAt: paying ? today : undefined };
     onSaveRecords(salaryRecords.map(r => r.id === rec.id ? next : r));
-    showToast(next.paid ? "Gaji ditandai dibayar" : "Status gaji dikembalikan ke belum bayar");
+    if (paying) {
+      onSaveKasbon(kasbon.map(k => k.employeeId === emp.id && !k.settled ? { ...k, settled: true, settledAt: today, settlementMonth: month } : k));
+    } else {
+      onSaveKasbon(kasbon.map(k => k.settlementMonth === month ? { ...k, settled: false, settledAt: undefined, settlementMonth: undefined } : k));
+    }
+    showToast(paying ? "Gaji ditandai dibayar · kasbon lunas" : "Status gaji dikembalikan ke belum bayar");
   };
 
   const doDelete = () => {
@@ -125,6 +143,31 @@ export default function SalaryView({ employees, stores, attendance, transactions
     onSaveRecords(salaryRecords.filter(r => r.id !== confirmDelete));
     setConfirmDelete(null);
     showToast("Gaji dihapus");
+  };
+
+  const addKasbon = (emp: Employee) => {
+    const amount = Math.round(Number(kasbonAmount));
+    if (!amount || amount <= 0) { showToast("Isi nominal kasbon", false); return; }
+    const entry: Kasbon = {
+      id: `KB-${emp.id}-${Date.now()}`,
+      employeeId: emp.id,
+      date: kasbonDate || new Date().toISOString().slice(0, 10),
+      amount,
+      note: kasbonNote.trim() || undefined,
+      settled: false,
+    };
+    onSaveKasbon([...kasbon, entry]);
+    setKasbonAmount("");
+    setKasbonNote("");
+    setKasbonDate(new Date().toISOString().slice(0, 10));
+    showToast(`Kasbon ${emp.name} sebesar ${fmt(entry.amount)} dicatat`);
+  };
+
+  const deleteKasbon = (id: string) => {
+    const k = kasbon.find(x => x.id === id);
+    onSaveKasbon(kasbon.filter(x => x.id !== id));
+    setConfirmKasbonId(null);
+    showToast(k ? `Kasbon ${fmt(k.amount)} dihapus` : "Catatan kasbon dihapus");
   };
 
   const openLapor = (emp: Employee) => {
@@ -151,6 +194,8 @@ export default function SalaryView({ employees, stores, attendance, transactions
     const N = (n: number) => new Intl.NumberFormat("id-ID").format(n);
     const daily = Math.round(rec.baseSalary / 30);
     const reached = rec.salesTarget > 0 && rec.salesTotal >= rec.salesTarget;
+    const potongan = outstandingFor(rec.employeeId);
+    const net = Math.max(0, rec.total - potongan);
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Slip Gaji ${esc(rec.employeeName)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -197,7 +242,9 @@ export default function SalaryView({ employees, stores, attendance, transactions
       <tr><td>Omzet Penjualan</td><td class="num"></td><td class="num">${R(rec.salesTotal)}</td></tr>
       <tr><td>Target Penjualan</td><td class="num"></td><td class="num">${N(rec.salesTarget)}</td></tr>
       <tr><td>Bonus Capai Target</td><td class="num">${reached ? "Tercapai" : "Belum tercapai"}</td><td class="num">${R(rec.bonus)}</td></tr>
-      <tr class="grand"><td colspan="2">TOTAL GAJI DITERIMA</td><td class="num">${R(rec.total)}</td></tr>
+      <tr class="grand"><td colspan="2">TOTAL GAJI</td><td class="num">${R(rec.total)}</td></tr>
+      <tr><td>Potongan Kasbon</td><td class="num">${potongan ? "Belum lunas" : "Tidak ada"}</td><td class="num">${potongan ? "− " + R(potongan) : "0"}</td></tr>
+      <tr class="grand"><td colspan="2">TOTAL DITERIMA</td><td class="num">${R(net)}</td></tr>
       <tr><td>Status Pembayaran</td><td class="num">${rec.paid ? "Dibayar" + (rec.paidAt ? " " + esc(rec.paidAt) : "") : "Belum dibayar"}</td><td class="num"></td></tr>
     </table>
     <div class="sign">
@@ -330,6 +377,12 @@ export default function SalaryView({ employees, stores, attendance, transactions
                   ))}
                   <div className="my-2 border-t border-dashed border-black" />
                   <div className="flex justify-between font-bold text-sm"><span>Total Gaji</span><span>{fmt(slipRec.total)}</span></div>
+                  {outstandingFor(slipRec.employeeId) > 0 && (
+                    <div className="flex justify-between py-0.5"><span>Potongan Kasbon</span><span>- {fmt(outstandingFor(slipRec.employeeId))}</span></div>
+                  )}
+                  <div className="flex justify-between font-bold text-sm" style={{ borderTop: "1px solid #000", paddingTop: 4 }}>
+                    <span>Total Diterima</span><span>{fmt(Math.max(0, slipRec.total - outstandingFor(slipRec.employeeId)))}</span>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
@@ -390,9 +443,15 @@ export default function SalaryView({ employees, stores, attendance, transactions
                           <span className="font-mono text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
                         </div>
                       ))}
+                      {outstandingFor(laporEmp.id) > 0 && (
+                        <div className="flex justify-between items-center px-3 py-2 rounded-lg" style={cell}>
+                          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Potongan Kasbon</span>
+                          <span className="font-mono text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "#dc2626" }}>- {fmt(outstandingFor(laporEmp.id))}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center px-3 py-2.5 rounded-lg font-bold" style={{ ...cell, borderWidth: 1.5 }}>
-                        <span className="text-xs">Total Gaji</span>
-                        <span className="font-mono text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(rec.total)}</span>
+                        <span className="text-xs">Total Diterima</span>
+                        <span className="font-mono text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(Math.max(0, rec.total - outstandingFor(laporEmp.id)))}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 mt-4">
@@ -418,6 +477,99 @@ export default function SalaryView({ employees, stores, attendance, transactions
                       </div>
                     </div>
                   </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* OVERLAY: KASBON PER KARYAWAN */}
+      {kasbonEmp && (() => {
+        const list = kasbon.filter(k => k.employeeId === kasbonEmp.id).sort((a, b) => b.date.localeCompare(a.date));
+        const outstanding = list.filter(k => !k.settled).reduce((s, k) => s + (k.amount || 0), 0);
+        const totalTaken = list.reduce((s, k) => s + (k.amount || 0), 0);
+        return (
+          <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+            <div className="rounded-2xl my-auto w-[440px] max-w-[92vw]" style={{ background: "var(--card)" }}>
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+                <div>
+                  <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="text-sm">Kasbon — {kasbonEmp.name}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, kasbonEmp.storeId)} · Potongan otomatis dari slip gaji saat dibayar</div>
+                </div>
+                <button onClick={() => { setKasbonEmp(null); setConfirmKasbonId(null); }} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-5">
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="px-3 py-3 rounded-xl" style={cell}>
+                    <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Sisa belum lunas</div>
+                    <div className="font-mono text-sm font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: outstanding > 0 ? "#d97706" : "#16a34a" }}>{fmt(outstanding)}</div>
+                  </div>
+                  <div className="px-3 py-3 rounded-xl" style={cell}>
+                    <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Total kasbon dicatat</div>
+                    <div className="font-mono text-sm font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(totalTaken)}</div>
+                  </div>
+                </div>
+
+                {mut && (
+                  <div className="rounded-xl p-3 mb-4" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>Catat Kasbon Baru</div>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <div className="text-[10px] mb-1" style={{ color: "var(--muted-foreground)" }}>Nominal (Rp)</div>
+                        <input inputMode="numeric" placeholder="0" value={kasbonAmount}
+                          onChange={e => setKasbonAmount(e.target.value.replace(/[^\d]/g, ""))}
+                          className="px-2.5 py-2 rounded-lg text-xs w-full outline-none"
+                          style={inputStyle} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] mb-1" style={{ color: "var(--muted-foreground)" }}>Tanggal</div>
+                        <input type="date" value={kasbonDate} onChange={e => setKasbonDate(e.target.value)} className="px-2.5 py-2 rounded-lg text-xs w-full outline-none" style={inputStyle} />
+                      </div>
+                    </div>
+                    <div className="text-[10px] mb-1" style={{ color: "var(--muted-foreground)" }}>Catatan (opsional)</div>
+                    <input placeholder="Mis. Kasbon keperluan keluarga" value={kasbonNote} onChange={e => setKasbonNote(e.target.value)} className="px-2.5 py-2 rounded-lg text-xs w-full outline-none mb-2" style={inputStyle} />
+                    <button onClick={() => addKasbon(kasbonEmp)} className="w-full py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "var(--foreground)" }}>
+                      + Catat Kasbon
+                    </button>
+                  </div>
+                )}
+
+                <div className="text-xs font-semibold mb-2">Riwayat Kasbon</div>
+                {list.length === 0 ? (
+                  <div className="text-center text-xs py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada kasbon untuk karyawan ini.</div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {list.map(k => (
+                      <div key={k.id} className="px-3 py-2.5 rounded-xl flex items-center justify-between gap-2" style={{ background: "var(--background)" }}>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(k.amount)}</span>
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={k.settled ? { background: "#f0fdf4", color: "#16a34a" } : { background: "#fffbeb", color: "#d97706" }}>
+                              {k.settled ? "LUNAS" : "BELUM"}
+                            </span>
+                          </div>
+                          <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                            {k.date}{k.note ? ` · ${k.note}` : ""}{k.settled && k.settledAt ? ` · Lunas ${k.settledAt}` : ""}
+                          </div>
+                        </div>
+                        {canDelete && (
+                          confirmKasbonId === k.id ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button onClick={() => deleteKasbon(k.id)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white" style={{ background: "#ef4444" }}>Ya, hapus</button>
+                              <button onClick={() => setConfirmKasbonId(null)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Ga jadi</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmKasbonId(k.id)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus kasbon">
+                              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#dc2626" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          )
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -487,7 +639,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
               </div>
             </div>
           </div>
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-3 text-xs">
+          <div className="grid gap-2 grid-cols-2 lg:grid-cols-4 text-xs">
             <div className="px-3 py-2.5 rounded-xl font-semibold" style={cell}>
               <div style={{ color: "var(--muted-foreground)", fontWeight: 500 }}>Total gaji {month}</div>
               <div className="font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)", fontWeight: 700 }}>{fmt(totalGaji)}</div>
@@ -500,6 +652,10 @@ export default function SalaryView({ employees, stores, attendance, transactions
               <div style={{ color: "var(--muted-foreground)", fontWeight: 500 }}>Laporan tersimpan</div>
               <div className="font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{monthRecords.length} bulan {month}</div>
             </div>
+            <div className="px-3 py-2.5 rounded-xl font-semibold" style={cell}>
+              <div style={{ color: "var(--muted-foreground)", fontWeight: 500 }}>Kasbon belum lunas</div>
+              <div className="font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: totalKasbonOutstanding > 0 ? "#d97706" : "#16a34a", fontWeight: 700 }}>{fmt(totalKasbonOutstanding)}</div>
+            </div>
           </div>
         </div>
 
@@ -508,7 +664,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
           <div className="p-5 pb-0">
             <div className="text-sm font-semibold mb-1">Gaji & Target Penjualan</div>
             <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-              Klik <b>Edit</b> untuk mengubah gaji pokok, target & bonus, atau <b>Laporan</b> untuk membuka laporan gaji per karyawan.
+              Klik <b>Edit</b> untuk mengubah gaji pokok, target & bonus, <b>Laporan</b> untuk membuka laporan gaji per karyawan, atau <b>Kasbon</b> untuk mencatat uang muka yang dipotong dari gaji.
             </div>
           </div>
 
@@ -549,6 +705,10 @@ export default function SalaryView({ employees, stores, attendance, transactions
                                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17h6m-6-4h6m-6-4h6M5 21h14a2 2 0 002-2V7.5L15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                 Laporan
                               </button>
+                              <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#fefce8", color: "#a16207" }}>
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>
+                                Kasbon
+                              </button>
                               {canDelete && mut && (
                                 <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
                                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -563,17 +723,6 @@ export default function SalaryView({ employees, stores, attendance, transactions
                                 <div className="text-sm font-semibold truncate">{emp.name}</div>
                                 <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {mut && (
-                                  <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
-                                )}
-                                <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#eef2ff", color: "#4f46e5" }}>Laporan</button>
-                                {canDelete && mut && (
-                                  <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
-                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                  </button>
-                                )}
-                              </div>
                             </div>
                             <div className="mt-2.5 grid grid-cols-3 gap-1.5">
                               {[
@@ -586,6 +735,18 @@ export default function SalaryView({ employees, stores, attendance, transactions
                                   <div className="font-mono font-semibold text-[11px] mt-0.5 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{c.val}</div>
                                 </div>
                               ))}
+                            </div>
+                            <div className="mt-2.5 flex items-center justify-end gap-1.5 flex-wrap">
+                              {mut && (
+                                <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
+                              )}
+                              <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#eef2ff", color: "#4f46e5" }}>Laporan</button>
+                              <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#fefce8", color: "#a16207" }}>Kasbon</button>
+                              {canDelete && mut && (
+                                <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
+                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

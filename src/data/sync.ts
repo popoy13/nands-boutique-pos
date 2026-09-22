@@ -13,6 +13,7 @@ import type {
   CashDeposit,
   SalaryConfig,
   SalaryRecord,
+  Kasbon,
 } from "./types"
 import type { AppSettings } from "./settings"
 import { defaultSettings } from "./settings"
@@ -729,11 +730,34 @@ export const salaryRecordToDB = (x: SalaryRecord): Record<string, unknown> => ({
   paid_at: x.paidAt ?? null,
 })
 
+export const kasbonFromDB = (r: Record<string, unknown>): Kasbon => ({
+  id: s(r.id),
+  employeeId: s(r.employee_id),
+  date: s(r.date),
+  amount: n(r.amount),
+  note: r.note ? String(r.note) : undefined,
+  settled: !!r.settled,
+  settledAt: r.settled_at ? String(r.settled_at) : undefined,
+  settlementMonth: r.settlement_month ? String(r.settlement_month) : undefined,
+})
+
+export const kasbonToDB = (x: Kasbon): Record<string, unknown> => ({
+  id: x.id,
+  employee_id: x.employeeId,
+  date: x.date,
+  amount: x.amount,
+  note: x.note ?? null,
+  settled: x.settled,
+  settled_at: x.settledAt ?? null,
+  settlement_month: x.settlementMonth ?? null,
+})
+
 /* Simpan gaji via app_settings (JSON) agar selalu tersimpan
    walau tabel dedicated belum dibuat di database. */
 export async function saveSalaryJson(
   config: Record<string, unknown>[],
   records: Record<string, unknown>[],
+  kasbon: Record<string, unknown>[] | null = null,
 ): Promise<void> {
   const { error: e1 } = await supabase
     .from("app_settings")
@@ -743,6 +767,12 @@ export async function saveSalaryJson(
     .from("app_settings")
     .upsert({ key: "salary_records", value: records }, { onConflict: "key" })
   if (e2) throw e2
+  if (kasbon !== null) {
+    const { error: e3 } = await supabase
+      .from("app_settings")
+      .upsert({ key: "salary_kasbon", value: kasbon }, { onConflict: "key" })
+    if (e3) throw e3
+  }
 }
 
 export const salaryConfigFromSettings = (
@@ -761,6 +791,15 @@ export const salaryRecordsFromSettings = (
   const val = row?.value
   if (!Array.isArray(val)) return []
   return (val as Record<string, unknown>[]).map(salaryRecordFromDB)
+}
+
+export const kasbonFromSettings = (
+  rows: Record<string, unknown>[],
+): Kasbon[] => {
+  const row = rows.find((r) => r && r.key === "salary_kasbon")
+  const val = row?.value
+  if (!Array.isArray(val)) return []
+  return (val as Record<string, unknown>[]).map(kasbonFromDB)
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -794,6 +833,7 @@ export interface AllData {
   deposits: CashDeposit[]
   salaryConfig: SalaryConfig[]
   salaryRecords: SalaryRecord[]
+  kasbon: Kasbon[]
   transactions: Transaction[]
   deletedTransactions: DeletedTransaction[]
   settings: AppSettings
@@ -860,6 +900,7 @@ export async function loadAll(): Promise<LoadResult> {
       : depositsFromSettings(settingsRows)
     const salaryConfig = salaryConfigFromSettings(settingsRows)
     const salaryRecords = salaryRecordsFromSettings(settingsRows)
+    const kasbon = kasbonFromSettings(settingsRows)
 
     return {
       ok: true,
@@ -874,6 +915,7 @@ export async function loadAll(): Promise<LoadResult> {
         deposits,
         salaryConfig,
         salaryRecords,
+        kasbon,
         transactions: first(trxR).map(trxFromDB),
         deletedTransactions: first(delR).map(delFromDB),
         settings: settingsFromDB(settingsRows),

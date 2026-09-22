@@ -9,8 +9,9 @@ import {
   expFromDB, expToDB, writeExpenses, saveExpensesJson,
   depFromDB, depToDB, writeDeposits, saveDepositsJson,
   salaryConfigFromDB, salaryConfigToDB, salaryRecordFromDB, salaryRecordToDB, saveSalaryJson,
+  kasbonFromDB, kasbonToDB,
 } from "../data/sync";
-import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit, SalaryConfig, SalaryRecord } from "../data/types";
+import type { Transaction, DeletedTransaction, Employee, Product, Store, Discount, Member, AttendanceRecord, Expense, CashDeposit, SalaryConfig, SalaryRecord, Kasbon } from "../data/types";
 import type { Category } from "../data/sync";
 import type { AppSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
@@ -47,6 +48,7 @@ export interface SyncedStore {
   deposits: CashDeposit[]; setDeposits: Dispatch<SetStateAction<CashDeposit[]>>;
   salaryConfig: SalaryConfig[]; setSalaryConfig: Dispatch<SetStateAction<SalaryConfig[]>>;
   salaryRecords: SalaryRecord[]; setSalaryRecords: Dispatch<SetStateAction<SalaryRecord[]>>;
+  kasbon: Kasbon[]; setKasbon: Dispatch<SetStateAction<Kasbon[]>>;
   flush: () => Promise<void>;
 }
 
@@ -66,7 +68,8 @@ export function useSyncedStore(): SyncedStore {
   const [deposits, setDepositsState] = useState<CashDeposit[]>([]);
   const [salaryConfig, setSalaryConfigState] = useState<SalaryConfig[]>([]);
   const [salaryRecords, setSalaryRecordsState] = useState<SalaryRecord[]>([]);
-  const salaryRef = useRef<{ config: SalaryConfig[]; records: SalaryRecord[] }>({ config: [], records: [] });
+  const [kasbon, setKasbonState] = useState<Kasbon[]>([]);
+  const salaryRef = useRef<{ config: SalaryConfig[]; records: SalaryRecord[]; kasbon: Kasbon[] }>({ config: [], records: [], kasbon: [] });
 
   const readyRef = useRef(false);
   readyRef.current = ready;
@@ -151,8 +154,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         break;
       }
       case "salary": {
-        const p = payload as { config: Record<string, unknown>[]; records: Record<string, unknown>[] };
-        await saveSalaryJson(p.config ?? [], p.records ?? []);
+        const p = payload as { config: Record<string, unknown>[]; records: Record<string, unknown>[]; kasbon: Record<string, unknown>[] };
+        await saveSalaryJson(p.config ?? [], p.records ?? [], p.kasbon ?? []);
         break;
       }
       default: await saveRows(table, payload as Record<string, unknown>[]);
@@ -286,6 +289,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     const payload = {
       config: salaryRef.current.config.map(salaryConfigToDB),
       records: salaryRef.current.records.map(salaryRecordToDB),
+      kasbon: salaryRef.current.kasbon.map(kasbonToDB),
     };
     pendingRef.current["salary"] = payload;
     if (timersRef.current["salary"]) return;
@@ -310,6 +314,14 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     const next = typeof upd === "function" ? (upd as (p: SalaryRecord[]) => SalaryRecord[])(prev) : upd;
     if (next !== prev) {
       salaryRef.current = { ...salaryRef.current, records: next };
+      pushSalary();
+    }
+    return next;
+  });
+  const setKasbon: Dispatch<SetStateAction<Kasbon[]>> = (upd) => setKasbonState(prev => {
+    const next = typeof upd === "function" ? (upd as (p: Kasbon[]) => Kasbon[])(prev) : upd;
+    if (next !== prev) {
+      salaryRef.current = { ...salaryRef.current, kasbon: next };
       pushSalary();
     }
     return next;
@@ -371,12 +383,14 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setDepositsState(rows.map(depFromDB));
         break;
       case "salary": {
-        const p = rows as { config?: Record<string, unknown>[]; records?: Record<string, unknown>[] };
+        const p = rows as { config?: Record<string, unknown>[]; records?: Record<string, unknown>[]; kasbon?: Record<string, unknown>[] };
         const config = Array.isArray(p?.config) ? p.config.map(salaryConfigFromDB) : salaryRef.current.config;
         const records = Array.isArray(p?.records) ? p.records.map(salaryRecordFromDB) : salaryRef.current.records;
-        salaryRef.current = { config, records };
+        const kasbon = Array.isArray(p?.kasbon) ? p.kasbon.map(kasbonFromDB) : salaryRef.current.kasbon;
+        salaryRef.current = { config, records, kasbon };
         setSalaryConfigState(config);
         setSalaryRecordsState(records);
+        setKasbonState(kasbon);
         break;
       }
     }
@@ -406,7 +420,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
         setDepositsState(d.deposits);
         setSalaryConfigState(d.salaryConfig);
         setSalaryRecordsState(d.salaryRecords);
-        salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords };
+        setKasbonState(d.kasbon);
+        salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords, kasbon: d.kasbon };
         setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
       } else {
         console.warn("[sync] Supabase belum disetup - jalankan database/supabase-setup.sql di SQL Editor. Memakai data lokal sementara.");
@@ -447,7 +462,8 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
             setDepositsState(d.deposits);
             setSalaryConfigState(d.salaryConfig);
             setSalaryRecordsState(d.salaryRecords);
-            salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords };
+            setKasbonState(d.kasbon);
+            salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords, kasbon: d.kasbon };
             setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
             productsRemovedRef.current = { products: [], variants: [] };
             for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
@@ -474,6 +490,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     deposits, setDeposits,
     salaryConfig, setSalaryConfig,
     salaryRecords, setSalaryRecords,
+    kasbon, setKasbon,
     flush,
   };
 }

@@ -191,3 +191,14 @@ export interface SalaryRecord {
   paid: boolean;
   paidAt?: string;
 }
+
+export interface Kasbon {
+  id: string;
+  employeeId: string;
+  date: string;
+  amount: number;
+  note?: string;
+  settled: boolean;
+  settledAt?: string;
+  settlementMonth?: string;
+}

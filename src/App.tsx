@@ -110,6 +110,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     deposits, setDeposits,
     salaryConfig, setSalaryConfig,
     salaryRecords, setSalaryRecords,
+    kasbon, setKasbon,
     flush,
   } = useSyncedStore();
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -442,11 +443,12 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       setAttendance(prev => prev.filter(r => !ids.includes(r.id)));
     });
 
-  const handleResetSalary = (): Promise<ResetResult> =>
+const handleResetSalary = (): Promise<ResetResult> =>
     runReset(async () => {
-      await saveSalaryJson([], []);
+      await saveSalaryJson([], [], []);
       setSalaryConfig([]);
       setSalaryRecords([]);
+      setKasbon([]);
     });
 
   const handleResetChat = (): Promise<ResetResult> =>
@@ -704,8 +706,10 @@ const canDepositBank = has("deposit", "bank");
             transactions={transactions}
             salaryConfig={salaryConfig}
             salaryRecords={salaryRecords}
+            kasbon={kasbon}
             onSaveSalaryConfig={setSalaryConfig}
             onSaveSalaryRecords={setSalaryRecords}
+            onSaveKasbon={setKasbon}
             canGaji={canEmpGaji}
             canGajiAdd={canEmpGajiAdd}
             canGajiEdit={canEmpGajiEdit}

@@ -145,6 +145,13 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       } else {
         onSave(employees.map(e => e.id === toSave.id ? toSave : e));
       }
+      // Sinkron gaji pokok dst. daftar karyawan dengan setelan tanpa hashing.
+      const savedCfg = salaryConfig.find(c => c.employeeId === toSave.id);
+      if (savedCfg && Math.abs(savedCfg.baseSalary - toSave.salary) >= 1) {
+        onSaveSalaryConfig?.(salaryConfig.map(c => c.employeeId === toSave.id ? { ...c, baseSalary: toSave.salary } : c));
+      } else if (!savedCfg && toSave.salary > 0) {
+        onSaveSalaryConfig?.([...salaryConfig, { employeeId: toSave.id, baseSalary: toSave.salary, salesTarget: 0, bonus: 0 }]);
+      }
       setEditing(null);
       setIsNew(false);
       setPinInput("");
@@ -469,6 +476,11 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             salaryRecords={salaryRecords}
             onSaveConfig={onSaveSalaryConfig ?? (() => {})}
             onSaveRecords={onSaveSalaryRecords ?? (() => {})}
+            onSyncBaseSalary={(id, base) => {
+              const emp = employees.find(e => e.id === id);
+              if (!emp || Math.abs((emp.salary ?? 0) - base) < 1) return;
+              onSave(employees.map(e => e.id === id ? { ...e, salary: base } : e));
+            }}
             canAdd={canGajiAdd}
             canEdit={canGajiEdit}
             canDelete={canGajiDelete}
@@ -621,7 +633,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
                   {/* Salary */}
                   <div className="text-right shrink-0 hidden sm:block">
-                    <div className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(emp.salary)}</div>
+                    <div className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(salaryConfig.find(c => c.employeeId === emp.id)?.baseSalary ?? emp.salary)}</div>
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>per bulan</div>
                   </div>
 

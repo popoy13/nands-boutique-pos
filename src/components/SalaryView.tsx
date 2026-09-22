@@ -40,10 +40,9 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const [toastOk, setToastOk] = useState(true);
   const [cfgPage, setCfgPage] = useState(1);
   const [cfgPageSize, setCfgPageSize] = useState(5);
-  const [repPage, setRepPage] = useState(1);
-  const [repPageSize, setRepPageSize] = useState(5);
   const [pickOpen, setPickOpen] = useState(false);
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
+  const [laporEmp, setLaporEmp] = useState<Employee | null>(null);
   const [slipRec, setSlipRec] = useState<SalaryRecord | null>(null);
 
   const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3200); };
@@ -51,16 +50,6 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const monthRecords = salaryRecords.filter(r => r.month === month);
   const recByEmp = new Map(monthRecords.map(r => [r.employeeId, r]));
   const active = employees.filter(e => e.status === "active");
-
-  const roster = (() => {
-    const map = new Map<string, Employee>();
-    for (const e of active) map.set(e.id, e);
-    for (const r of monthRecords) {
-      const emp = employees.find(e => e.id === r.employeeId);
-      if (emp) map.set(emp.id, emp);
-    }
-    return [...map.values()];
-  })();
 
   const draftFor = (emp: Employee) => {
     const existing = configDraft[emp.id];
@@ -138,13 +127,12 @@ export default function SalaryView({ employees, stores, attendance, transactions
     showToast("Gaji dihapus");
   };
 
-  const openSlip = (emp: Employee) => {
-    const rec = recByEmp.get(emp.id) ?? computeOne(emp);
+  const openLapor = (emp: Employee) => {
+    setLaporEmp(emp);
     if (!recByEmp.get(emp.id)) {
-      onSaveRecords(upsertRecords(salaryRecords, [rec]));
+      onSaveRecords(upsertRecords(salaryRecords, [computeOne(emp)]));
       showToast("Gaji dihitung otomatis");
     }
-    setSlipRec(rec);
   };
 
   const printSlip = (rec: SalaryRecord) => {
@@ -233,11 +221,6 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const cfgCount = Math.max(1, Math.ceil(cfgTotal / cfgPageSize));
   const cfgSafe = Math.min(cfgPage, cfgCount);
   const cfgItems = active.slice((cfgSafe - 1) * cfgPageSize, cfgSafe * cfgPageSize);
-
-  const repTotal = roster.length;
-  const repCount = Math.max(1, Math.ceil(repTotal / repPageSize));
-  const repSafe = Math.min(repPage, repCount);
-  const repItems = roster.slice((repSafe - 1) * repPageSize, repSafe * repPageSize);
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -361,6 +344,87 @@ export default function SalaryView({ employees, stores, attendance, transactions
         </div>
       )}
 
+      {/* OVERLAY: LAPORAN GAJI PER KARYAWAN */}
+      {laporEmp && (() => {
+        const rec = recByEmp.get(laporEmp.id) ?? null;
+        const reached = rec ? rec.salesTarget > 0 && rec.salesTotal >= rec.salesTarget : false;
+        const statusPill = rec
+          ? rec.paid
+            ? { bg: "#f0fdf4", color: "#16a34a", text: "DIBAYAR" + (rec.paidAt ? ` · ${rec.paidAt}` : "") }
+            : { bg: "#fffbeb", color: "#d97706", text: "BELUM BAYAR" }
+          : null;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+            <div className="rounded-2xl my-auto w-[420px] max-w-[90vw]" style={{ background: "var(--card)" }}>
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+                <div>
+                  <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="text-sm">Laporan Gaji — {laporEmp.name}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, laporEmp.storeId)} · {month}</div>
+                </div>
+                <button onClick={() => setLaporEmp(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-5">
+                {!rec ? (
+                  <div className="text-center py-6">
+                    <div className="text-sm mb-1">Belum ada laporan gaji untuk {month}</div>
+                    <div className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Absensi & omzet karyawan akan dihitung otomatis saat tombol diklik.</div>
+                    <button onClick={() => hitungOne(laporEmp)} className="px-4 py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "var(--accent)" }}>Hitung Sekarang</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: statusPill!.bg, color: statusPill!.color }}>{statusPill!.text}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      {[
+                        ["Hari Masuk", `${rec.attendanceCount} hari`],
+                        ["Gaji Pokok Diterima", fmt(rec.gross)],
+                        ["Omzet Penjualan", fmt(rec.salesTotal)],
+                        ["Target Penjualan", fmtNum(rec.salesTarget)],
+                        ["Bonus Capai Target", reached ? fmt(rec.bonus) : "—"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between items-center px-3 py-2 rounded-lg" style={cell}>
+                          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{k}</span>
+                          <span className="font-mono text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center px-3 py-2.5 rounded-lg font-bold" style={{ ...cell, borderWidth: 1.5 }}>
+                        <span className="text-xs">Total Gaji</span>
+                        <span className="font-mono text-sm" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(rec.total)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 mt-4">
+                      <div className="flex gap-2">
+                        {mut && (
+                          <button onClick={() => togglePaid(laporEmp)} className="flex-1 py-2.5 rounded-xl text-xs font-bold" style={{ background: rec.paid ? "#fffbeb" : "#f0fdf4", border: "1px solid var(--border)", color: rec.paid ? "#d97706" : "#16a34a" }}>
+                            {rec.paid ? "Batal Bayar" : "Tandai Dibayar"}
+                          </button>
+                        )}
+                        <button onClick={() => setSlipRec(rec)} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2" style={{ background: "var(--foreground)" }}>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
+                          Cetak Slip
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setLaporEmp(null)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tutup</button>
+                        {canDelete && (
+                          <button onClick={() => setConfirmDelete(rec.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5" style={{ background: "#fef2f2", color: "#ef4444" }}>
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            Hapus Gaji
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="relative mx-auto w-full max-w-4xl px-4 sm:px-6 py-4 flex flex-col gap-4">
         {/* HEADER */}
         <div className="w-full rounded-2xl p-5" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
@@ -370,7 +434,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
               <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Rumus: (Gaji Pokok ÷ 30) × hari masuk · bonus tetap bila omzet capai target</div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <input type="month" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); setRepPage(1); } }}
+              <input type="month" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); } }}
                 className="px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
               {mut && (
                 <button onClick={hitungAll} className="px-3 py-2 rounded-xl text-xs font-semibold text-white whitespace-nowrap" style={{ background: "var(--foreground)" }}>
@@ -410,7 +474,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                                 Edit
                               </button>
                             )}
-                            <button onClick={() => { openSlip(emp); setPickOpen(false); }}
+                            <button onClick={() => { openLapor(emp); setPickOpen(false); }}
                               className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>
                               Laporan
                             </button>
@@ -442,9 +506,9 @@ export default function SalaryView({ employees, stores, attendance, transactions
         {/* SETELAN GAJI */}
         <div className="w-full rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div className="p-5 pb-0">
-            <div className="text-sm font-semibold mb-1">Setelan Gaji & Target Penjualan</div>
+            <div className="text-sm font-semibold mb-1">Gaji & Target Penjualan</div>
             <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-              Klik <b>Edit</b> pada baris karyawan untuk mengubah gaji pokok, target & bonus.
+              Klik <b>Edit</b> untuk mengubah gaji pokok, target & bonus, atau <b>Laporan</b> untuk membuka laporan gaji per karyawan.
             </div>
           </div>
 
@@ -480,6 +544,10 @@ export default function SalaryView({ employees, stores, attendance, transactions
                                 Edit
                               </button>
                             )}
+                            <button onClick={() => openLapor(emp)} className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#eef2ff", color: "#4f46e5" }}>
+                              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17h6m-6-4h6m-6-4h6M5 21h14a2 2 0 002-2V7.5L15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                              Laporan
+                            </button>
                             {canDelete && mut && (
                               <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
                                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -501,6 +569,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                             {mut && (
                               <button onClick={() => setEditEmp(emp)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
                             )}
+                            <button onClick={() => openLapor(emp)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: "#eef2ff", color: "#4f46e5" }}>Laporan</button>
                             {canDelete && mut && (
                               <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
                                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -518,141 +587,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
           )}
         </div>
 
-        {/* LAPORAN GAJI */}
-        <div className="w-full rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="p-5 pb-2">
-            <div>
-              <div className="text-sm font-semibold">Laporan Gaji — {month}</div>
-              <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>Hasil dari absensi masuk & pencapaian target penjualan.</div>
-            </div>
-          </div>
-
-          {roster.length === 0 ? (
-            <div className="px-5 pb-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada laporan. Tekan "Hitung Ulang Semua" untuk membuat.</div>
-          ) : (
-            <>
-              <div className="px-5 pb-1">
-                <div className="hidden sm:grid sm:grid-cols-[2fr_0.55fr_1fr_1.2fr_0.8fr_0.9fr_0.9fr_auto] gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
-                  <span>Karyawan</span>
-                  <span>Masuk</span>
-                  <span>Pokok</span>
-                  <span>Omzet / Target</span>
-                  <span>Bonus</span>
-                  <span>Total</span>
-                  <span>Status</span>
-                  <span className="text-right">Aksi</span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {repItems.map(emp => {
-                    const rec = recByEmp.get(emp.id);
-                    if (!rec) {
-                      return (
-                        <div key={emp.id} className="p-3 rounded-xl flex items-center justify-between gap-2 flex-wrap" style={{ background: "var(--background)" }}>
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="text-xs font-semibold truncate">{emp.name}</span>
-                            <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Belum dihitung</span>
-                            <button onClick={() => openSlip(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Hitung</button>
-                          </div>
-                        </div>
-                      );
-                    }
-                    const reached = rec.salesTarget > 0 && rec.salesTotal >= rec.salesTarget;
-                    const statusPill = rec.paid
-                      ? { bg: "#f0fdf4", color: "#16a34a", text: "DIBAYAR" + (rec.paidAt ? ` · ${rec.paidAt}` : "") }
-                      : { bg: "#fffbeb", color: "#d97706", text: "BELUM BAYAR" };
-                    return (
-                      <div key={rec.id} className="px-3 py-2.5 rounded-xl" style={{ background: "var(--background)" }}>
-                        <div className="hidden sm:grid sm:grid-cols-[2fr_0.55fr_1fr_1.2fr_0.8fr_0.9fr_0.9fr_auto] gap-2 items-center">
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold truncate">{rec.employeeName}</div>
-                            <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, rec.storeId)}</div>
-                          </div>
-                          <div className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{rec.attendanceCount}</div>
-                          <div className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(rec.gross)}</div>
-                          <div className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace", color: reached ? "#16a34a" : "var(--foreground)" }}>
-                            {fmt(rec.salesTotal)} / {fmtNum(rec.salesTarget)}
-                            <div className="text-[9px] font-semibold" style={{ color: reached ? "#16a34a" : "var(--muted-foreground)" }}>{reached ? "TARGET TERCAPAI" : "belum capai"}</div>
-                          </div>
-                          <div className="font-mono text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: rec.bonus > 0 ? "#16a34a" : "var(--foreground)" }}>{fmt(rec.bonus)}</div>
-                          <div className="font-mono text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(rec.total)}</div>
-                          <div><span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: statusPill.bg, color: statusPill.color }}>{statusPill.text}</span></div>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button onClick={() => openSlip(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#eef2ff" }} title="Lihat & cetak slip gaji">
-                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
-                            </button>
-                            {mut && (
-                              <button onClick={() => togglePaid(emp)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap" style={{ background: rec.paid ? "#fffbeb" : "#f0fdf4", border: "1px solid var(--border)" }}>
-                                {rec.paid ? "Batal" : "Bayar"}
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button onClick={() => setConfirmDelete(rec.id)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus gaji">
-                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="sm:hidden flex flex-col gap-2">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="text-xs font-semibold min-w-0">
-                              {rec.employeeName}
-                              <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full align-middle" style={{ background: "var(--secondary)", color: "var(--muted-foreground)" }}>{storeNameOf(stores, rec.storeId)}</span>
-                              <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style={{ background: statusPill.bg, color: statusPill.color }}>{statusPill.text}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button onClick={() => openSlip(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#eef2ff" }} title="Lihat & cetak slip gaji">
-                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
-                              </button>
-                              {mut && (
-                                <button onClick={() => togglePaid(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: rec.paid ? "#fffbeb" : "#f0fdf4", border: "1px solid var(--border)" }}>
-                                  {rec.paid ? "Batal Bayar" : "Tandai Dibayar"}
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button onClick={() => setConfirmDelete(rec.id)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus gaji">
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <div className="grid gap-1.5 grid-cols-2 text-xs">
-                            <div className="p-2 rounded-lg" style={cell}>
-                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Masuk</div>
-                              <div className="font-mono font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{rec.attendanceCount} hari</div>
-                            </div>
-                            <div className="p-2 rounded-lg" style={cell}>
-                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Gaji Pokok</div>
-                              <div className="font-mono font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(rec.gross)}</div>
-                            </div>
-                            <div className="p-2 rounded-lg" style={cell}>
-                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Omzet / Target</div>
-                              <div className="font-mono font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: reached ? "#16a34a" : "var(--foreground)" }}>{fmt(rec.salesTotal)} / {fmtNum(rec.salesTarget)}</div>
-                              <div className="text-[9px] font-semibold mt-0.5" style={{ color: reached ? "#16a34a" : "var(--muted-foreground)" }}>{reached ? "TARGET TERCAPAI" : "belum capai"}</div>
-                            </div>
-                            <div className="p-2 rounded-lg" style={cell}>
-                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Bonus</div>
-                              <div className="font-mono font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: rec.bonus > 0 ? "#16a34a" : "var(--foreground)" }}>{fmt(rec.bonus)}</div>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center p-2 rounded-lg font-bold text-sm" style={{ ...cell, borderWidth: 1.5 }}>
-                            <span>Total Gaji</span>
-                            <span className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(rec.total)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <Pagination total={repTotal} page={repSafe} pageSize={repPageSize} onPageChange={setRepPage} onPageSizeChange={s => { setRepPageSize(s); setRepPage(1); }} pageSizeOptions={[5, 10, 20]} rowLabel="karyawan" />
-            </>
-          )}
         </div>
-      </div>
     </div>
   );
 }

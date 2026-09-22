@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { safeRows } from "../lib/safeExport";
 import { validateImageFile } from "../lib/imageFile";
 import type { Employee, AttendanceRecord, Transaction, SalaryConfig, SalaryRecord } from "../data/types";
+import type { AppSettings } from "../data/settings";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
@@ -43,6 +44,7 @@ interface Props {
   canGajiAdd?: boolean;
   canGajiEdit?: boolean;
   canGajiDelete?: boolean;
+  settings?: AppSettings;
 }
 
 const emptyEmployee = (): Employee => ({
@@ -58,7 +60,7 @@ const emptyEmployee = (): Employee => ({
   pin: "",
 });
 
-export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser, attendance = [], transactions = [], salaryConfig = [], salaryRecords = [], onSaveSalaryConfig, onSaveSalaryRecords, canGaji = false, canGajiAdd = false, canGajiEdit = false, canGajiDelete = false }: Props) {
+export default function EmployeeView({ employees, stores, onSave, canEdit = true, canImport = true, canExport = true, canAdd = true, roles, currentUser, attendance = [], transactions = [], salaryConfig = [], salaryRecords = [], onSaveSalaryConfig, onSaveSalaryRecords, canGaji = false, canGajiAdd = false, canGajiEdit = false, canGajiDelete = false, settings }: Props) {
   const [tab, setTab] = useState<"daftar" | "gaji">("daftar");
   const [search, setSearch] = useState("");
   const [filterStore, setFilterStore] = useState("all");
@@ -484,6 +486,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
             canAdd={canGajiAdd}
             canEdit={canGajiEdit}
             canDelete={canGajiDelete}
+            settings={settings}
           />
         </div>
       ) : (

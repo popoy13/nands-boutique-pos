@@ -18,7 +18,7 @@ const ExpenseView = lazy(() => import("./components/ExpenseView"));
 const DepositView = lazy(() => import("./components/DepositView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 import { useSyncedStore } from "./hooks/useSyncedStore";
-import { deleteAttendance, deleteTransaction, deleteRows } from "./data/sync";
+import { deleteAttendance, deleteTransaction, deleteRows, saveSalaryJson } from "./data/sync";
 import type { ResetResult } from "./data/sync";
 import type { Employee, Transaction, AttendanceRecord, Member } from "./data/types";
 import { getAllowedMenus, hasAction, ensureRoles } from "./data/roles";
@@ -442,6 +442,13 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       setAttendance(prev => prev.filter(r => !ids.includes(r.id)));
     });
 
+  const handleResetSalary = (): Promise<ResetResult> =>
+    runReset(async () => {
+      await saveSalaryJson([], []);
+      setSalaryConfig([]);
+      setSalaryRecords([]);
+    });
+
   const handleResetChat = (): Promise<ResetResult> =>
     runReset(async () => {
       const { error: messageError } = await supabase.from("chat_messages").delete().not("id", "is", null);
@@ -703,6 +710,7 @@ const canDepositBank = has("deposit", "bank");
             canGajiAdd={canEmpGajiAdd}
             canGajiEdit={canEmpGajiEdit}
             canGajiDelete={canEmpGajiDelete}
+            settings={settings}
           />
         )}
         {safeTab === "store" && (
@@ -806,6 +814,8 @@ const canDepositBank = has("deposit", "bank");
             onResetTransactions={handleResetTransactions}
             onResetDeletedTransactions={handleResetDeletedTransactions}
             onResetAttendance={handleResetAttendance}
+            onResetSalary={handleResetSalary}
+            salaryRecords={salaryRecords}
             onResetChat={handleResetChat}
           />
         )}

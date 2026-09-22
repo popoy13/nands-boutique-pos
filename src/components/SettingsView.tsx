@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord, DeletedTransaction } from "../data/types";
+import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord, DeletedTransaction, SalaryRecord } from "../data/types";
 import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
@@ -31,6 +31,8 @@ interface Props {
   onResetTransactions: (ids: string[]) => Promise<ResetResult>;
   onResetDeletedTransactions: () => Promise<ResetResult>;
   onResetAttendance: (ids: string[]) => Promise<ResetResult>;
+  onResetSalary: () => Promise<ResetResult>;
+  salaryRecords: SalaryRecord[];
   onResetChat: () => Promise<ResetResult>;
 }
 
@@ -115,7 +117,7 @@ function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; bran
   );
 }
 
-export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, deletedTransactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetDeletedTransactions, onResetAttendance, onResetChat }: Props) {
+export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, deletedTransactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetDeletedTransactions, onResetAttendance, onResetSalary, salaryRecords, onResetChat }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
@@ -275,6 +277,12 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const resetAttAll = () =>
     void onResetAttendance(attendance.map(r => r.id))
       .then(res => finishReset(res, `Semua riwayat absensi (${attendance.length}) dihapus`));
+
+  const resetSalaryAll = () => {
+    if (salaryRecords.length === 0) { showToast("Tidak ada data gaji untuk dihapus", false); return; }
+    void onResetSalary()
+      .then(res => finishReset(res, `Semua data gaji karyawan (${salaryRecords.length} laporan) dihapus`));
+  };
 
   const resetAttRange = () => {
     const from = resetAttFrom.trim(), to = resetAttTo.trim();
@@ -1131,6 +1139,19 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                   {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* SALARY */}
+          <div className="px-5 pb-5" style={{ borderTop: "1.5px solid var(--border)", paddingTop: 16 }}>
+            <div className="text-sm font-semibold mb-1">Gaji Karyawan</div>
+            <div className="text-[11px] mb-3" style={{ color: "var(--muted-foreground)" }}>{salaryRecords.length} laporan gaji tersimpan</div>
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: "var(--background)", opacity: salaryRecords.length === 0 ? 0.5 : 1 }}>
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>Hapus Semua Data Gaji & Setelan</div>
+                <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>Menghapus laporan gaji, setelan gaji pokok, target & bonus</div>
+              </div>
+              <ResetButton label="Hapus Semua" onReset={resetSalaryAll} />
             </div>
           </div>
 

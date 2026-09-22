@@ -1,11 +1,15 @@
 import { useState } from "react";
 import type { AttendanceRecord, Employee, SalaryConfig, SalaryRecord, Transaction } from "../data/types";
+import type { AppSettings } from "../data/settings";
 import { attendanceCountFor, salesTotalFor, computeSalary, upsertRecords, currentMonth } from "../data/salary";
+import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtNum = (n: number) => new Intl.NumberFormat("id-ID").format(n);
+
+const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
 interface Props {
   employees: Employee[];
@@ -20,12 +24,15 @@ interface Props {
   canAdd?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  settings?: AppSettings;
 }
 
 const storeNameOf = (stores: { id: string; name: string }[], id: string) =>
   stores.find(s => s.id === id)?.name.replace("NAND'S BOUTIQUE - ", "") ?? id;
 
-export default function SalaryView({ employees, stores, attendance, transactions, salaryConfig, salaryRecords, onSaveConfig, onSaveRecords, onSyncBaseSalary, canAdd = false, canEdit = false, canDelete = false }: Props) {
+const esc = (s: string) => s.replace(/[<>&"]/g, c => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : "&quot;"));
+
+export default function SalaryView({ employees, stores, attendance, transactions, salaryConfig, salaryRecords, onSaveConfig, onSaveRecords, onSyncBaseSalary, canAdd = false, canEdit = false, canDelete = false, settings }: Props) {
   const [month, setMonth] = useState(currentMonth());
   const [configDraft, setConfigDraft] = useState<Record<string, { baseSalary: number; salesTarget: number; bonus: number }>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -35,6 +42,9 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const [cfgPageSize, setCfgPageSize] = useState(5);
   const [repPage, setRepPage] = useState(1);
   const [repPageSize, setRepPageSize] = useState(5);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [editEmp, setEditEmp] = useState<Employee | null>(null);
+  const [slipRec, setSlipRec] = useState<SalaryRecord | null>(null);
 
   const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3200); };
 
@@ -88,7 +98,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
     const d = draftFor(emp);
     if (d.baseSalary <= 0 && d.salesTarget <= 0 && d.bonus <= 0) {
       showToast("Setelahkan minimal gaji pokok atau target", false);
-      return;
+      return false;
     }
     const others = salaryConfig.filter(c => c.employeeId !== emp.id);
     onSaveConfig([...others, { employeeId: emp.id, baseSalary: Math.max(0, d.baseSalary), salesTarget: Math.max(0, d.salesTarget), bonus: Math.max(0, d.bonus) }]);
@@ -98,7 +108,14 @@ export default function SalaryView({ employees, stores, attendance, transactions
       const rec = computeOne(emp, d);
       onSaveRecords(upsertRecords(salaryRecords, [rec]));
     }
-    showToast("Setelan gaji disimpan");
+    return true;
+  };
+
+  const saveConfigModal = (emp: Employee) => {
+    if (!saveConfig(emp)) return;
+    setEditEmp(null);
+    if (salaryConfig.some(c => c.employeeId === emp.id)) showToast("Setelan gaji disimpan");
+    else showToast("Setelan gaji ditambahkan");
   };
 
   const removeConfig = (emp: Employee) => {
@@ -121,6 +138,93 @@ export default function SalaryView({ employees, stores, attendance, transactions
     showToast("Gaji dihapus");
   };
 
+  const openSlip = (emp: Employee) => {
+    const rec = recByEmp.get(emp.id) ?? computeOne(emp);
+    if (!recByEmp.get(emp.id)) {
+      onSaveRecords(upsertRecords(salaryRecords, [rec]));
+      showToast("Gaji dihitung otomatis");
+    }
+    setSlipRec(rec);
+  };
+
+  const printSlip = (rec: SalaryRecord) => {
+    const w = window.open("", "_blank", "width=820,height=760");
+    if (!w) { showToast("Izinkan pop-up untuk mencetak slip", false); return; }
+    const brand = settings?.brand;
+    const company = brand?.name || "NAND'S BOUTIQUE";
+    const tagline = brand?.tagline || "";
+    const logo = assetUrl(brand?.logo || "");
+    const logoSrc = logo && !/^[a-z][a-z0-9+.-]*:/i.test(logo) ? new URL(logo, window.location.href).href : logo;
+    const storeClean = storeNameOf(stores, rec.storeId);
+    const [yy, mm] = rec.month.split("-");
+    const monthName = `${MONTHS_ID[Number(mm) - 1] || mm} ${yy}`;
+    const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const R = (n: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+    const N = (n: number) => new Intl.NumberFormat("id-ID").format(n);
+    const daily = Math.round(rec.baseSalary / 30);
+    const reached = rec.salesTarget > 0 && rec.salesTotal >= rec.salesTarget;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Slip Gaji ${esc(rec.employeeName)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#111;background:#e5e7eb}
+  .page{width:190mm;min-height:150mm;margin:10mm auto;background:#fff;padding:14mm;box-shadow:0 2px 14px rgba(0,0,0,.15)}
+  .head{display:flex;align-items:center;gap:5mm;border-bottom:2px solid #111;padding-bottom:4mm}
+  .head img{height:18mm;max-width:60mm;object-fit:contain}
+  .logo-ph{width:18mm;height:18mm;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9pt}
+  .brand{flex:1}
+  .brand h1{font-size:17pt;letter-spacing:.5px;line-height:1.1}
+  .brand div{font-size:9pt;color:#555;margin-top:1mm}
+  .title{font-size:14pt;font-weight:700;text-align:center;border-bottom:1.5px solid #111;padding:3mm 0;margin-top:5mm;letter-spacing:1px}
+  table.meta{width:100%;margin-top:5mm;font-size:10pt;border-collapse:collapse}
+  table.meta td{padding:1.2mm 0}
+  .sec{font-weight:700;margin:6mm 0 2mm;font-size:10.5pt}
+  table.det{width:100%;border-collapse:collapse;font-size:10pt}
+  table.det th,table.det td{border:1px solid #222;padding:2mm;text-align:left}
+  table.det th{background:#f1f1f1}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .grand td{font-weight:700;background:#f7f7f7;font-size:11pt}
+  .sign{display:flex;justify-content:space-between;margin-top:20mm}
+  .sign div{width:38%;text-align:center;font-size:10pt;font-weight:600}
+  .sign .lin{margin-top:16mm;border-top:1px solid #111;padding-top:1.5mm}
+  .foot{font-size:8pt;color:#777;text-align:center;margin-top:10mm;border-top:1px dashed #aaa;padding-top:2mm}
+  @media print{body{background:#fff}.page{margin:0;box-shadow:none}}
+</style></head><body>
+  <div class="page">
+    <div class="head">
+      ${logoSrc ? `<img src="${esc(logoSrc)}" alt="Logo"/>` : `<div class="logo-ph">${esc(company.charAt(0))}</div>`}
+      <div class="brand"><h1>${esc(company)}</h1><div>${esc(tagline)}${tagline && storeClean ? " • " : ""}${storeClean ? "Cabang " + esc(storeClean) : ""}</div></div>
+      <div><span style="font-size:9pt;padding:1mm 3mm;border:1.5px solid #111;font-weight:700">${rec.paid ? "LUNAS" : "BELUM DIBAYAR"}</span></div>
+    </div>
+    <div class="title">SLIP GAJI KARYAWAN</div>
+    <table class="meta">
+      <tr><td width="26%"><b>Nama Karyawan</b></td><td width="26%">${esc(rec.employeeName)}</td><td width="24%"><b>Periode</b></td><td>${esc(monthName)}</td></tr>
+      <tr><td><b>Cabang</b></td><td>${esc(storeClean)}</td><td><b>Tanggal Cetak</b></td><td>${esc(today)}</td></tr>
+    </table>
+    <div class="sec">Rincian Gaji</div>
+    <table class="det">
+      <tr><th>Uraian</th><th style="width:24%">Perhitungan</th><th style="width:22%">Jumlah</th></tr>
+      <tr><td>Gaji Pokok</td><td class="num">${N(rec.baseSalary)} ÷ 30 hari</td><td class="num">${R(rec.baseSalary)}</td></tr>
+      <tr><td>Hari Masuk</td><td class="num">${rec.attendanceCount} hari</td><td class="num"></td></tr>
+      <tr><td>Gaji Pokok Diterima</td><td class="num">${N(rec.attendanceCount)} × ${N(daily)}</td><td class="num">${R(rec.gross)}</td></tr>
+      <tr><td>Omzet Penjualan</td><td class="num"></td><td class="num">${R(rec.salesTotal)}</td></tr>
+      <tr><td>Target Penjualan</td><td class="num"></td><td class="num">${N(rec.salesTarget)}</td></tr>
+      <tr><td>Bonus Capai Target</td><td class="num">${reached ? "Tercapai" : "Belum tercapai"}</td><td class="num">${R(rec.bonus)}</td></tr>
+      <tr class="grand"><td colspan="2">TOTAL GAJI DITERIMA</td><td class="num">${R(rec.total)}</td></tr>
+      <tr><td>Status Pembayaran</td><td class="num">${rec.paid ? "Dibayar" + (rec.paidAt ? " " + esc(rec.paidAt) : "") : "Belum dibayar"}</td><td class="num"></td></tr>
+    </table>
+    <div class="sign">
+      <div><div>Diterima oleh,</div><div class="lin">${esc(rec.employeeName)}</div></div>
+      <div><div>Hormat kami,</div><div class="lin">DIREKTUR UTAMA</div></div>
+    </div>
+    <div class="foot">Dicetak otomatis dari ${esc(company)} Point of Sale</div>
+  </div>
+</body></html>`;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 400);
+  };
+
   const totalGaji = monthRecords.reduce((s, r) => s + r.total, 0);
   const totalBelum = monthRecords.filter(r => !r.paid).reduce((s, r) => s + r.total, 0);
   const mut = canAdd || canEdit;
@@ -135,14 +239,13 @@ export default function SalaryView({ employees, stores, attendance, transactions
   const repSafe = Math.min(repPage, repCount);
   const repItems = roster.slice((repSafe - 1) * repPageSize, repSafe * repPageSize);
 
-  const baseLabel = (v: number) => v === 0 ? "" : String(v);
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "8px 10px",
     borderRadius: 10,
     fontSize: 12,
     outline: "none",
-    background: "var(--card)",
+    background: "var(--background)",
     border: "1px solid var(--border)",
     fontFamily: "'JetBrains Mono', monospace",
   };
@@ -153,16 +256,18 @@ export default function SalaryView({ employees, stores, attendance, transactions
     padding: "8px 10px",
   };
 
+  const editDraft = editEmp ? draftFor(editEmp) : null;
+
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
+        <div className="fixed bottom-6 right-6 z-[70] px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg" style={{ background: toastOk ? "#16a34a" : "#ef4444" }}>
           {toast}
         </div>
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-2">Hapus Gaji?</div>
             <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Laporan gaji bulan ini akan dihapus dari daftar.</div>
@@ -174,10 +279,92 @@ export default function SalaryView({ employees, stores, attendance, transactions
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-4xl px-4 sm:px-6 py-4 flex flex-col gap-4">
+      {/* OVERLAY: PILIH KARYAWAN — edit / laporan */}
+      {editEmp && (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="w-80 max-w-[90vw] rounded-2xl p-6 my-auto" style={{ background: "var(--card)" }}>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="mb-1">Setelan Gaji — {editEmp.name}</div>
+            <div className="text-[11px] mb-4" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, editEmp.storeId)} · Gaji pokok dibagi 30 hari × hari masuk</div>
+            {editDraft && [
+              { label: "Gaji Pokok / bulan", key: "baseSalary" as const },
+              { label: "Target Penjualan / bulan", key: "salesTarget" as const },
+              { label: "Bonus bila capai target", key: "bonus" as const },
+            ].map(f => (
+              <div key={f.key} className="mb-3">
+                <label className="block text-[10px] font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
+                <input type="number" min={0} placeholder="0" value={editDraft[f.key] === 0 ? "" : String(editDraft[f.key])}
+                  onChange={e => setDraft(editEmp.id, { [f.key]: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-full outline-none" style={inputStyle} />
+              </div>
+            ))}
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditEmp(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Batal</button>
+              <button onClick={() => saveConfigModal(editEmp)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                {salaryConfig.some(c => c.employeeId === editEmp.id) ? "Simpan" : "Tambah"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY: SLIP GAJI */}
+      {slipRec && (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="rounded-2xl my-auto max-w-[90vw] w-[420px]" style={{ background: "var(--card)" }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="text-sm">Slip Gaji — {slipRec.employeeName}</div>
+              <button onClick={() => setSlipRec(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="rounded-xl" style={{ background: "#fff", color: "#111", fontFamily: "'Courier New', monospace", fontSize: 11, border: "1px solid #d1d5db" }}>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 border-b border-black pb-2 mb-2">
+                    {assetUrl(settings?.brand?.logo || "") ? (
+                      <img src={assetUrl(settings?.brand?.logo || "")} alt="logo" className="h-8 w-8 object-contain" />
+                    ) : (
+                      <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold">{String(settings?.brand?.name || "N").charAt(0)}</div>
+                    )}
+                    <div>
+                      <div className="font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>{settings?.brand?.name || "NAND'S BOUTIQUE"}</div>
+                      <div className="text-[9px]">{storeNameOf(stores, slipRec.storeId)}</div>
+                    </div>
+                  </div>
+                  <div className="text-center font-bold mb-2">SLIP GAJI KARYAWAN</div>
+                  <div className="mb-1">Nama : {slipRec.employeeName}</div>
+                  <div className="mb-1">Bulan : {month} ({slipRec.paid ? `DIBAYAR${slipRec.paidAt ? " " + slipRec.paidAt : ""}` : "BELUM DIBAYAR"})</div>
+                  <div className="my-2 border-t border-dashed border-black" />
+                  {[
+                    ["Gaji Pokok", fmt(slipRec.baseSalary)],
+                    ["Hari Masuk", `${slipRec.attendanceCount} hari`],
+                    ["Gaji Pokok Diterima", fmt(slipRec.gross)],
+                    ["Omzet Penjualan", fmt(slipRec.salesTotal)],
+                    ["Target Penjualan", fmtNum(slipRec.salesTarget)],
+                    ["Bonus", fmt(slipRec.bonus)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between py-0.5"><span>{k}</span><span>{v}</span></div>
+                  ))}
+                  <div className="my-2 border-t border-dashed border-black" />
+                  <div className="flex justify-between font-bold text-sm"><span>Total Gaji</span><span>{fmt(slipRec.total)}</span></div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setSlipRec(null)} className="flex-1 py-2.5 rounded-xl text-xs font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tutup</button>
+                <button onClick={() => printSlip(slipRec)} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2" style={{ background: "var(--foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
+                  Cetak Slip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative mx-auto w-full max-w-4xl px-4 sm:px-6 py-4 flex flex-col gap-4">
         {/* HEADER */}
         <div className="w-full rounded-2xl p-5" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+          <div className="relative flex items-center justify-between mb-3 flex-wrap gap-3">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 16 }}>Gaji Karyawan</div>
               <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Rumus: (Gaji Pokok ÷ 30) × hari masuk · bonus tetap bila omzet capai target</div>
@@ -190,6 +377,50 @@ export default function SalaryView({ employees, stores, attendance, transactions
                   Hitung Ulang Semua
                 </button>
               )}
+              <div className="relative">
+                <button onClick={() => setPickOpen(v => !v)} title="Menu karyawan"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap"
+                  style={{ background: pickOpen ? "var(--foreground)" : "var(--background)", border: "1px solid var(--border)", color: pickOpen ? "#fff" : "var(--foreground)" }}>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Karyawan
+                  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+
+                {pickOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setPickOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 z-40 w-80 max-h-[55vh] overflow-y-auto rounded-2xl p-2" style={{ background: "var(--card)", border: "1.5px solid var(--border)", boxShadow: "0 18px 50px rgba(0,0,0,0.2)" }}>
+                      <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Daftar Karyawan</div>
+                      {active.length === 0 && <div className="px-2 py-6 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>Belum ada karyawan aktif</div>}
+                      {active.map(emp => (
+                        <div key={emp.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-xl mb-1" style={{ background: "var(--background)" }}>
+                          <div className="min-w-0 flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: "var(--foreground)" }}>
+                              {emp.name.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold truncate">{emp.name}</div>
+                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            {mut && (
+                              <button onClick={() => { setEditEmp(emp); setPickOpen(false); }}
+                                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                                Edit
+                              </button>
+                            )}
+                            <button onClick={() => { openSlip(emp); setPickOpen(false); }}
+                              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>
+                              Laporan
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           <div className="grid gap-2 grid-cols-1 sm:grid-cols-3 text-xs">
@@ -213,7 +444,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
           <div className="p-5 pb-0">
             <div className="text-sm font-semibold mb-1">Setelan Gaji & Target Penjualan</div>
             <div className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-              Gaji pokok dibagi 30 hari lalu dikali hari masuk. Omzet penjualan hanya untuk menentukan bonus (bukan sumber gaji pokok).
+              Klik <b>Edit</b> pada baris karyawan untuk mengubah gaji pokok, target & bonus.
             </div>
           </div>
 
@@ -222,38 +453,31 @@ export default function SalaryView({ employees, stores, attendance, transactions
           ) : (
             <>
               <div className="px-5 pb-1">
-                <div className="hidden sm:grid sm:grid-cols-[2fr_1.1fr_1.1fr_0.9fr_auto] gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
                   <span>Karyawan</span>
-                  <span>Gaji Pokok /bln</span>
-                  <span>Target Penjualan</span>
+                  <span>Gaji Pokok</span>
+                  <span>Target</span>
                   <span>Bonus</span>
                   <span className="text-right">Aksi</span>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   {cfgItems.map(emp => {
                     const d = draftFor(emp);
-                    const cfgExists = salaryConfig.some(c => c.employeeId === emp.id);
                     return (
-                      <div key={emp.id}>
-                        <div className="hidden sm:grid sm:grid-cols-[2fr_1.1fr_1.1fr_0.9fr_auto] gap-2 items-center px-3 py-2 rounded-xl" style={{ background: "var(--background)" }}>
+                      <div key={emp.id} className="px-3 py-2.5 rounded-xl" style={{ background: "var(--background)" }}>
+                        <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center">
                           <div className="min-w-0">
                             <div className="text-xs font-semibold truncate">{emp.name}</div>
                             <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
                           </div>
-                          <input type="number" min={0} disabled={!mut} placeholder="0" value={baseLabel(d.baseSalary)}
-                            onChange={e => setDraft(emp.id, { baseSalary: Math.max(0, Number(e.target.value) || 0) })}
-                            className="w-full outline-none disabled:opacity-60" style={inputStyle} aria-label={`Gaji pokok ${emp.name}`} />
-                          <input type="number" min={0} disabled={!mut} placeholder="0" value={baseLabel(d.salesTarget)}
-                            onChange={e => setDraft(emp.id, { salesTarget: Math.max(0, Number(e.target.value) || 0) })}
-                            className="w-full outline-none disabled:opacity-60" style={inputStyle} aria-label={`Target penjualan ${emp.name}`} />
-                          <input type="number" min={0} disabled={!mut} placeholder="0" value={baseLabel(d.bonus)}
-                            onChange={e => setDraft(emp.id, { bonus: Math.max(0, Number(e.target.value) || 0) })}
-                            className="w-full outline-none disabled:opacity-60" style={inputStyle} aria-label={`Bonus ${emp.name}`} />
+                          <div className="font-mono text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.baseSalary)}</div>
+                          <div className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtNum(d.salesTarget)}</div>
+                          <div className="font-mono text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.bonus)}</div>
                           <div className="flex items-center justify-end gap-1.5">
                             {mut && (
-                              <button onClick={() => saveConfig(emp)}
-                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white whitespace-nowrap" style={{ background: "var(--foreground)" }}>
-                                {cfgExists ? "Simpan" : "Tambah"}
+                              <button onClick={() => setEditEmp(emp)} className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                                style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                                Edit
                               </button>
                             )}
                             {canDelete && mut && (
@@ -264,33 +488,25 @@ export default function SalaryView({ employees, stores, attendance, transactions
                           </div>
                         </div>
 
-                        <div className="sm:hidden p-3 rounded-xl flex flex-col gap-2" style={{ background: "var(--background)" }}>
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="text-sm font-semibold min-w-0">
-                              {emp.name}
-                              <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full align-middle" style={{ background: "var(--secondary)", color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</span>
+                        <div className="sm:hidden flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold truncate">{emp.name}</div>
+                            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]" style={{ color: "var(--muted-foreground)" }}>
+                              <span>Pokok <b className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.baseSalary)}</b></span>
+                              <span>Target <b className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtNum(d.salesTarget)}</b></span>
+                              <span>Bonus <b className="font-mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.bonus)}</b></span>
                             </div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            {mut && (
+                              <button onClick={() => setEditEmp(emp)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
+                            )}
                             {canDelete && mut && (
-                              <button onClick={() => removeConfig(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "#fef2f2", color: "#ef4444" }}>Hapus Setelan</button>
+                              <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
                             )}
                           </div>
-                          {[
-                            { label: "Gaji Pokok /bln (÷30)", key: "baseSalary" as const },
-                            { label: "Target Penjualan /bln", key: "salesTarget" as const },
-                            { label: "Bonus bila capai", key: "bonus" as const },
-                          ].map(f => (
-                            <div key={f.key}>
-                              <label className="block text-[10px] font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>{f.label}</label>
-                              <input type="number" min={0} disabled={!mut} placeholder="0" value={baseLabel(d[f.key])}
-                                onChange={e => setDraft(emp.id, { [f.key]: Math.max(0, Number(e.target.value) || 0) })}
-                                className="w-full outline-none disabled:opacity-60" style={inputStyle} />
-                            </div>
-                          ))}
-                          {mut && (
-                            <button onClick={() => saveConfig(emp)} className="px-4 py-2 rounded-xl text-xs font-bold text-white self-start" style={{ background: "var(--foreground)" }}>
-                              {salaryConfig.some(c => c.employeeId === emp.id) ? "Simpan Setelan" : "Tambah Setelan"}
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -316,10 +532,10 @@ export default function SalaryView({ employees, stores, attendance, transactions
           ) : (
             <>
               <div className="px-5 pb-1">
-                <div className="hidden sm:grid sm:grid-cols-[2fr_0.6fr_1.1fr_1.3fr_0.9fr_1fr_1fr_auto] gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                <div className="hidden sm:grid sm:grid-cols-[2fr_0.55fr_1fr_1.2fr_0.8fr_0.9fr_0.9fr_auto] gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
                   <span>Karyawan</span>
                   <span>Masuk</span>
-                  <span>Gaji Pokok</span>
+                  <span>Pokok</span>
                   <span>Omzet / Target</span>
                   <span>Bonus</span>
                   <span>Total</span>
@@ -338,9 +554,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Belum dihitung</span>
-                            {mut && (
-                              <button onClick={() => hitungOne(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Hitung</button>
-                            )}
+                            <button onClick={() => openSlip(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Hitung</button>
                           </div>
                         </div>
                       );
@@ -350,8 +564,8 @@ export default function SalaryView({ employees, stores, attendance, transactions
                       ? { bg: "#f0fdf4", color: "#16a34a", text: "DIBAYAR" + (rec.paidAt ? ` · ${rec.paidAt}` : "") }
                       : { bg: "#fffbeb", color: "#d97706", text: "BELUM BAYAR" };
                     return (
-                      <div key={rec.id}>
-                        <div className="hidden sm:grid sm:grid-cols-[2fr_0.6fr_1.1fr_1.3fr_0.9fr_1fr_1fr_auto] gap-2 items-center px-3 py-2 rounded-xl" style={{ background: "var(--background)" }}>
+                      <div key={rec.id} className="px-3 py-2.5 rounded-xl" style={{ background: "var(--background)" }}>
+                        <div className="hidden sm:grid sm:grid-cols-[2fr_0.55fr_1fr_1.2fr_0.8fr_0.9fr_0.9fr_auto] gap-2 items-center">
                           <div className="min-w-0">
                             <div className="text-xs font-semibold truncate">{rec.employeeName}</div>
                             <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, rec.storeId)}</div>
@@ -366,9 +580,12 @@ export default function SalaryView({ employees, stores, attendance, transactions
                           <div className="font-mono text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--accent)" }}>{fmt(rec.total)}</div>
                           <div><span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: statusPill.bg, color: statusPill.color }}>{statusPill.text}</span></div>
                           <div className="flex items-center justify-end gap-1.5">
+                            <button onClick={() => openSlip(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#eef2ff" }} title="Lihat & cetak slip gaji">
+                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
+                            </button>
                             {mut && (
                               <button onClick={() => togglePaid(emp)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap" style={{ background: rec.paid ? "#fffbeb" : "#f0fdf4", border: "1px solid var(--border)" }}>
-                                {rec.paid ? "Batal Bayar" : "Tandai Dibayar"}
+                                {rec.paid ? "Batal" : "Bayar"}
                               </button>
                             )}
                             {canDelete && (
@@ -379,14 +596,17 @@ export default function SalaryView({ employees, stores, attendance, transactions
                           </div>
                         </div>
 
-                        <div className="sm:hidden p-3 rounded-xl flex flex-col gap-2" style={{ background: "var(--background)" }}>
+                        <div className="sm:hidden flex flex-col gap-2">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="text-sm font-semibold min-w-0">
+                            <div className="text-xs font-semibold min-w-0">
                               {rec.employeeName}
                               <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full align-middle" style={{ background: "var(--secondary)", color: "var(--muted-foreground)" }}>{storeNameOf(stores, rec.storeId)}</span>
                               <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full align-middle" style={{ background: statusPill.bg, color: statusPill.color }}>{statusPill.text}</span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
+                              <button onClick={() => openSlip(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#eef2ff" }} title="Lihat & cetak slip gaji">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2z" /></svg>
+                              </button>
                               {mut && (
                                 <button onClick={() => togglePaid(emp)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: rec.paid ? "#fffbeb" : "#f0fdf4", border: "1px solid var(--border)" }}>
                                   {rec.paid ? "Batal Bayar" : "Tandai Dibayar"}
@@ -410,7 +630,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                             </div>
                             <div className="p-2 rounded-lg" style={cell}>
                               <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>Omzet / Target</div>
-                              <div className={`font-mono font-bold mt-0.5`} style={{ fontFamily: "'JetBrains Mono', monospace", color: reached ? "#16a34a" : "var(--foreground)" }}>{fmt(rec.salesTotal)} / {fmtNum(rec.salesTarget)}</div>
+                              <div className="font-mono font-bold mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace", color: reached ? "#16a34a" : "var(--foreground)" }}>{fmt(rec.salesTotal)} / {fmtNum(rec.salesTarget)}</div>
                               <div className="text-[9px] font-semibold mt-0.5" style={{ color: reached ? "#16a34a" : "var(--muted-foreground)" }}>{reached ? "TARGET TERCAPAI" : "belum capai"}</div>
                             </div>
                             <div className="p-2 rounded-lg" style={cell}>

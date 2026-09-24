@@ -36,7 +36,7 @@ interface Props {
   onResetChat: () => Promise<ResetResult>;
 }
 
-type Tab = "printer" | "attendance" | "pembayaran" | "brand" | "roles" | "barcode" | "reset";
+type Tab = "printer" | "slip" | "attendance" | "pembayaran" | "brand" | "roles" | "barcode" | "reset";
 
 const field = {
   background: "var(--background)",
@@ -177,16 +177,18 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   const canOpenTab = (id: Tab): boolean => {
     if (id === "reset") return isAdmin;
     const acts = permissions?.settings;
-    return !acts || acts.includes(id);
+    if (!acts) return true;
+    if (id === "printer" || id === "slip") return acts.includes("printer");
+    return acts.includes(id);
   };
-  const allTabs: Tab[] = ["printer", "attendance", "roles", "barcode", "pembayaran", "brand", "reset"];
+  const allTabs: Tab[] = ["printer", "slip", "attendance", "roles", "barcode", "pembayaran", "brand", "reset"];
 
   useEffect(() => {
     if (tab === "reset" && isAdmin) return;
     const acts = permissions?.settings;
     if (!acts) return;
-    if (!acts.includes(tab)) {
-      const first = allTabs.find(t => t !== "reset" && acts.includes(t));
+    if (!canOpenTab(tab)) {
+      const first = allTabs.find(t => t !== "reset" && canOpenTab(t));
       if (first) setTab(first);
     }
   }, [permissions, tab, isAdmin]);
@@ -439,7 +441,8 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   );
 
   const tabDefs = ([
-    { id: "printer", label: "Printer", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
+    { id: "printer", label: "Struk", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg> },
+    { id: "slip", label: "Slip Gaji", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17h6m-6-4h6m-6-4h6M5 21h14a2 2 0 002-2V7.5L15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> },
     { id: "attendance", label: "Absensi", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
     { id: "roles", label: "Role & Menu", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
     { id: "barcode", label: "Perangkat Barcode", icon: <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7V4a1 1 0 011-1h3M17 3h3a1 1 0 011 1v3m0 10v3a1 1 0 01-1 1h-3M7 21H4a1 1 0 01-1-1v-3M8 7h1v4H8zM12 7h1v4h-1zM16 7h1v4h-1zM8 13h1v4H8zM12 13h1v4h-1zM16 13h1v4h-1z" /></svg> },
@@ -490,11 +493,10 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5">
 
-      {/* PRINTER */}
+      {/* STRUK */}
       {tab === "printer" && (
-        <>
         <div className="w-full p-5 rounded-2xl mb-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-0.5">Setting Tampilan Struk Penjualan</div>
               <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Tampilan struk KASIR</div>
@@ -512,7 +514,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>LEBAR KERTAS (MM)</label>
               <select value={draftPrinter.paperWidth} onChange={e => setDraftPrinter(p => ({ ...p, paperWidth: Number(e.target.value) }))}
@@ -539,7 +541,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
           <div className="mb-5">
             <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO CETAK STRUK</label>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
                 {draftPrinter.receiptLogo ? (
                   <img src={assetUrl(draftPrinter.receiptLogo)} alt="Logo struk" className="w-full h-full object-contain" />
@@ -608,9 +610,12 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             Simpan Setelan Struk
           </button>
         </div>
+      )}
 
+      {/* SLIP GAJI */}
+      {tab === "slip" && (
         <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div>
               <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-0.5">Setting Tampilan Slip Gaji Karyawan</div>
               <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Tampilan slip gaji (Nama, Jabatan, Tanggal, Lokasi Kerja, Hari Masuk, Omzet Penjualan, Target Penjualan, Bonus, Mengetahui)</div>
@@ -659,7 +664,6 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             Simpan Setelan Slip Gaji
           </button>
         </div>
-        </>
       )}
 
       {/* PRATINJAU STRUK — floating overlay (always available, independent of active tab) */}

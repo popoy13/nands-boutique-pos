@@ -363,22 +363,29 @@ export default function SalaryView({ employees, stores, attendance, transactions
             <div className="p-5">
               <div className="rounded-xl" style={{ background: "#fff", color: "#111", fontFamily: "'Courier New', monospace", fontSize: 11, border: "1px solid #d1d5db" }}>
                 <div className="p-4">
-                  <div className="flex items-center gap-2 border-b border-black pb-2 mb-2">
-                    {assetUrl(settings?.brand?.logo || "") ? (
-                      <img src={assetUrl(settings?.brand?.logo || "")} alt="logo" className="h-8 w-8 object-contain" />
-                    ) : (
-                      <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold">{String(settings?.brand?.name || "N").charAt(0)}</div>
-                    )}
-                    <div>
-                      <div className="font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>{settings?.brand?.name || "NAND'S BOUTIQUE"}</div>
-                      <div className="text-[9px]">{storeNameOf(stores, slipRec.storeId)}</div>
+                  <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {assetUrl(settings?.brand?.logo || "") ? (
+                        <img src={assetUrl(settings?.brand?.logo || "")} alt="logo" className="h-8 w-8 object-contain" />
+                      ) : (
+                        <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold">{String(settings?.brand?.name || "N").charAt(0)}</div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>{settings?.brand?.name || "NAND'S BOUTIQUE"}</div>
+                        <div className="text-[9px] truncate">{storeNameOf(stores, slipRec.storeId)}</div>
+                      </div>
                     </div>
+                    <div className="text-[9px] px-1.5 py-0.5 border-2 border-black font-bold shrink-0">{slipRec.paid ? "LUNAS" : "BELUM DIBAYAR"}</div>
                   </div>
-                  <div className="text-center font-bold mb-2">SLIP GAJI KARYAWAN</div>
-                  {slipShow("showName") && <div className="mb-1">Nama : {slipRec.employeeName}</div>}
-                  {slipShow("showPosition") && <div className="mb-1">Jabatan : {(() => { const rk = employees.find(e => e.id === slipRec.employeeId)?.role; return (rk && settings?.roles?.[rk]?.label) || rk || "—"; })()}</div>}
-                  {slipShow("showLocation") && <div className="mb-1">Lokasi : {storeNameOf(stores, slipRec.storeId)}</div>}
-                  {slipShow("showDate") && <div className="mb-1">Bulan : {month} ({slipRec.paid ? `DIBAYAR${slipRec.paidAt ? " " + slipRec.paidAt : ""}` : "BELUM DIBAYAR"})</div>}
+                  <div className="text-center font-bold mb-2 text-[12px] tracking-widest">SLIP GAJI KARYAWAN</div>
+                  {[
+                    ...(slipShow("showName") ? [["Nama Karyawan", slipRec.employeeName]] : []),
+                    ...(slipShow("showPosition") ? [["Jabatan", (() => { const rk = employees.find(e => e.id === slipRec.employeeId)?.role; return (rk && settings?.roles?.[rk]?.label) || rk || "—"; })()]] : []),
+                    ...(slipShow("showLocation") ? [["Lokasi Kerja", storeNameOf(stores, slipRec.storeId)]] : []),
+                    ...(slipShow("showDate") ? [["Periode", `${month.split("-")[1]}/${month.split("-")[0]}`], ["Tanggal", new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })]] : []),
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between py-0.5"><span>{k}</span><span>{v}</span></div>
+                  ))}
                   <div className="my-2 border-t border-dashed border-black" />
                   {[
                     ["Gaji Pokok", fmt(slipRec.baseSalary)],
@@ -393,11 +400,17 @@ export default function SalaryView({ employees, stores, attendance, transactions
                   <div className="my-2 border-t border-dashed border-black" />
                   <div className="flex justify-between font-bold text-sm"><span>Total Gaji</span><span>{fmt(slipRec.total)}</span></div>
                   {outstandingFor(slipRec.employeeId) > 0 && (
-                    <div className="flex justify-between py-0.5"><span>Potongan Kasbon</span><span>- {fmt(outstandingFor(slipRec.employeeId))}</span></div>
+                    <div className="flex justify-between py-0.5" style={{ color: "#dc2626" }}><span>Potongan Kasbon</span><span>- {fmt(outstandingFor(slipRec.employeeId))}</span></div>
                   )}
                   <div className="flex justify-between font-bold text-sm" style={{ borderTop: "1px solid #000", paddingTop: 4 }}>
                     <span>Total Diterima</span><span>{fmt(Math.max(0, slipRec.total - outstandingFor(slipRec.employeeId)))}</span>
                   </div>
+                  {slipShow("showAcknowledge") && (
+                    <div className="flex justify-between gap-4 mt-7">
+                      <div className="text-center text-[9px] w-[45%]"><div>Yang Menerima,</div><div className="mt-7 border-t border-black pt-0.5 truncate">( {slipRec.employeeName} )</div></div>
+                      <div className="text-center text-[9px] w-[45%]"><div>Mengetahui,</div><div className="mt-7 border-t border-black pt-0.5">DIREKTUR UTAMA</div></div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2 mt-4">

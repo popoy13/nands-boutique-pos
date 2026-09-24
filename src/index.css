@@ -25,8 +25,8 @@ body {
   touch-action: manipulation;
   min-width: 320px;
   min-height: 100%;
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 select,

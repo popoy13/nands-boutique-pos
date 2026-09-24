@@ -1,8 +1,10 @@
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import type { AttendanceRecord, Employee, SalaryConfig, SalaryRecord, Transaction, Kasbon } from "../data/types";
 import type { AppSettings } from "../data/settings";
 import { attendanceCountFor, salesTotalFor, computeSalary, upsertRecords, currentMonth } from "../data/salary";
 import { assetUrl } from "../lib/assets";
+import { safeRows } from "../lib/safeExport";
 import Pagination from "./Pagination";
 import EmptyState from "./EmptyState";
 
@@ -172,6 +174,59 @@ export default function SalaryView({ employees, stores, attendance, transactions
     onSaveKasbon(kasbon.filter(x => x.id !== id));
     setConfirmKasbonId(null);
     showToast(k ? `Kasbon ${fmt(k.amount)} dihapus` : "Catatan kasbon dihapus");
+  };
+
+  const handleExport = () => {
+    if (!active.length) { showToast("Tidak ada karyawan aktif", false); return; }
+    const label = `${month.slice(0, 4)} ${MONTHS_ID[Number(month.slice(5, 7)) - 1]}`;
+    const detailRows: Record<string, unknown>[] = active.map(e => {
+      const rec = computeOne(e);
+      const potongan = outstandingFor(e.id);
+      const diterima = Math.max(0, rec.total - potongan);
+      const status = recByEmp.has(e.id)
+        ? (rec.paid ? "Dibayar" : "Belum Dibayar")
+        : "Belum Dihitung";
+      return {
+        "Karyawan": e.name,
+        "Toko": storeNameOf(stores, e.storeId),
+        "Hari Masuk": rec.attendanceCount,
+        "Gaji Pokok": rec.baseSalary,
+        "Gaji Diterima": rec.gross,
+        "Omzet": rec.salesTotal,
+        "Target": rec.salesTarget,
+        "Bonus": rec.bonus,
+        "Potongan Kasbon": potongan,
+        "Total Diterima": diterima,
+        "Status": status,
+      };
+    });
+    const configRows: Record<string, unknown>[] = active.map(e => {
+      const d = draftFor(e);
+      return {
+        "Karyawan": e.name,
+        "Toko": storeNameOf(stores, e.storeId),
+        "Gaji Pokok": d.baseSalary,
+        "Target": d.salesTarget,
+        "Bonus": d.bonus,
+      };
+    });
+    const kasbonRows: Record<string, unknown>[] = kasbon.map(k => {
+      const emp = employees.find(x => x.id === k.employeeId);
+      return {
+        "Karyawan": emp?.name ?? k.employeeId,
+        "Tanggal": k.date,
+        "Nominal": k.amount,
+        "Catatan": k.note ?? "",
+        "Status": k.settled ? "Lunas" : "Belum",
+        "Tanggal Lunas": k.settledAt ?? "",
+      };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeRows(detailRows)), "Rincian Gaji");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeRows(configRows)), "Setelan Gaji");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeRows(kasbonRows)), "Daftar Kasbon");
+    XLSX.writeFile(wb, `nands-boutique-gaji-${label.replace(/\s+/g, "-")}.xlsx`);
+    showToast(`Laporan gaji ${label} diunduh`);
   };
 
   const openLapor = (emp: Employee) => {
@@ -616,6 +671,12 @@ export default function SalaryView({ employees, stores, attendance, transactions
             <div className="flex items-center gap-2 flex-wrap">
               <input type="month" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); } }}
                 className="px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
+              <button onClick={handleExport}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap"
+                style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Export Excel
+              </button>
               {mut && (
                 <button onClick={hitungAll} className="px-3 py-2 rounded-xl text-xs font-semibold text-white whitespace-nowrap transition-all" style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
                   Hitung Ulang Semua
@@ -702,7 +763,14 @@ export default function SalaryView({ employees, stores, attendance, transactions
             <>
               <div className="px-5 pb-1">
                 <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid var(--border)" }}>
-                  <table className="hidden sm:table w-full min-w-[780px] text-xs border-collapse">
+                  <table className="hidden lg:table w-full min-w-[680px] text-xs border-collapse">
+                    <colgroup>
+                      <col style={{ width: "40%" }} />
+                      <col style={{ width: "15%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "auto" }} />
+                    </colgroup>
                     <thead>
                       <tr className="text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
                         <th className="text-left px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Karyawan</th>
@@ -718,7 +786,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                         return (
                           <tr key={emp.id} className="align-middle" style={{ borderTop: "1px solid var(--border)" }}>
                             <td className="px-4 py-3 min-w-0">
-                              <div className="font-semibold truncate max-w-[280px]">{emp.name}</div>
+                              <div className="font-semibold truncate">{emp.name}</div>
                               <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
                             </td>
                             <td className="px-4 py-3 text-right font-mono font-semibold whitespace-nowrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.baseSalary)}</td>

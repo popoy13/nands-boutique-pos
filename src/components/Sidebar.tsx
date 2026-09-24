@@ -50,7 +50,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
           <img src={assetUrl(brand.logo)} alt={brand.name} className="w-full h-full object-cover" />
         </div>
           <div className="flex-1 min-w-0">
-            <div title={brand.name} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 12, letterSpacing: "0.02em", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
+            <div title={brand.name} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.02em", lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
           </div>
           <Avatar src={currentUser.photo} name={currentUser.name} role={currentUser.role} className="w-7 h-7 text-xs" />
@@ -82,7 +82,7 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
           <img src={assetUrl(brand.logo)} alt={brand.name} className="w-full h-full object-cover" />
         </div>
           <div className="min-w-0 flex-1">
-            <div title={brand.name} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 12, letterSpacing: "0.02em", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.name}</div>
+            <div title={brand.name} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, color: "white", fontSize: 13, letterSpacing: "0.02em", lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{brand.name}</div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{brand.tagline}</div>
           </div>
         </div>

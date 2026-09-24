@@ -103,14 +103,16 @@ export default function Sidebar({ activeTab, activeStore, setActiveStore, stores
       <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "0 0 8px" }} />
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-1 flex flex-col gap-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-1 flex flex-col overflow-y-auto">
+        <div className="px-3 pb-1.5 pt-2 text-[9px] font-bold tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.28)" }}>MENU</div>
         {navItems.map(item => {
           const active = activeTab === item.id;
           const href = MENU_PAGES[item.id] ?? "#";
           return (
             <a key={item.id} href={href}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-underline"
+              className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 no-underline hover:bg-white/5"
               style={{ background: active ? "rgba(124,58,237,0.15)" : "transparent", color: active ? "var(--accent)" : "var(--sidebar-fg)" }}>
+              {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full" style={{ background: "var(--accent)", boxShadow: "0 0 8px rgba(124,58,237,0.6)" }} />}
               <span style={{ color: active ? "var(--accent)" : "rgba(156,163,175,0.55)", flexShrink: 0 }}>{item.icon}</span>
               <span className="flex-1 min-w-0">{item.label}</span>
               {(item.id === "chat" ? unreadCounts.chat : item.id === "history" ? unreadCounts.history : 0) > 0 && (
@@ -180,18 +182,22 @@ export function MobileBottomNav({ allowed, activeTab, unreadCounts = { chat: 0, 
   const renderItem = (item: { id: string; label: string; icon: React.ReactNode }, compact: boolean) => {
     const active = activeTab === item.id;
     const href = MENU_PAGES[item.id] ?? "#";
+    const badge = (item.id === "chat" ? unreadCounts.chat : item.id === "history" ? unreadCounts.history : 0) > 0;
     return (
       <a key={item.id} href={href} onClick={() => setOpen(false)}
         className={compact
-          ? "flex-1 min-w-0 flex flex-col items-center gap-1 py-2.5 px-1 transition-all no-underline"
-          : "flex flex-col items-center gap-1.5 py-3.5 rounded-2xl transition-all no-underline"}
+          ? "flex-1 min-w-0 flex flex-col items-center gap-1 py-2 px-1 transition-all no-underline"
+          : "flex flex-col items-center gap-2 py-4 rounded-2xl transition-all no-underline"}
         style={compact
           ? { color: active ? "var(--accent)" : "rgba(156,163,175,0.7)", borderTop: `2px solid ${active ? "var(--accent)" : "transparent"}`, background: active ? "rgba(124,58,237,0.08)" : "transparent" }
           : { background: active ? "rgba(124,58,237,0.1)" : "var(--background)", border: `1.5px solid ${active ? "var(--accent)" : "var(--border)"}`, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
-        <span style={{ color: active ? "var(--accent)" : "rgba(156,163,175,0.6)" }}>{item.icon}</span>
+        <span className={`${compact ? "w-8 h-6 rounded-full flex items-center justify-center" : "w-12 h-12 rounded-2xl flex items-center justify-center"} shrink-0 transition-all`}
+          style={{ background: compact ? (active ? "rgba(124,58,237,0.18)" : "transparent") : (active ? "rgba(124,58,237,0.14)" : "var(--muted)"), color: compact ? undefined : (active ? "var(--accent)" : "var(--muted-foreground)") }}>
+          {item.icon}
+        </span>
         <span className="relative">
-          <span className={compact ? "text-[9px] font-medium truncate w-full text-center" : "text-[10px] font-semibold"}>{item.label}</span>
-          {(item.id === "chat" ? unreadCounts.chat : item.id === "history" ? unreadCounts.history : 0) > 0 && (
+          <span className={compact ? "text-[10px] font-semibold truncate w-full text-center" : "text-[11px] font-semibold"}>{item.label}</span>
+          {badge && (
             <span className="absolute -top-2 -right-3 min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: "#ef4444" }}>
               {Math.min(99, item.id === "chat" ? unreadCounts.chat : unreadCounts.history)}
             </span>

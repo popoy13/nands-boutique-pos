@@ -43,6 +43,31 @@ const field = {
   border: "1.5px solid var(--border)",
 } as const;
 
+const listItem = {
+  background: "var(--background)",
+  border: "1px solid var(--border)",
+} as const;
+
+function ListRow({ label, desc, control, sep = true }: { label: string; desc?: string; control: React.ReactNode; sep?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3" style={{ borderBottom: sep ? "1px solid var(--border)" : "none" }}>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">{label}</div>
+        {desc && <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{desc}</div>}
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  );
+}
+
+function ListSection({ label }: { label: string }) {
+  return (
+    <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
+      {label}
+    </div>
+  );
+}
+
 const PALETTE = ["#7c3aed", "#2563eb", "#0d9488", "#16a34a", "#ea580c", "#db2777", "#ca8a04", "#4f46e5"];
 
 function SalarySlipPreview({ slip, brandName }: { slip: SalarySlipSettings; brandName: string }) {
@@ -508,48 +533,34 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             </button>
           </div>
 
-          <div className="mb-4">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>NAMA PRINTER</label>
-            <input type="text" value={draftPrinter.printerName} onChange={e => setDraftPrinter(p => ({ ...p, printerName: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>LEBAR KERTAS (MM)</label>
+          <div className="rounded-2xl overflow-hidden mb-5" style={{ border: "1px solid var(--border)" }}>
+            <ListRow label="Nama Printer" desc="Nama perangkat printer struk" control={
+              <input type="text" value={draftPrinter.printerName} onChange={e => setDraftPrinter(p => ({ ...p, printerName: e.target.value }))}
+                className="w-40 sm:w-56 px-3 py-2 rounded-xl text-sm text-right outline-none" style={listItem} />
+            } />
+            <ListRow label="Lebar Kertas" desc="Ukuran kertas struk" control={
               <select value={draftPrinter.paperWidth} onChange={e => setDraftPrinter(p => ({ ...p, paperWidth: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
+                className="w-28 px-3 py-2 rounded-xl text-sm outline-none" style={listItem}>
                 {[58, 72, 80].map(w => <option key={w} value={w}>{w} mm</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>JUMLAH SALINAN</label>
+            } />
+            <ListRow label="Jumlah Salinan" desc="Berapa kali struk dicetak" control={
               <select value={draftPrinter.copies} onChange={e => setDraftPrinter(p => ({ ...p, copies: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
+                className="w-20 px-3 py-2 rounded-xl text-sm outline-none" style={listItem}>
                 {[1, 2, 3].map(c => <option key={c} value={c}>{c}x</option>)}
               </select>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl mb-4" style={{ background: "var(--background)" }}>
-            <div>
-              <div className="text-sm font-semibold">Cetak otomatis</div>
-              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Struk langsung dicetak setelah pembayaran berhasil</div>
-            </div>
-            {toggle(draftPrinter.autoPrint, v => setDraftPrinter(p => ({ ...p, autoPrint: v })))}
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>LOGO CETAK STRUK</label>
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
-                {draftPrinter.receiptLogo ? (
-                  <img src={assetUrl(draftPrinter.receiptLogo)} alt="Logo struk" className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-[9px] px-1 text-center" style={{ color: "var(--muted-foreground)" }}>Tanpa logo</span>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
+            } />
+            <ListRow label="Cetak Otomatis" desc="Struk langsung dicetak setelah pembayaran berhasil"
+              control={toggle(draftPrinter.autoPrint, v => setDraftPrinter(p => ({ ...p, autoPrint: v })))} />
+            <ListRow label="Logo Struk" desc="Logo di bagian atas struk. Kosong = tanpa logo" control={
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden shrink-0" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                  {draftPrinter.receiptLogo ? (
+                    <img src={assetUrl(draftPrinter.receiptLogo)} alt="Logo struk" className="w-full h-full object-contain" />
+                  ) : (
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: "var(--muted-foreground)" }}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M6 21h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                  )}
+                </div>
                 <input ref={receiptLogoRef} type="file" accept="image/*" className="hidden"
                   onChange={async e => {
                     const file = e.target.files?.[0];
@@ -564,46 +575,35 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                     }
                     e.target.value = "";
                   }} />
-                <button onClick={() => receiptLogoRef.current?.click()} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
-                  Unggah Logo
+                <button onClick={() => receiptLogoRef.current?.click()} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                  Unggah
                 </button>
                 {draftPrinter.receiptLogo && (
                   <button onClick={() => setDraftPrinter(p => ({ ...p, receiptLogo: defaultSettings.printer.receiptLogo }))}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--secondary)" }}>
-                    Hapus Logo
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold" style={{ background: "var(--secondary)" }}>
+                    Hapus
                   </button>
                 )}
               </div>
+            } />
+            <ListSection label="Tampilan di struk" />
+            {([
+              { key: "showTax", label: "Pajak", desc: "Baris pajak di bagian rincian" },
+              { key: "showCashier", label: "Kasir", desc: "Nama kasir di bagian atas struk" },
+              { key: "showDate", label: "Tanggal", desc: "Tanggal transaksi di bagian atas struk" },
+              { key: "showTime", label: "Jam", desc: "Jam transaksi di bagian atas struk" },
+              { key: "showChange", label: "Kembalian", desc: "Baris kembalian di bagian rincian" },
+            ] as { key: keyof PrinterSettings; label: string; desc: string }[]).map((row, i) => (
+              <ListRow key={row.key} label={row.label} desc={row.desc} sep={i < 4}
+                control={toggle(draftPrinter[row.key] as boolean, v => setDraftPrinter(p => ({ ...p, [row.key]: v })))} />
+            ))}
+            <ListSection label="Bawah struk" />
+            <div className="px-4 pt-3 pb-4">
+              <div className="text-sm font-semibold mb-1">Teks Bawah Struk</div>
+              <div className="text-xs mb-2" style={{ color: "var(--muted-foreground)" }}>Teks di bagian bawah struk. Tiap baris otomatis menjadi baris baru.</div>
+              <textarea value={draftPrinter.footerText} onChange={e => setDraftPrinter(p => ({ ...p, footerText: e.target.value }))}
+                rows={3} placeholder="Contoh: Terima kasih telah berbelanja!" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={field} />
             </div>
-            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Tampil di bagian atas struk. Kosong = logo tidak dicetak.</div>
-          </div>
-
-          <div className="mb-5">
-            <div className="text-xs font-semibold mb-2.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI STRUK</div>
-            <div className="rounded-2xl" style={{ border: "1px solid var(--border)" }}>
-              {([
-                { key: "showTax", label: "Pajak", desc: "Baris pajak di bagian rincian" },
-                { key: "showCashier", label: "Kasir", desc: "Nama kasir di bagian atas struk" },
-                { key: "showDate", label: "Tanggal", desc: "Tanggal transaksi di bagian atas struk" },
-                { key: "showTime", label: "Jam", desc: "Jam transaksi di bagian atas struk" },
-                { key: "showChange", label: "Kembalian", desc: "Baris kembalian di bagian rincian" },
-              ] as { key: keyof PrinterSettings; label: string; desc: string }[]).map((row, i) => (
-                <div key={row.key} className="flex items-center justify-between p-3" style={{ borderBottom: i < 4 ? "1px solid var(--border)" : "none" }}>
-                  <div>
-                    <div className="text-sm font-semibold">{row.label}</div>
-                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{row.desc}</div>
-                  </div>
-                  {toggle(draftPrinter[row.key] as boolean, v => setDraftPrinter(p => ({ ...p, [row.key]: v })))}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>DESKRIPSI BAWAH STRUK</label>
-            <textarea value={draftPrinter.footerText} onChange={e => setDraftPrinter(p => ({ ...p, footerText: e.target.value }))}
-              rows={3} placeholder="Contoh: Terima kasih telah berbelanja!" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none" style={field} />
-            <div className="text-[10px] mt-1.5" style={{ color: "var(--muted-foreground)" }}>Teks di bagian bawah struk. Tiap baris otomatis menjadi baris baru.</div>
           </div>
 
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
@@ -627,37 +627,28 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             </button>
           </div>
 
-          <div className="mb-4">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>UKURAN KERTAS</label>
-            <select value={draftSlip.paperSize} onChange={e => setDraftSlip(p => ({ ...p, paperSize: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
-              <option value="A4">A4</option>
-            </select>
-          </div>
-
-          <div className="mb-5">
-            <div className="text-xs font-semibold mb-2.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI SLIP GAJI</div>
-            <div className="rounded-2xl" style={{ border: "1px solid var(--border)" }}>
-              {([
-                { key: "showName", label: "Nama", desc: "Nama karyawan di bagian atas slip" },
-                { key: "showPosition", label: "Jabatan", desc: "Jabatan karyawan" },
-                { key: "showDate", label: "Tanggal", desc: "Periode & tanggal slip" },
-                { key: "showLocation", label: "Lokasi kerja", desc: "Cabang tempat karyawan bekerja" },
-                { key: "showAttendance", label: "Hari masuk", desc: "Jumlah hari hadir karyawan" },
-                { key: "showSales", label: "Omzet penjualan", desc: "Pencapaian penjualan karyawan" },
-                { key: "showTarget", label: "Target penjualan", desc: "Target yang harus dicapai" },
-                { key: "showBonus", label: "Bonus", desc: "Bonus atas pencapaian target" },
-                { key: "showAcknowledge", label: "Mengetahui", desc: "Tanda tangan persetujuan slip" },
-              ] as { key: keyof SalarySlipSettings; label: string; desc: string }[]).map((row, i) => (
-                <div key={row.key} className="flex items-center justify-between p-3" style={{ borderBottom: i < 8 ? "1px solid var(--border)" : "none" }}>
-                  <div>
-                    <div className="text-sm font-semibold">{row.label}</div>
-                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{row.desc}</div>
-                  </div>
-                  {toggle(draftSlip[row.key] as boolean, v => setDraftSlip(p => ({ ...p, [row.key]: v })))}
-                </div>
-              ))}
-            </div>
+          <div className="rounded-2xl overflow-hidden mb-5" style={{ border: "1px solid var(--border)" }}>
+            <ListRow label="Ukuran Kertas" desc="Ukuran kertas slip gaji" control={
+              <select value={draftSlip.paperSize} onChange={e => setDraftSlip(p => ({ ...p, paperSize: e.target.value }))}
+                className="w-24 px-3 py-2 rounded-xl text-sm outline-none" style={listItem}>
+                <option value="A4">A4</option>
+              </select>
+            } />
+            <ListSection label="Tampilan di slip gaji" />
+            {([
+              { key: "showName", label: "Nama", desc: "Nama karyawan di bagian atas slip" },
+              { key: "showPosition", label: "Jabatan", desc: "Jabatan karyawan" },
+              { key: "showDate", label: "Tanggal", desc: "Periode & tanggal slip" },
+              { key: "showLocation", label: "Lokasi kerja", desc: "Cabang tempat karyawan bekerja" },
+              { key: "showAttendance", label: "Hari masuk", desc: "Jumlah hari hadir karyawan" },
+              { key: "showSales", label: "Omzet penjualan", desc: "Pencapaian penjualan karyawan" },
+              { key: "showTarget", label: "Target penjualan", desc: "Target yang harus dicapai" },
+              { key: "showBonus", label: "Bonus", desc: "Bonus atas pencapaian target" },
+              { key: "showAcknowledge", label: "Mengetahui", desc: "Tanda tangan persetujuan slip" },
+            ] as { key: keyof SalarySlipSettings; label: string; desc: string }[]).map((row, i) => (
+              <ListRow key={row.key} label={row.label} desc={row.desc} sep={i < 8}
+                control={toggle(draftSlip[row.key] as boolean, v => setDraftSlip(p => ({ ...p, [row.key]: v })))} />
+            ))}
           </div>
 
           <button onClick={saveSlip} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>

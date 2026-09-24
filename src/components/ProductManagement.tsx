@@ -571,7 +571,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
             <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>FOTO PRODUK</label>
             <div className="flex gap-2">
               <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
-                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white", opacity: photoBusy ? 0.6 : 1 }}>
+                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: photoBusy ? "var(--muted)" : "var(--accent)", opacity: 1 }}>
                 {photoBusy ? "Memuat..." : "Ubah Foto"}
               </button>
               <button onClick={handlePhotoRemove} className="px-3 py-2 rounded-xl text-xs font-semibold text-red-500" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
@@ -618,7 +618,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
             {editing.variants.map((v, i) => (
               <button key={i} onClick={() => setActiveVariantIdx(i)}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all"
-                style={{ background: activeVariantIdx === i ? "var(--foreground)" : "var(--background)", color: activeVariantIdx === i ? "white" : "var(--muted-foreground)", border: `1px solid ${activeVariantIdx === i ? "var(--foreground)" : "var(--border)"}` }}>
+                style={{ background: activeVariantIdx === i ? "var(--accent)" : "var(--background)", color: activeVariantIdx === i ? "white" : "var(--muted-foreground)", border: `1px solid ${activeVariantIdx === i ? "var(--accent)" : "var(--border)"}` }}>
                 {variantLabel(v)}
               </button>
             ))}
@@ -683,7 +683,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
       <div className="px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
         <button onClick={handleSave} disabled={!editing.name.trim() || editing.basePrice <= 0}
           className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: editing.name.trim() && editing.basePrice > 0 ? "var(--foreground)" : "var(--muted)", color: editing.name.trim() && editing.basePrice > 0 ? "white" : "var(--muted-foreground)" }}>
+          style={{ background: editing.name.trim() && editing.basePrice > 0 ? "var(--accent)" : "var(--muted)", color: editing.name.trim() && editing.basePrice > 0 ? "white" : "var(--muted-foreground)", boxShadow: editing.name.trim() && editing.basePrice > 0 ? "0 4px 12px rgba(124,58,237,0.25)" : "none" }}>
           Simpan Produk
         </button>
       </div>

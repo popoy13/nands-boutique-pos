@@ -363,7 +363,9 @@ export default function ChatView({
         <div className="flex items-center justify-between gap-3">
           <div><h1 className="text-xl font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>Chat Karyawan</h1><p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Komunikasi realtime antar karyawan</p></div>
           <div className="flex items-center gap-2">
-            <div className="text-xs hidden sm:block" style={{ color: "var(--muted-foreground)" }}>{onlineIds.size} online · {employees.filter(e => e.status === "active").length} karyawan</div>
+            <div className="text-xs hidden sm:flex items-center gap-1.5" style={{ color: "var(--muted-foreground)" }}>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: onlineIds.size > 0 ? "#22c55e" : "#9ca3af", boxShadow: onlineIds.size > 0 ? "0 0 0 3px rgba(34,197,94,0.15)" : "none" }} />
+            {onlineIds.size} online · {employees.filter(e => e.status === "active").length} karyawan</div>
             {canDeleteAll && <button onClick={() => void deleteAllChat()} disabled={bulkDeleting} className="rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ background: "#fee2e2", color: "#b91c1c" }}>Hapus semua chat</button>}
             <button onClick={selectionMode ? cancelSelection : () => setSelectionMode(true)} className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: selectionMode ? "var(--accent)" : "var(--secondary)", color: selectionMode ? "white" : "var(--foreground)" }}>{selectionMode ? "Batal" : "Pilih"}</button>
           </div>
@@ -383,7 +385,7 @@ export default function ChatView({
           const mine = message.sender_id === currentUser.id;
           const showDate = index === 0 || formatDate(messages[index - 1].created_at) !== formatDate(message.created_at);
           return <div key={message.id}>
-            {showDate && <div className="text-center text-[10px] my-3" style={{ color: "var(--muted-foreground)" }}>{formatDate(message.created_at)}</div>}
+            {showDate && <div className="flex justify-center my-3"><span className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "var(--card)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}>{formatDate(message.created_at)}</span></div>}
             <div className={`flex gap-2 mb-3 ${mine ? "justify-end" : "justify-start"}`}>
               {selectionMode && <input type="checkbox" checked={selectedMessageIds.has(message.id)} onChange={() => toggleMessageSelection(message.id)} className="mt-6 w-4 h-4 accent-[var(--accent)]" aria-label={`Pilih pesan ${message.sender_name}`} />}
               {!mine && <Avatar src={message.sender_photo ?? undefined} name={message.sender_name} role="" className="w-8 h-8 text-[10px] shrink-0" />}

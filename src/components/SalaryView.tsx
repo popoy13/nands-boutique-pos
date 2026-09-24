@@ -701,81 +701,92 @@ export default function SalaryView({ employees, stores, attendance, transactions
           ) : (
             <>
               <div className="px-5 pb-1">
-                <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--border)" }}>
-                  <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider items-center" style={{ background: "var(--background)", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
-                    <span>Karyawan</span>
-                    <span className="text-right">Gaji Pokok</span>
-                    <span className="text-right">Target</span>
-                    <span className="text-right">Bonus</span>
-                    <span className="text-right">Aksi</span>
-                  </div>
-                  <div className="flex flex-col">
+                <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid var(--border)" }}>
+                  <table className="hidden sm:table w-full min-w-[780px] text-xs border-collapse">
+                    <thead>
+                      <tr className="text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
+                        <th className="text-left px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Karyawan</th>
+                        <th className="text-right px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Gaji Pokok</th>
+                        <th className="text-right px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Target</th>
+                        <th className="text-right px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Bonus</th>
+                        <th className="text-right px-4 py-2.5 whitespace-nowrap" style={{ fontWeight: 700 }}>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cfgItems.map((emp, i) => {
+                        const d = draftFor(emp);
+                        return (
+                          <tr key={emp.id} className="align-middle" style={{ borderTop: "1px solid var(--border)" }}>
+                            <td className="px-4 py-3 min-w-0">
+                              <div className="font-semibold truncate max-w-[280px]">{emp.name}</div>
+                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-semibold whitespace-nowrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.baseSalary)}</td>
+                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtNum(d.salesTarget)}</td>
+                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.bonus)}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                {mut && (
+                                  <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                                    Edit
+                                  </button>
+                                )}
+                                <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#eef2ff", color: "#4f46e5" }}>
+                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17h6m-6-4h6m-6-4h6M5 21h14a2 2 0 002-2V7.5L15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                  Laporan
+                                </button>
+                                <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#fefce8", color: "#a16207" }}>
+                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>
+                                  Kasbon
+                                </button>
+                                {canDelete && mut && (
+                                  <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  <div className="sm:hidden rounded-xl flex flex-col">
                     {cfgItems.map((emp, i) => {
                       const d = draftFor(emp);
                       const last = i === cfgItems.length - 1;
                       return (
-                        <div key={emp.id} className="px-4 py-2.5" style={{ borderBottom: last ? "none" : "1px solid var(--border)" }}>
-                          <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center text-xs">
+                        <div key={emp.id} className="p-3.5" style={{ borderBottom: last ? "none" : "1px solid var(--border)" }}>
+                          <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="font-semibold truncate">{emp.name}</div>
-                              <div className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
-                            </div>
-                            <div className="font-mono font-semibold text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.baseSalary)}</div>
-                            <div className="font-mono text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtNum(d.salesTarget)}</div>
-                            <div className="font-mono text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.bonus)}</div>
-                            <div className="flex items-center justify-end gap-1.5">
-                              {mut && (
-                                <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
-                                  Edit
-                                </button>
-                              )}
-                              <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#eef2ff", color: "#4f46e5" }}>
-                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17h6m-6-4h6m-6-4h6M5 21h14a2 2 0 002-2V7.5L15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                                Laporan
-                              </button>
-                              <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap" style={{ background: "#fefce8", color: "#a16207" }}>
-                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>
-                                Kasbon
-                              </button>
-                              {canDelete && mut && (
-                                <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              )}
+                              <div className="text-sm font-semibold truncate">{emp.name}</div>
+                              <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
                             </div>
                           </div>
-
-                          <div className="sm:hidden">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold truncate">{emp.name}</div>
-                                <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, emp.storeId)}</div>
+                          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                            {[
+                              { label: "Gaji Pokok", val: fmt(d.baseSalary) },
+                              { label: "Target", val: fmtNum(d.salesTarget) },
+                              { label: "Bonus", val: fmt(d.bonus) },
+                            ].map((c) => (
+                              <div key={c.label} className="px-2.5 py-2 rounded-lg min-w-0" style={{ background: "var(--card)" }}>
+                                <div className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
+                                <div className="font-mono font-semibold text-[11px] mt-0.5 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{c.val}</div>
                               </div>
-                            </div>
-                            <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-                              {[
-                                { label: "Gaji Pokok", val: fmt(d.baseSalary) },
-                                { label: "Target", val: fmtNum(d.salesTarget) },
-                                { label: "Bonus", val: fmt(d.bonus) },
-                              ].map((c) => (
-                                <div key={c.label} className="px-2.5 py-2 rounded-lg min-w-0" style={{ background: "var(--card)" }}>
-                                  <div className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>{c.label}</div>
-                                  <div className="font-mono font-semibold text-[11px] mt-0.5 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{c.val}</div>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="mt-2.5 flex items-center justify-end gap-1.5 flex-wrap">
-                              {mut && (
-                                <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
-                              )}
-                              <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#eef2ff", color: "#4f46e5" }}>Laporan</button>
-                              <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#fefce8", color: "#a16207" }}>Kasbon</button>
-                              {canDelete && mut && (
-                                <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              )}
-                            </div>
+                            ))}
+                          </div>
+                          <div className="mt-2.5 flex items-center justify-end gap-1.5 flex-wrap">
+                            {mut && (
+                              <button onClick={() => setEditEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>Edit</button>
+                            )}
+                            <button onClick={() => openLapor(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#eef2ff", color: "#4f46e5" }}>Laporan</button>
+                            <button onClick={() => setKasbonEmp(emp)} className="h-8 px-3 rounded-lg text-xs font-bold" style={{ background: "#fefce8", color: "#a16207" }}>Kasbon</button>
+                            {canDelete && mut && (
+                              <button onClick={() => removeConfig(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#fef2f2" }} title="Hapus setelan gaji">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

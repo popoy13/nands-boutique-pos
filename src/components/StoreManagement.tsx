@@ -9,7 +9,7 @@ interface Props {
   canDelete?: boolean;
 }
 
-const empty = (): Store => ({ id: `s-${Date.now()}`, name: "NAND'S BOUTIQUE - ", address: "", phone: "", openHour: "08:00", closeHour: "21:00" });
+const empty = (): Store => ({ id: `s-${Date.now()}`, name: "", address: "", phone: "", openHour: "08:00", closeHour: "21:00" });
 
 export default function StoreManagement({ stores, onSave, canAdd = true, canEdit = true, canDelete = true }: Props) {
   const [editing, setEditing] = useState<Store | null>(null);
@@ -57,7 +57,7 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
 
       <div className="lg:flex-1 lg:overflow-y-auto px-5 py-4 flex flex-col gap-4">
         {[
-          { label: "Nama Toko", key: "name", placeholder: "NAND'S BOUTIQUE - Lokasi" },
+          { label: "Nama Toko", key: "name", placeholder: "Nama Toko / Lokasi" },
           { label: "Alamat Lengkap", key: "address", placeholder: "Jl. ..." },
           { label: "No. Telepon", key: "phone", placeholder: "021-xxxxxxx" },
         ].map(f => (

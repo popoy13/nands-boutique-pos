@@ -216,7 +216,9 @@ export default function AttendanceView({ records, stores, employees, currentUser
     </>
   ) : todayRecord.clockOut ? (
     <div className="text-center py-6 rounded-xl" style={{ background: "var(--secondary)" }}>
-      <div className="text-3xl mb-2">✓</div>
+      <div className="w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center text-white" style={{ background: "#16a34a" }}>
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+      </div>
       <div className="text-sm font-semibold">Absensi hari ini selesai</div>
       <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Masuk {todayRecord.clockIn} · Pulang {todayRecord.clockOut}</div>
     </div>
@@ -305,7 +307,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
                 onClick={handleClockOut}
                 disabled={!photo}
                 className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
-                style={{ background: photo ? "#ea580c" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
+                style={{ background: photo ? "var(--accent)" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
               >
                 Absen Pulang
               </button>

@@ -73,7 +73,7 @@ export default function Pagination({ total, page, pageSize, onPageChange, onPage
           style={{ ...btn(false), opacity: safePage <= 1 ? 0.35 : 1 }}
           aria-label="Halaman sebelumnya"
         >
-          ‹
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         {pages.map((p, i) => (
           <span key={p} style={{ display: "inline-flex", alignItems: "center" }}>
@@ -93,7 +93,7 @@ export default function Pagination({ total, page, pageSize, onPageChange, onPage
           style={{ ...btn(false), opacity: safePage >= count ? 0.35 : 1 }}
           aria-label="Halaman berikutnya"
         >
-          ›
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
     </div>

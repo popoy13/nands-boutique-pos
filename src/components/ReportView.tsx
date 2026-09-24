@@ -491,7 +491,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
                   <div className="h-1.5 rounded-full" style={{ width: `${storeBreakdownMax > 0 ? (s.revenue / storeBreakdownMax) * 100 : 0}%`, background: i === 0 ? "#7c3aed" : i === 1 ? "#3b82f6" : "#7c3aed" }} />
                 </div>
                 <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                  {s.count} transaksi · Pglr {fmt(s.expense)} · Bersih <b style={{ color: s.net >= 0 ? "#16a34a" : "#db2777" }}>{fmt(s.net)}</b>
+                  {s.count} transaksi · Pengeluaran {fmt(s.expense)} · Bersih <b style={{ color: s.net >= 0 ? "#16a34a" : "#db2777" }}>{fmt(s.net)}</b>
                 </div>
               </div>
             ))}

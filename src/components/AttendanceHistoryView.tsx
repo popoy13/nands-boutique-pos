@@ -91,7 +91,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       "Tanggal": r.date,
       "Nama": r.employeeName,
       "Jabatan": getRoleLabel(r.role, roles),
-      "Toko": r.storeName,
+      "Toko": (r.storeName ?? "").replace("NAND'S BOUTIQUE - ", ""),
       "Jam Masuk": r.clockIn,
       "Jam Pulang": r.clockOut ?? "",
       "Status": r.clockOut ? (isLateFor(r.clockIn, openHourFor(r.storeId)) ? "Telat" : "Hadir") : r.date < todayISO() ? "Tidak Catat Pulang" : "Menunggu Pulang",
@@ -173,7 +173,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
 
                     <div className="p-3 rounded-xl mb-3" style={{ background: "var(--background)" }}>
                       <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Toko</div>
-                      <div className="text-sm font-semibold">{selected.storeName}</div>
+                      <div className="text-sm font-semibold">{(selected.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")}</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
@@ -289,12 +289,12 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
                     <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
                       {fmtDate(r.date)} · Masuk <span className="font-mono">{r.clockIn}</span> · Pulang <span className="font-mono">{r.clockOut ?? "—"}</span>
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{r.storeName}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{(r.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")}</div>
                   </div>
                   {r.photoOut && <img src={assetUrl(r.photoOut)} alt="Foto pulang" className="w-8 h-8 rounded-lg object-cover shrink-0" title="Foto pulang" />}
                   {onDelete && (
                     <button onClick={e => { e.stopPropagation(); setDeleteTarget(r); }}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-red-50"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-[#fef2f2]"
                       title="Hapus catatan">
                       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>

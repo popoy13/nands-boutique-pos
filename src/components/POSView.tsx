@@ -359,7 +359,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
               <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-lg z-20" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 {memberSuggestions.map(m => (
                   <button key={m.id} onClick={() => { setSelectedMember(m); setMemberSearch(""); setShowMemberSearch(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors">
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--secondary)] transition-colors">
                     <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: TIER_COLOR[m.tier].bg, color: TIER_COLOR[m.tier].text }}>
                       {m.name.charAt(0)}
                     </div>

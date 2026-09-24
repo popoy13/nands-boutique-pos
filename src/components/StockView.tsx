@@ -117,7 +117,11 @@ export default function StockView({ products, stores, categories, activeStore, o
           <div>
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Stok</div>
             {lowStockCount > 0 && (
-              <div className="text-xs mt-0.5" style={{ color: "#ef4444" }}>⚠ {lowStockCount} varian stok rendah (≤3)</div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold mt-1"
+                style={{ background: "#fef2f2", color: "#ef4444" }}>
+                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+                {lowStockCount} varian stok rendah (≤3)
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -144,14 +148,15 @@ export default function StockView({ products, stores, categories, activeStore, o
           </select>
           <select value={filterStore} onChange={e => setFilterStore(e.target.value)}
             className="text-xs rounded-xl px-3 py-2 outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {stores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse" style={{ minWidth: 900 }}>
+      {/* Table - desktop */}
+      <div className="hidden lg:block flex-1 overflow-auto">
+        <div className="rounded-xl" style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
+          <table className="w-full border-collapse" style={{ minWidth: 900 }}>
           <thead>
             <tr style={{ background: "var(--background)", position: "sticky", top: 0, zIndex: 10 }}>
               <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)", minWidth: 200 }}>Produk</th>
@@ -173,7 +178,7 @@ export default function StockView({ products, stores, categories, activeStore, o
                 const spanOnPage = firstOnPage ? pageRows.filter(r => r.p.id === product.id).length : 1;
 
                 return (
-                  <tr key={variant.sku} className="transition-colors hover:bg-gray-50"
+                  <tr key={variant.sku} className="transition-colors hover:bg-[var(--secondary)]"
                     style={{ borderBottom: "1px solid var(--border)", background: isOut ? "#fef2f2" : isLow ? "#fffbeb" : "var(--card)" }}>
                     {firstOnPage ? (
                       <td className="px-4 py-3" rowSpan={spanOnPage > 1 ? spanOnPage : undefined}>
@@ -214,7 +219,7 @@ export default function StockView({ products, stores, categories, activeStore, o
                       ) : canEdit ? (
                         <button
                           onClick={() => { setEditCell({ sku: variant.sku, storeId: filterStore }); setEditVal(String(storeQty)); }}
-                          className="font-mono text-sm font-bold px-3 py-1 rounded-lg transition-all hover:bg-gray-100"
+                          className="font-mono text-sm font-bold px-3 py-1 rounded-lg transition-all hover:bg-[var(--secondary)]"
                           style={{ fontFamily: "'JetBrains Mono', monospace", color: isOut ? "#ef4444" : isLow ? "#d97706" : "var(--foreground)" }}
                         >
                           {storeQty}
@@ -240,8 +245,71 @@ export default function StockView({ products, stores, categories, activeStore, o
               })}
           </tbody>
         </table>
-        {rows.length === 0 && (
+          {rows.length === 0 && (
+            <EmptyState icon="📦" title="Tidak ada produk ditemukan" hint="Coba kata kunci, kategori, atau toko lain pada filter." />
+          )}
+        </div>
+      </div>
+
+      {/* Cards - mobile */}
+      <div className="lg:hidden flex-1 overflow-y-auto px-4 py-4">
+        {rows.length === 0 ? (
           <EmptyState icon="📦" title="Tidak ada produk ditemukan" hint="Coba kata kunci, kategori, atau toko lain pada filter." />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {pageRows.map(({ p: product, v: variant }) => {
+              const storeQty = variant.stocks.find(s => s.storeId === filterStore)?.quantity ?? 0;
+              const isLow = storeQty > 0 && storeQty <= 3;
+              const isOut = storeQty === 0;
+              const isEditing = editCell?.sku === variant.sku && editCell?.storeId === filterStore;
+              const qtyColor = isOut ? "#ef4444" : isLow ? "#d97706" : "var(--foreground)";
+              return (
+                <div key={variant.sku} className="p-4 rounded-xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+                  <div className="flex items-start gap-3">
+                    <img src={product.image} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold leading-tight">{product.name}</div>
+                      <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{product.brand} · {product.category}</div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="font-mono text-[11px]" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--muted-foreground)" }}>{variant.sku}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "var(--secondary)" }}>{variant.size || "—"}</span>
+                        <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{variant.color || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-3">
+                    <span className="font-mono text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        style={{ background: isOut ? "#fef2f2" : isLow ? "#fffbeb" : "#f0fdf4", color: isOut ? "#ef4444" : isLow ? "#d97706" : "#16a34a" }}>
+                        {isOut ? "Habis" : isLow ? "Hampir Habis" : "Tersedia"}
+                      </span>
+                      {isEditing ? (
+                        <input autoFocus type="number" value={editVal}
+                          onChange={e => setEditVal(e.target.value)}
+                          onBlur={() => handleEditCommit(product.id, variant.sku, filterStore)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleEditCommit(product.id, variant.sku, filterStore);
+                            if (e.key === "Escape") { setEditCell(null); setEditVal(""); }
+                          }}
+                          className="w-16 text-center text-xs font-mono font-bold rounded-lg px-2 py-1 outline-none"
+                          style={{ background: "white", border: "2px solid var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}
+                        />
+                      ) : canEdit ? (
+                        <button onClick={() => { setEditCell({ sku: variant.sku, storeId: filterStore }); setEditVal(String(storeQty)); }}
+                          className="font-mono text-sm font-bold px-3 py-1 rounded-lg transition-all"
+                          style={{ fontFamily: "'JetBrains Mono', monospace", color: qtyColor }}>
+                          {storeQty}
+                        </button>
+                      ) : (
+                        <span className="font-mono text-sm font-bold px-3 py-1" style={{ fontFamily: "'JetBrains Mono', monospace", color: qtyColor }}>{storeQty}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

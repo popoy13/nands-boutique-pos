@@ -796,7 +796,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
             <tbody>
               {pageItems.map(p => (
                 <tr key={p.id} onClick={bulkMode ? () => toggleSelect(p.id) : undefined}
-                  className={"transition-colors hover:bg-gray-50" + (bulkMode ? " cursor-pointer select-none" : "")}
+                  className={"transition-colors hover:bg-[var(--secondary)]" + (bulkMode ? " cursor-pointer select-none" : "")}
                   style={{ borderBottom: "1px solid var(--border)", background: selected.has(p.id) ? "rgba(124,58,237,0.07)" : editing?.id === p.id ? "rgba(124,58,237,0.03)" : "var(--card)" }}>
                   {bulkMode && (
                     <td className="px-4 py-3 w-10">

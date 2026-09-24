@@ -281,13 +281,13 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
                     style={{ background: "var(--background)", border: `2px solid ${isValid ? "var(--border)" : "#fca5a5"}`, fontFamily: "'JetBrains Mono', monospace" }} />
                   <div className="grid grid-cols-5 gap-2 mb-3">
                     <button onClick={() => setPayment(total)}
-                      className="py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-gray-100"
+                      className="py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-[var(--secondary)]"
                       style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
                       Pas
                     </button>
                     {QUICK.map(amt => (
                       <button key={amt} onClick={() => setPayment(Math.ceil(total / amt) * amt)}
-                        className="py-2.5 rounded-xl text-xs font-mono font-medium transition-all hover:bg-gray-100"
+                        className="py-2.5 rounded-xl text-xs font-mono font-medium transition-all hover:bg-[var(--secondary)]"
                         style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }}>
                         {amt >= 1000 ? `${amt / 1000}rb` : amt}
                       </button>

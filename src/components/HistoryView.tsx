@@ -5,6 +5,7 @@ import DateRangeFilter, { todayISO } from "./DateRangeFilter";
 import { escapeHtml } from "../lib/sanitize";
 import { verifyPin } from "../lib/auth";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -421,7 +422,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
 
         <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {(tab === "active" ? pageItems : deletedPageItems).length === 0 ? (
-            <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>{tab === "active" ? "Tidak ada transaksi" : "Tidak ada transaksi terhapus"}</div>
+            <EmptyState icon="🧾" title={tab === "active" ? "Tidak ada transaksi" : "Tidak ada transaksi terhapus"} hint={tab === "active" ? "Transaksi dari kasir akan muncul di sini." : "Transaksi yang dihapus dari Riwayat Transaksi akan muncul di sini."} />
           ) : (
             <div className="flex flex-col gap-2">
               {tab === "active" ? pageItems.map(t => (

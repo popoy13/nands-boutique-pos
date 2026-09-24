@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { Discount } from "../data/types";
 import { todayISO } from "../lib/dates";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -319,7 +320,7 @@ export default function DiscountView({ discounts, stores, onSave, canAdd = true,
               );
             })}
             {filtered.length === 0 && (
-              <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada diskon</div>
+              <EmptyState icon="🏷️" title="Belum ada diskon" hint="Buat promosi diskon untuk produk agar lebih menarik." />
             )}
           </div>
         </div>

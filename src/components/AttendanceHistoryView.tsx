@@ -7,6 +7,7 @@ import { getRoleLabel } from "../data/roles";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmtDate = (d: string) => {
   const clean = String(d ?? "").slice(0, 10);
@@ -266,7 +267,7 @@ export default function AttendanceHistoryView({ records, stores, employees, curr
       {/* List */}
       <div className="flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
         {filtered.length === 0 ? (
-          <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada catatan absensi</div>
+          <EmptyState icon="🕒" title="Tidak ada catatan absensi" hint="Pastikan karyawan sudah absen masuk pada rentang tanggal ini." />
         ) : (
           <div className="flex flex-col gap-2">
             {pageItems.map(r => {

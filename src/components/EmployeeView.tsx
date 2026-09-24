@@ -10,6 +10,7 @@ import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
 import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
 import SalaryView from "./SalaryView";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -599,7 +600,7 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
 
         <div className="lg:flex-1 lg:overflow-y-auto px-4 sm:px-6 py-4">
           {filtered.length === 0 ? (
-            <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada karyawan ditemukan</div>
+            <EmptyState icon="👥" title="Tidak ada karyawan ditemukan" hint="Coba ubah kata kunci pencarian atau role filter." />
           ) : (
             <div className="flex flex-col gap-2">
               {pageItems.map(emp => (

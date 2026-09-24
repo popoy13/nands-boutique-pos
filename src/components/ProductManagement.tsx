@@ -7,6 +7,7 @@ import { compressImage } from "../lib/compressImage";
 import { validateImageFile } from "../lib/imageFile";
 import { verifyPin } from "../lib/auth";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -847,7 +848,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada produk</div>}
+          {filtered.length === 0 && <EmptyState icon="🛍️" title="Tidak ada produk" hint="Tambahkan produk baru atau ubah kata kunci pencarian." />}
         </div>
 
         <Pagination

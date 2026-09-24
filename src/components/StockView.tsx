@@ -4,6 +4,7 @@ import { safeRows } from "../lib/safeExport";
 import type { Product } from "../data/types";
 import type { Category } from "../data/sync";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -240,7 +241,7 @@ export default function StockView({ products, stores, categories, activeStore, o
           </tbody>
         </table>
         {rows.length === 0 && (
-          <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>Tidak ada produk ditemukan</div>
+          <EmptyState icon="📦" title="Tidak ada produk ditemukan" hint="Coba kata kunci, kategori, atau toko lain pada filter." />
         )}
       </div>
 

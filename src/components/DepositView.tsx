@@ -9,6 +9,7 @@ import { compressImage } from "../lib/compressImage";
 import { readStruk } from "../lib/ocr";
 import DateRangeFilter from "./DateRangeFilter";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -456,9 +457,7 @@ export default function DepositView({ deposits, stores, employees = [], banks, o
         <div className="lg:flex-1 lg:overflow-y-auto p-4 sm:p-6">
           <div className="flex flex-col gap-3">
             {pageItems.length === 0 && (
-              <div className="text-center py-16 text-sm" style={{ color: "var(--muted-foreground)" }}>
-                {deposits.length === 0 ? "Belum ada catatan setor tunai." : "Tidak ada catatan sesuai filter."}
-              </div>
+              <EmptyState icon="🏦" title={deposits.length === 0 ? "Belum ada setoran tunai" : "Tidak ada catatan sesuai filter"} hint={deposits.length === 0 ? "Catatan setor tunai kasir akan muncul di sini." : "Coba ubah rentang tanggal atau kata kunci pencarian."} />
             )}
             {pageItems.map(e => (
               <div key={e.id} className="p-4 rounded-2xl" style={{ background: "var(--card)", border: `1.5px solid ${editing?.id === e.id ? "var(--accent)" : "var(--border)"}` }}>

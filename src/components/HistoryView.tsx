@@ -380,7 +380,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
               <div className="flex rounded-xl p-1 gap-1" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <button onClick={() => switchTab("active")}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                  style={{ background: tab === "active" ? "var(--foreground)" : "transparent", color: tab === "active" ? "white" : "var(--muted-foreground)" }}>
+                  style={{ background: tab === "active" ? "var(--accent)" : "transparent", color: tab === "active" ? "white" : "var(--muted-foreground)" }}>
                   Aktif ({filtered.length})
                 </button>
                 <button onClick={() => switchTab("deleted")}

@@ -365,8 +365,8 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{periodCaption}</div>
           </div>
           <button onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition-all"
+            style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             Export
           </button>
@@ -381,7 +381,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
             {(["7d", "30d", "all"] as const).map(p => (
               <button key={p} onClick={() => setPeriod(p)}
                 className="px-3 py-2 text-xs font-semibold transition-all"
-                style={{ background: period === p ? "var(--foreground)" : "var(--card)", color: period === p ? "white" : "var(--muted-foreground)" }}>
+                style={{ background: period === p ? "var(--accent)" : "var(--card)", color: period === p ? "white" : "var(--muted-foreground)" }}>
                 {p === "7d" ? "7 Hari" : p === "30d" ? "30 Hari" : "Semua"}
               </button>
             ))}

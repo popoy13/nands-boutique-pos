@@ -68,6 +68,18 @@ export default function SalaryView({ employees, stores, attendance, transactions
     kasbon.filter(k => k.employeeId === empId && !k.settled).reduce((s, k) => s + (k.amount || 0), 0);
   const totalKasbonOutstanding = kasbon.filter(k => !k.settled).reduce((s, k) => s + (k.amount || 0), 0);
 
+  const workedStoresFor = (empId: string, m: string): string => {
+    const names = Array.from(new Set(
+      attendance
+        .filter(a => a.employeeId === empId && String(a.date).slice(0, 10).startsWith(m))
+        .map(a => (a.storeName || storeNameOf(stores, a.storeId)).replace("NAND'S BOUTIQUE - ", ""))
+        .filter(Boolean),
+    ));
+    if (names.length) return names.join(", ");
+    const home = employees.find(e => e.id === empId);
+    return storeNameOf(stores, home?.storeId ?? "");
+  };
+
   const draftFor = (emp: Employee) => {
     const existing = configDraft[emp.id];
     if (existing) return existing;
@@ -188,7 +200,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
         : "Belum Dihitung";
       return {
         "Karyawan": e.name,
-        "Toko": storeNameOf(stores, e.storeId),
+        "Toko": workedStoresFor(e.id, month),
         "Hari Masuk": rec.attendanceCount,
         "Gaji Pokok": rec.baseSalary,
         "Gaji Diterima": rec.gross,
@@ -260,7 +272,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
     const metaRows: [string, string][] = [];
     if (slipShow("showName")) metaRows.push(["Nama Karyawan", rec.employeeName]);
     if (slipShow("showPosition")) metaRows.push(["Jabatan", roleLabel]);
-    if (slipShow("showLocation")) metaRows.push(["Lokasi Kerja", storeClean]);
+    if (slipShow("showLocation")) metaRows.push(["Lokasi Kerja", workedStoresFor(rec.employeeId, rec.month)]);
     if (slipShow("showDate")) metaRows.push(["Periode", monthName]);
     if (slipShow("showDate")) metaRows.push(["Tanggal Cetak", today]);
     const detRows: string[] = [];
@@ -428,7 +440,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                       )}
                       <div className="min-w-0">
                         <div className="font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>{settings?.brand?.name || "NAND'S BOUTIQUE"}</div>
-                        <div className="text-[9px] truncate">{storeNameOf(stores, slipRec.storeId)}</div>
+                        <div className="text-[9px] truncate">{workedStoresFor(slipRec.employeeId, slipRec.month)}</div>
                       </div>
                     </div>
                     <div className="text-[9px] px-1.5 py-0.5 border-2 border-black font-bold shrink-0">{slipRec.paid ? "LUNAS" : "BELUM DIBAYAR"}</div>
@@ -437,7 +449,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                   {[
                     ...(slipShow("showName") ? [["Nama Karyawan", slipRec.employeeName]] : []),
                     ...(slipShow("showPosition") ? [["Jabatan", (() => { const rk = employees.find(e => e.id === slipRec.employeeId)?.role; return (rk && settings?.roles?.[rk]?.label) || rk || "—"; })()]] : []),
-                    ...(slipShow("showLocation") ? [["Lokasi Kerja", storeNameOf(stores, slipRec.storeId)]] : []),
+                    ...(slipShow("showLocation") ? [["Lokasi Kerja", workedStoresFor(slipRec.employeeId, slipRec.month)]] : []),
                     ...(slipShow("showDate") ? [["Periode", `${month.split("-")[1]}/${month.split("-")[0]}`], ["Tanggal", new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between py-0.5"><span>{k}</span><span>{v}</span></div>
@@ -496,7 +508,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
               <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
                 <div>
                   <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700 }} className="text-sm">Laporan Gaji — {laporEmp.name}</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{storeNameOf(stores, laporEmp.storeId)} · {month}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{workedStoresFor(laporEmp.id, month)} · {month}</div>
                 </div>
                 <button onClick={() => setLaporEmp(null)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

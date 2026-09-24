@@ -128,17 +128,19 @@ export default function AttendanceView({ records, stores, employees, currentUser
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  const canAnyStore = currentUser.role === "admin" || currentUser.role === "manager" || currentUser.role === "manager_operasional";
-  const clockStores = canAnyStore ? stores : stores.filter(s => s.id === currentUser.storeId);
+  const clockStores = stores;
   const selStoreId = clockStores.some(s => s.id === attStore) ? attStore : clockStores[0]?.id ?? currentUser.storeId;
-  const attStoreObj = clockStores.find(s => s.id === selStoreId);
-  const attStoreName = attStoreObj?.name ?? "—";
+
+  const todayStr = todayISO();
+  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr);
+
+  const attStoreObj = todayRecord
+    ? (stores.find(s => s.id === todayRecord.storeId) ?? null)
+    : (clockStores.find(s => s.id === selStoreId) ?? null);
+  const attStoreName = attStoreObj?.name ?? todayRecord?.storeName ?? "—";
   const openHour = attStoreObj?.openHour ?? "08:00";
   const closeHour = attStoreObj?.closeHour ?? "21:00";
   const liveTime = now.toLocaleTimeString("en-GB", { hour12: false });
-
-  const todayStr = todayISO();
-  const todayRecord = records.find(r => r.employeeId === currentUser.id && r.date === todayStr && r.storeId === selStoreId);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -262,8 +264,8 @@ export default function AttendanceView({ records, stores, employees, currentUser
             <div className="mb-4 p-3 rounded-xl" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>LOKASI ABSENSI</label>
               {clockStores.length > 1 ? (
-                <select value={selStoreId} onChange={e => { setAttStore(e.target.value); setPhoto(null); setUsingFile(false); }}
-                  className="w-full px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <select value={todayRecord ? todayRecord.storeId : selStoreId} disabled={!!todayRecord} onChange={e => { setAttStore(e.target.value); setPhoto(null); setUsingFile(false); }}
+                  className="w-full px-3 py-2 rounded-xl text-xs outline-none disabled:opacity-60" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                   {clockStores.map(s => <option key={s.id} value={s.id}>{s.name.replace("NAND'S BOUTIQUE - ", "")}</option>)}
                 </select>
               ) : (

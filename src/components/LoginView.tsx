@@ -30,9 +30,7 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
     return () => clearInterval(id);
   }, [lockTimer]);
 
-  const activeEmployees = employees.filter(e =>
-    e.status === "active" && (filterStore === "all" || e.storeId === filterStore)
-  );
+  const activeEmployees = employees.filter(e => e.status === "active");
 
   const filteredEmployees = activeEmployees.filter(e =>
     !search.trim() || e.name.toLowerCase().includes(search.trim().toLowerCase()) || e.role.includes(search.trim().toLowerCase())

@@ -7,6 +7,7 @@ import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
 import DateRangeFilter from "./DateRangeFilter";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -454,7 +455,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Produk Terlaris</div>
           {topProducts.length === 0 ? (
-            <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada data</div>
+            <EmptyState compact icon="🏆" title="Belum ada data" hint="Mulai isi data penjualan untuk melihat produk terlaris." />
           ) : (
             <div className="flex flex-col gap-2">
               {topProducts.map((p, i) => (
@@ -477,7 +478,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
         <div className="p-4 sm:p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-4">Performa Toko</div>
           {storeBreakdown.length === 0 ? (
-            <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada toko</div>
+            <EmptyState compact icon="🏬" title="Belum ada toko" hint="Data performa per toko akan tampil di sini." />
           ) : (
           <div className="flex flex-col gap-3">
             {storeBreakdown.map((s, i) => (
@@ -511,7 +512,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
           </div>
         </div>
         {filteredDeleted.length === 0 ? (
-          <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada transaksi yang dihapus</div>
+          <EmptyState compact icon="🗑️" title="Belum ada transaksi yang dihapus" hint="Transaksi yang dihapus kasir akan tampil di sini." />
         ) : (
           <div className="flex flex-col gap-2">
             {deletedVisible.map(d => (
@@ -561,7 +562,7 @@ export default function ReportView({ transactions, deletedTransactions, expenses
           </div>
         </div>
         {filteredExpenses.length === 0 ? (
-          <div className="text-sm text-center py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada pengeluaran pada periode ini</div>
+          <EmptyState compact icon="💸" title="Belum ada pengeluaran pada periode ini" hint="Pengeluaran operasional periode ini akan tampil di sini." />
         ) : (
           <div className="flex flex-col gap-2">
             {expVisible.map(e => (

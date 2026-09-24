@@ -360,7 +360,7 @@ export default function DepositView({ deposits, stores, employees = [], banks, o
 
             <div className="flex flex-col gap-1.5 mb-3 max-h-64 overflow-y-auto">
               {banks.length === 0 && (
-                <div className="text-sm py-4 text-center" style={{ color: "var(--muted-foreground)" }}>Belum ada bank. Tambahkan bank owner perusahaan.</div>
+                <EmptyState compact icon="🏦" title="Belum ada bank" hint="Tambahkan bank owner perusahaan untuk menyimpan rekening setoran." />
               )}
               {banks.map((b, idx) => (
                 <div key={b} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "var(--muted)" }}>

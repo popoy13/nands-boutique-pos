@@ -4,6 +4,7 @@ import type { AppSettings } from "../data/settings";
 import { attendanceCountFor, salesTotalFor, computeSalary, upsertRecords, currentMonth } from "../data/salary";
 import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
+import EmptyState from "./EmptyState";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -449,8 +450,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
               <div className="p-5">
                 {!rec ? (
                   <div className="text-center py-6">
-                    <div className="text-sm mb-1">Belum ada laporan gaji untuk {month}</div>
-                    <div className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>Absensi & omzet karyawan akan dihitung otomatis saat tombol diklik.</div>
+                    <EmptyState compact icon="🧾" title={`Belum ada laporan gaji untuk ${month}`} hint="Absensi & omzet karyawan akan dihitung otomatis saat tombol diklik." />
                     <button onClick={() => hitungOne(laporEmp)} className="px-4 py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "var(--accent)" }}>Hitung Sekarang</button>
                   </div>
                 ) : (
@@ -567,7 +567,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
 
                 <div className="text-xs font-semibold mb-2">Riwayat Kasbon</div>
                 {list.length === 0 ? (
-                  <div className="text-center text-xs py-6" style={{ color: "var(--muted-foreground)" }}>Belum ada kasbon untuk karyawan ini.</div>
+                  <EmptyState compact icon="💳" title="Belum ada kasbon" hint="Kasbon untuk karyawan ini akan tampil di sini." />
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {list.map(k => (
@@ -635,7 +635,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                     <div className="fixed inset-0 z-30" onClick={() => setPickOpen(false)} />
                     <div className="absolute right-0 top-full mt-2 z-40 w-80 max-h-[55vh] overflow-y-auto rounded-2xl p-2" style={{ background: "var(--card)", border: "1.5px solid var(--border)", boxShadow: "0 18px 50px rgba(0,0,0,0.2)" }}>
                       <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Daftar Karyawan</div>
-                      {active.length === 0 && <div className="px-2 py-6 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>Belum ada karyawan aktif</div>}
+                      {active.length === 0 && <EmptyState compact icon="👥" title="Belum ada karyawan aktif" />}
                       {active.map(emp => (
                         <div key={emp.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-xl mb-1" style={{ background: "var(--background)" }}>
                           <div className="min-w-0 flex items-center gap-2">
@@ -697,7 +697,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
           </div>
 
           {active.length === 0 ? (
-            <div className="px-5 pb-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada karyawan aktif</div>
+            <EmptyState compact icon="👥" title="Belum ada karyawan aktif" hint="Data gaji karyawan yang aktif akan tampil di sini." />
           ) : (
             <>
               <div className="px-5 pb-1">

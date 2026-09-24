@@ -2,6 +2,7 @@
 import type { CartItem } from "../data/types";
 import type { PrinterSettings, PaymentMethodOption } from "../data/settings";
 import { escapeHtml } from "../lib/sanitize";
+import EmptyState from "./EmptyState";
 
 const fmtNum = (n: number) => new Intl.NumberFormat("id-ID").format(n);
 const fmt = (n: number) =>
@@ -268,9 +269,7 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
                     ))}
                   </div>
                 ) : (
-                  <div className="p-4 rounded-xl text-center text-xs" style={{ background: "var(--background)", color: "var(--muted-foreground)" }}>
-                    Belum ada metode pembayaran aktif. Atur di Setelan &gt; Pembayaran.
-                  </div>
+                  <EmptyState compact icon="💳" title="Belum ada metode pembayaran aktif" hint="Atur metode di Setelan &gt; Pembayaran." />
                 )}
               </div>
 

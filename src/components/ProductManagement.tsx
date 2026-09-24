@@ -969,7 +969,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
                 );
               })}
               {catNames.length === 0 && (
-                <div className="text-center py-8 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada kategori. Tambahkan di bawah.</div>
+                <EmptyState compact icon="🗂️" title="Belum ada kategori" hint="Tambahkan kategori baru di bawah." />
               )}
             </div>
 
@@ -1052,7 +1052,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
                 );
               })}
               {sizeList.length === 0 && (
-                <div className="text-center py-8 text-sm" style={{ color: "var(--muted-foreground)" }}>Belum ada ukuran. Tambahkan di bawah.</div>
+                <EmptyState compact icon="📏" title="Belum ada ukuran" hint="Tambahkan ukuran baru di bawah." />
               )}
             </div>
 

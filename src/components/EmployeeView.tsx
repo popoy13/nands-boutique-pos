@@ -458,12 +458,12 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
           <div className="inline-flex p-0.5 rounded-xl gap-0.5" style={{ background: "var(--muted)" }}>
             <button onClick={() => setTab("daftar")}
               className="px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: tab === "daftar" ? "var(--foreground)" : "transparent", color: tab === "daftar" ? "white" : "var(--muted-foreground)" }}>
+              style={{ background: tab === "daftar" ? "var(--accent)" : "transparent", color: tab === "daftar" ? "white" : "var(--muted-foreground)" }}>
               Daftar Karyawan
             </button>
             <button onClick={() => setTab("gaji")}
               className="px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: tab === "gaji" ? "var(--foreground)" : "transparent", color: tab === "gaji" ? "white" : "var(--muted-foreground)" }}>
+              style={{ background: tab === "gaji" ? "var(--accent)" : "transparent", color: tab === "gaji" ? "white" : "var(--muted-foreground)" }}>
               Gaji Karyawan
             </button>
           </div>

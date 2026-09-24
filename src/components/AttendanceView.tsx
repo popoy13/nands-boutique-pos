@@ -249,7 +249,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
               {currentUser.photo ? (
                 <img src={assetUrl(currentUser.photo)} alt={currentUser.name} className="w-11 h-11 rounded-full object-cover" />
               ) : (
-                <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--foreground)" }}>{currentUser.name.charAt(0)}</div>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: "var(--accent)" }}>{currentUser.name.charAt(0)}</div>
               )}
               <div>
                 <div className="text-sm font-semibold">{currentUser.name}</div>
@@ -293,7 +293,7 @@ export default function AttendanceView({ records, stores, employees, currentUser
                 onClick={handleClockIn}
                 disabled={!photo}
                 className="w-full mt-3 py-3 rounded-xl text-sm font-semibold transition-all"
-                style={{ background: photo ? "var(--foreground)" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)" }}
+                style={{ background: photo ? "var(--accent)" : "var(--muted)", color: photo ? "white" : "var(--muted-foreground)", boxShadow: photo ? "0 4px 12px rgba(124,58,237,0.25)" : "none" }}
               >
                 Absen Masuk
               </button>

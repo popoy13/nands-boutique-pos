@@ -617,7 +617,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
               <input type="month" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); } }}
                 className="px-3 py-2 rounded-xl text-xs outline-none" style={{ background: "var(--background)", border: "1px solid var(--border)" }} />
               {mut && (
-                <button onClick={hitungAll} className="px-3 py-2 rounded-xl text-xs font-semibold text-white whitespace-nowrap" style={{ background: "var(--foreground)" }}>
+                <button onClick={hitungAll} className="px-3 py-2 rounded-xl text-xs font-semibold text-white whitespace-nowrap transition-all" style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
                   Hitung Ulang Semua
                 </button>
               )}

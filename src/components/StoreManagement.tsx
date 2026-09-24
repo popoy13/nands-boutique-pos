@@ -132,8 +132,8 @@ export default function StoreManagement({ stores, onSave, canAdd = true, canEdit
             <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>Manajemen Toko</div>
             {canAdd && (
               <button onClick={() => { setEditing(empty()); setIsNew(true); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white"
-                style={{ background: "var(--foreground)" }}>
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all"
+                style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                 Tambah Toko
               </button>

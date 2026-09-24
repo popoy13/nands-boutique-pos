@@ -742,7 +742,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
                     <option value="cash">Tunai</option>
                     <option value="card">Nominal tetap</option>
                   </select>
-                  <button onClick={addPaymentMethod} className="px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0" style={{ background: "var(--foreground)" }}>
+                  <button onClick={addPaymentMethod} className="px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0 transition-all" style={{ background: "var(--accent)" }}>
                     + Tambah
                   </button>
                 </div>
@@ -853,7 +853,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
               onChange={e => setNewRoleLabel(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleAddRole()}
               className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none" style={field} />
-            <button onClick={handleAddRole} className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+            <button onClick={handleAddRole} className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Tambah Role
             </button>

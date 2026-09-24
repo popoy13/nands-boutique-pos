@@ -611,7 +611,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>VARIAN ({editing.variants.length})</label>
-            <button onClick={addVariant} className="text-xs px-2.5 py-1 rounded-lg font-semibold" style={{ background: "var(--foreground)", color: "white" }}>+ Tambah</button>
+            <button onClick={addVariant} className="text-xs px-2.5 py-1 rounded-lg font-semibold text-white transition-all" style={{ background: "var(--accent)" }}>+ Tambah</button>
           </div>
 
           <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
@@ -757,7 +757,7 @@ export default function ProductManagement({ products, stores, categories, onUpda
                 )}
                 {canAdd && (
                   <button onClick={() => { setEditing(emptyProduct(stores.map(s => s.id), catNames[0] ?? "Kemeja")); setIsNew(true); setActiveVariantIdx(0); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--foreground)" }}>
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all" style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}>
                     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                     Tambah Produk
                   </button>

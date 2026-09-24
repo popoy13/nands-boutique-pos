@@ -54,6 +54,9 @@ export default function SalaryView({ employees, stores, attendance, transactions
 
   const showToast = (msg: string, ok = true) => { setToastOk(ok); setToast(msg); setTimeout(() => setToast(""), 3200); };
 
+  type SlipToggle = "showName" | "showPosition" | "showDate" | "showLocation" | "showAttendance" | "showSales" | "showTarget" | "showBonus" | "showAcknowledge";
+  const slipShow = (k: SlipToggle) => settings?.salarySlip?.[k] !== false;
+
   const monthRecords = salaryRecords.filter(r => r.month === month);
   const recByEmp = new Map(monthRecords.map(r => [r.employeeId, r]));
   const active = employees.filter(e => e.status === "active");
@@ -187,6 +190,8 @@ export default function SalaryView({ employees, stores, attendance, transactions
     const logo = assetUrl(brand?.logo || "");
     const logoSrc = logo && !/^[a-z][a-z0-9+.-]*:/i.test(logo) ? new URL(logo, window.location.href).href : logo;
     const storeClean = storeNameOf(stores, rec.storeId);
+    const roleKey = employees.find(e => e.id === rec.employeeId)?.role;
+    const roleLabel = (roleKey && settings?.roles?.[roleKey]?.label) || roleKey || "—";
     const [yy, mm] = rec.month.split("-");
     const monthName = `${MONTHS_ID[Number(mm) - 1] || mm} ${yy}`;
     const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -196,6 +201,23 @@ export default function SalaryView({ employees, stores, attendance, transactions
     const reached = rec.salesTarget > 0 && rec.salesTotal >= rec.salesTarget;
     const potongan = outstandingFor(rec.employeeId);
     const net = Math.max(0, rec.total - potongan);
+    const metaRows: [string, string][] = [];
+    if (slipShow("showName")) metaRows.push(["Nama Karyawan", rec.employeeName]);
+    if (slipShow("showPosition")) metaRows.push(["Jabatan", roleLabel]);
+    if (slipShow("showLocation")) metaRows.push(["Lokasi Kerja", storeClean]);
+    if (slipShow("showDate")) metaRows.push(["Periode", monthName]);
+    if (slipShow("showDate")) metaRows.push(["Tanggal Cetak", today]);
+    const detRows: string[] = [];
+    detRows.push(`<tr><td>Gaji Pokok</td><td class="num">${N(rec.baseSalary)} ÷ 30 hari</td><td class="num">${R(rec.baseSalary)}</td></tr>`);
+    if (slipShow("showAttendance")) detRows.push(`<tr><td>Hari Masuk</td><td class="num">${rec.attendanceCount} hari</td><td class="num"></td></tr>`);
+    detRows.push(`<tr><td>Gaji Pokok Diterima</td><td class="num">${N(rec.attendanceCount)} × ${N(daily)}</td><td class="num">${R(rec.gross)}</td></tr>`);
+    if (slipShow("showSales")) detRows.push(`<tr><td>Omzet Penjualan</td><td class="num"></td><td class="num">${R(rec.salesTotal)}</td></tr>`);
+    if (slipShow("showTarget")) detRows.push(`<tr><td>Target Penjualan</td><td class="num"></td><td class="num">${N(rec.salesTarget)}</td></tr>`);
+    if (slipShow("showBonus")) detRows.push(`<tr><td>Bonus Capai Target</td><td class="num">${reached ? "Tercapai" : "Belum tercapai"}</td><td class="num">${R(rec.bonus)}</td></tr>`);
+    detRows.push(`<tr class="grand"><td colspan="2">TOTAL GAJI</td><td class="num">${R(rec.total)}</td></tr>`);
+    detRows.push(`<tr><td>Potongan Kasbon</td><td class="num">${potongan ? "Belum lunas" : "Tidak ada"}</td><td class="num">${potongan ? "− " + R(potongan) : "0"}</td></tr>`);
+    detRows.push(`<tr class="grand"><td colspan="2">TOTAL DITERIMA</td><td class="num">${R(net)}</td></tr>`);
+    detRows.push(`<tr><td>Status Pembayaran</td><td class="num">${rec.paid ? "Dibayar" + (rec.paidAt ? " " + esc(rec.paidAt) : "") : "Belum dibayar"}</td><td class="num"></td></tr>`);
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Slip Gaji ${esc(rec.employeeName)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -220,6 +242,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
   .sign div{width:38%;text-align:center;font-size:10pt;font-weight:600}
   .sign .lin{margin-top:16mm;border-top:1px solid #111;padding-top:1.5mm}
   .foot{font-size:8pt;color:#777;text-align:center;margin-top:10mm;border-top:1px dashed #aaa;padding-top:2mm}
+  @page{size:A4;margin:0}
   @media print{body{background:#fff}.page{margin:0;box-shadow:none}}
 </style></head><body>
   <div class="page">
@@ -230,27 +253,17 @@ export default function SalaryView({ employees, stores, attendance, transactions
     </div>
     <div class="title">SLIP GAJI KARYAWAN</div>
     <table class="meta">
-      <tr><td width="26%"><b>Nama Karyawan</b></td><td width="26%">${esc(rec.employeeName)}</td><td width="24%"><b>Periode</b></td><td>${esc(monthName)}</td></tr>
-      <tr><td><b>Cabang</b></td><td>${esc(storeClean)}</td><td><b>Tanggal Cetak</b></td><td>${esc(today)}</td></tr>
+      ${metaRows.length ? metaRows.map(([k, v]) => `<tr><td width="26%"><b>${esc(k)}</b></td><td width="26%">${esc(v)}</td><td width="24%"></td><td></td></tr>`).join("") : ""}
     </table>
     <div class="sec">Rincian Gaji</div>
     <table class="det">
       <tr><th>Uraian</th><th style="width:24%">Perhitungan</th><th style="width:22%">Jumlah</th></tr>
-      <tr><td>Gaji Pokok</td><td class="num">${N(rec.baseSalary)} ÷ 30 hari</td><td class="num">${R(rec.baseSalary)}</td></tr>
-      <tr><td>Hari Masuk</td><td class="num">${rec.attendanceCount} hari</td><td class="num"></td></tr>
-      <tr><td>Gaji Pokok Diterima</td><td class="num">${N(rec.attendanceCount)} × ${N(daily)}</td><td class="num">${R(rec.gross)}</td></tr>
-      <tr><td>Omzet Penjualan</td><td class="num"></td><td class="num">${R(rec.salesTotal)}</td></tr>
-      <tr><td>Target Penjualan</td><td class="num"></td><td class="num">${N(rec.salesTarget)}</td></tr>
-      <tr><td>Bonus Capai Target</td><td class="num">${reached ? "Tercapai" : "Belum tercapai"}</td><td class="num">${R(rec.bonus)}</td></tr>
-      <tr class="grand"><td colspan="2">TOTAL GAJI</td><td class="num">${R(rec.total)}</td></tr>
-      <tr><td>Potongan Kasbon</td><td class="num">${potongan ? "Belum lunas" : "Tidak ada"}</td><td class="num">${potongan ? "− " + R(potongan) : "0"}</td></tr>
-      <tr class="grand"><td colspan="2">TOTAL DITERIMA</td><td class="num">${R(net)}</td></tr>
-      <tr><td>Status Pembayaran</td><td class="num">${rec.paid ? "Dibayar" + (rec.paidAt ? " " + esc(rec.paidAt) : "") : "Belum dibayar"}</td><td class="num"></td></tr>
+      ${detRows.join("")}
     </table>
-    <div class="sign">
+    ${slipShow("showAcknowledge") ? `<div class="sign">
       <div><div>Diterima oleh,</div><div class="lin">${esc(rec.employeeName)}</div></div>
-      <div><div>Hormat kami,</div><div class="lin">DIREKTUR UTAMA</div></div>
-    </div>
+      <div><div>Mengetahui,</div><div class="lin">DIREKTUR UTAMA</div></div>
+    </div>` : ""}
     <div class="foot">Dicetak otomatis dari ${esc(company)} Point of Sale</div>
   </div>
 </body></html>`;
@@ -362,16 +375,18 @@ export default function SalaryView({ employees, stores, attendance, transactions
                     </div>
                   </div>
                   <div className="text-center font-bold mb-2">SLIP GAJI KARYAWAN</div>
-                  <div className="mb-1">Nama : {slipRec.employeeName}</div>
-                  <div className="mb-1">Bulan : {month} ({slipRec.paid ? `DIBAYAR${slipRec.paidAt ? " " + slipRec.paidAt : ""}` : "BELUM DIBAYAR"})</div>
+                  {slipShow("showName") && <div className="mb-1">Nama : {slipRec.employeeName}</div>}
+                  {slipShow("showPosition") && <div className="mb-1">Jabatan : {(() => { const rk = employees.find(e => e.id === slipRec.employeeId)?.role; return (rk && settings?.roles?.[rk]?.label) || rk || "—"; })()}</div>}
+                  {slipShow("showLocation") && <div className="mb-1">Lokasi : {storeNameOf(stores, slipRec.storeId)}</div>}
+                  {slipShow("showDate") && <div className="mb-1">Bulan : {month} ({slipRec.paid ? `DIBAYAR${slipRec.paidAt ? " " + slipRec.paidAt : ""}` : "BELUM DIBAYAR"})</div>}
                   <div className="my-2 border-t border-dashed border-black" />
                   {[
                     ["Gaji Pokok", fmt(slipRec.baseSalary)],
-                    ["Hari Masuk", `${slipRec.attendanceCount} hari`],
+                    ...(slipShow("showAttendance") ? [["Hari Masuk", `${slipRec.attendanceCount} hari`]] : []),
                     ["Gaji Pokok Diterima", fmt(slipRec.gross)],
-                    ["Omzet Penjualan", fmt(slipRec.salesTotal)],
-                    ["Target Penjualan", fmtNum(slipRec.salesTarget)],
-                    ["Bonus", fmt(slipRec.bonus)],
+                    ...(slipShow("showSales") ? [["Omzet Penjualan", fmt(slipRec.salesTotal)]] : []),
+                    ...(slipShow("showTarget") ? [["Target Penjualan", fmtNum(slipRec.salesTarget)]] : []),
+                    ...(slipShow("showBonus") ? [["Bonus", fmt(slipRec.bonus)]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between py-0.5"><span>{k}</span><span>{v}</span></div>
                   ))}

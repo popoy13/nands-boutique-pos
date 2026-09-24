@@ -15,6 +15,19 @@ export interface PrinterSettings {
   footerText: string;
 }
 
+export interface SalarySlipSettings {
+  paperSize: string;
+  showName: boolean;
+  showPosition: boolean;
+  showDate: boolean;
+  showLocation: boolean;
+  showAttendance: boolean;
+  showSales: boolean;
+  showTarget: boolean;
+  showBonus: boolean;
+  showAcknowledge: boolean;
+}
+
 export interface BrandSettings {
   logo: string;
   name: string;
@@ -60,6 +73,7 @@ export interface PaymentSettings {
 
 export interface AppSettings {
   printer: PrinterSettings;
+  salarySlip: SalarySlipSettings;
   brand: BrandSettings;
   roles: Record<string, RoleConfig>;
   barcode: BarcodeSettings;
@@ -70,6 +84,7 @@ export interface AppSettings {
 
 export const defaultSettings: AppSettings = {
   printer: { printerName: "Printer Thermal", paperWidth: 80, copies: 1, autoPrint: false, receiptLogo: "", showTax: true, showCashier: true, showDate: true, showTime: true, showChange: true, footerText: "Terima kasih telah berbelanja!\nwww.nandsboutique.id" },
+  salarySlip: { paperSize: "A4", showName: true, showPosition: true, showDate: true, showLocation: true, showAttendance: true, showSales: true, showTarget: true, showBonus: true, showAcknowledge: true },
   brand: { logo: "logo.jpg", name: "NANDS BOUTIQUE", tagline: "Point of Sale System", loadingImage: "loadingscreen.png", loadingDescription: "sabar guys loading dulu" },
   roles: DEFAULT_ROLES,
   barcode: { mode: "camera", beep: true, vibrate: false, stripPrefix: "", stripSuffix: "", enterEndsScan: true },

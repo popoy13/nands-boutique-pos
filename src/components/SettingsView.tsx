@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Store, Employee, Product, Member, Discount, Transaction, AttendanceRecord, DeletedTransaction, SalaryRecord } from "../data/types";
-import type { AppSettings, PrinterSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
+import type { AppSettings, PrinterSettings, SalarySlipSettings, PaymentMethodKind, PaymentSettings } from "../data/settings";
 import { defaultSettings } from "../data/settings";
 import { ensureRoles, isBuiltinRole, MENU_ITEMS, slugifyRoleKey, ACTION_ITEMS, ACTION_LABELS, defaultPermissionsForMenus } from "../data/roles";
 import { compressImage } from "../lib/compressImage";
@@ -44,6 +44,52 @@ const field = {
 } as const;
 
 const PALETTE = ["#7c3aed", "#2563eb", "#0d9488", "#16a34a", "#ea580c", "#db2777", "#ca8a04", "#4f46e5"];
+
+function SalarySlipPreview({ slip, brandName }: { slip: SalarySlipSettings; brandName: string }) {
+  const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const R = (n: number) => n.toLocaleString("id-ID");
+  const shown = (key: keyof SalarySlipSettings): boolean => slip[key] === true;
+  const items = {
+    nama: "DINA SAFITRI",
+    jabatan: "KASIR",
+    lokasi: "TOKO CENTRAL",
+    periode: "September 2026",
+    hari: "24",
+    gajiPokok: "2.400.000",
+    gajiDiterima: "1.920.000",
+    omzet: "15.800.000",
+    target: "20.000.000",
+    bonus: "0",
+    total: "1.920.000",
+  };
+  return (
+    <div className="font-mono" style={{ width: 220, minHeight: 300, background: "#fff", color: "#000", fontSize: 8, lineHeight: 1.55, padding: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.22)", borderRadius: 4 }}>
+      <div className="text-center border-b border-black pb-1.5 mb-1.5">
+        <div style={{ fontWeight: 700, fontSize: 10 }}>{brandName}</div>
+        <div>SLIP GAJI KARYAWAN</div>
+      </div>
+      {shown("showName") && <div>Nama : {items.nama}</div>}
+      {shown("showPosition") && <div>Jabatan : {items.jabatan}</div>}
+      {shown("showLocation") && <div>Lokasi Kerja : {items.lokasi}</div>}
+      {shown("showDate") && (<><div>Periode : {items.periode}</div><div>Tanggal Cetak : {today}</div></>)}
+      {shown("showName") || shown("showPosition") || shown("showLocation") || shown("showDate") ? <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} /> : null}
+      <div>Gaji Pokok : {items.gajiPokok}</div>
+      {shown("showAttendance") && <div>Hari Masuk : {items.hari}</div>}
+      <div>Gaji Pokok Diterima : {items.gajiDiterima}</div>
+      {shown("showSales") && <div>Omzet Penjualan : {items.omzet}</div>}
+      {shown("showTarget") && <div>Target Penjualan : {items.target}</div>}
+      {shown("showBonus") && <div>Bonus : {items.bonus}</div>}
+      <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
+      <div style={{ fontWeight: 700 }}>TOTAL GAJI : {R(2400000)}</div>
+      {shown("showAcknowledge") && (
+        <div className="flex justify-between mt-4">
+          <div>Yang Menerima,</div>
+          <div>Mengetahui,</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ResetButton({ label, onReset }: { label: string; onReset: () => void }) {
   const [armed, setArmed] = useState(false);
@@ -120,6 +166,7 @@ function ReceiptPreview({ printer, brandName }: { printer: PrinterSettings; bran
 export default function SettingsView({ settings, stores, employees, onSaveSettings, onSaveStores, canEdit, currentUser, permissions, products, members, discounts, transactions, deletedTransactions, attendance, onResetProducts, onResetMembers, onResetDiscounts, onResetStores, onResetEmployees, onResetTransactions, onResetDeletedTransactions, onResetAttendance, onResetSalary, salaryRecords, onResetChat }: Props) {
   const [tab, setTab] = useState<Tab>("printer");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [slipPreviewOpen, setSlipPreviewOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [toastOk, setToastOk] = useState(true);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -145,6 +192,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   }, [permissions, tab, isAdmin]);
 
   const [draftPrinter, setDraftPrinter] = useState({ ...settings.printer });
+  const [draftSlip, setDraftSlip] = useState<SalarySlipSettings>(() => ({ ...defaultSettings.salarySlip, ...settings.salarySlip }));
   const [draftBrand, setDraftBrand] = useState({ ...settings.brand });
   const [draftPayments, setDraftPayments] = useState<PaymentSettings>(() => ({
     methods: settings.payments.methods.map(m => ({ ...m })),
@@ -166,6 +214,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
   // Sinkronkan draft dengan data terbaru dari perangkat lain (realtime broadcast),
   // tanpa merusak nilai yang baru saja disimpan.
   useEffect(() => { setDraftPrinter({ ...settings.printer }); }, [settings.printer]);
+  useEffect(() => { setDraftSlip({ ...defaultSettings.salarySlip, ...settings.salarySlip }); }, [settings.salarySlip]);
   useEffect(() => { setDraftBrand({ ...settings.brand }); }, [settings.brand]);
   useEffect(() => {
     setDraftPayments({
@@ -208,7 +257,8 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
     );
   }
 
-  const savePrinter = () => { onSaveSettings({ ...settings, printer: { ...draftPrinter, paperWidth: Number(draftPrinter.paperWidth) } }); showToast("Setelan printer disimpan"); };
+  const savePrinter = () => { onSaveSettings({ ...settings, printer: { ...draftPrinter, paperWidth: Number(draftPrinter.paperWidth) } }); showToast("Setelan struk disimpan"); };
+  const saveSlip = () => { onSaveSettings({ ...settings, salarySlip: draftSlip }); showToast("Setelan slip gaji disimpan"); };
   const saveBrand = () => { onSaveSettings({ ...settings, brand: draftBrand }); showToast("Menu utama diperbarui"); };
   const saveAttendance = () => { onSaveStores(draftStores); showToast("Jam operasional toko tersimpan"); };
   const saveBarcode = () => { onSaveSettings({ ...settings, barcode: draftBarcode }); showToast("Setelan perangkat barcode disimpan"); };
@@ -442,10 +492,13 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
 
       {/* PRINTER */}
       {tab === "printer" && (
-        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
-          <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-1">Setelan Printer</div>
+        <>
+        <div className="w-full p-5 rounded-2xl mb-4" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
           <div className="flex items-center justify-between gap-3 mb-5">
-            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Pengaturan pencetakan struk untuk kasir.</div>
+            <div>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-0.5">Setting Tampilan Struk Penjualan</div>
+              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Tampilan struk KASIR</div>
+            </div>
             <button onClick={() => setPreviewOpen(true)}
               className="px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all"
               style={{ background: "rgba(124,58,237,0.1)", color: "var(--accent)", border: "1.5px solid rgba(124,58,237,0.25)" }}>
@@ -552,9 +605,61 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
           </div>
 
           <button onClick={savePrinter} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
-            Simpan Setelan Printer
+            Simpan Setelan Struk
           </button>
         </div>
+
+        <div className="w-full p-5 rounded-2xl" style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 13 }} className="mb-0.5">Setting Tampilan Slip Gaji Karyawan</div>
+              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Tampilan slip gaji (Nama, Jabatan, Tanggal, Lokasi Kerja, Hari Masuk, Omzet Penjualan, Target Penjualan, Bonus, Mengetahui)</div>
+            </div>
+            <button onClick={() => setSlipPreviewOpen(true)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all"
+              style={{ background: "rgba(124,58,237,0.1)", color: "var(--accent)", border: "1.5px solid rgba(124,58,237,0.25)" }}>
+              Lihat Pratinjau Slip Gaji
+            </button>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--muted-foreground)" }}>UKURAN KERTAS</label>
+            <select value={draftSlip.paperSize} onChange={e => setDraftSlip(p => ({ ...p, paperSize: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={field}>
+              <option value="A4">A4</option>
+            </select>
+          </div>
+
+          <div className="mb-5">
+            <div className="text-xs font-semibold mb-2.5" style={{ color: "var(--muted-foreground)" }}>TAMPILAN DI SLIP GAJI</div>
+            <div className="rounded-2xl" style={{ border: "1px solid var(--border)" }}>
+              {([
+                { key: "showName", label: "Nama", desc: "Nama karyawan di bagian atas slip" },
+                { key: "showPosition", label: "Jabatan", desc: "Jabatan karyawan" },
+                { key: "showDate", label: "Tanggal", desc: "Periode & tanggal slip" },
+                { key: "showLocation", label: "Lokasi kerja", desc: "Cabang tempat karyawan bekerja" },
+                { key: "showAttendance", label: "Hari masuk", desc: "Jumlah hari hadir karyawan" },
+                { key: "showSales", label: "Omzet penjualan", desc: "Pencapaian penjualan karyawan" },
+                { key: "showTarget", label: "Target penjualan", desc: "Target yang harus dicapai" },
+                { key: "showBonus", label: "Bonus", desc: "Bonus atas pencapaian target" },
+                { key: "showAcknowledge", label: "Mengetahui", desc: "Tanda tangan persetujuan slip" },
+              ] as { key: keyof SalarySlipSettings; label: string; desc: string }[]).map((row, i) => (
+                <div key={row.key} className="flex items-center justify-between p-3" style={{ borderBottom: i < 8 ? "1px solid var(--border)" : "none" }}>
+                  <div>
+                    <div className="text-sm font-semibold">{row.label}</div>
+                    <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{row.desc}</div>
+                  </div>
+                  {toggle(draftSlip[row.key] as boolean, v => setDraftSlip(p => ({ ...p, [row.key]: v })))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={saveSlip} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
+            Simpan Setelan Slip Gaji
+          </button>
+        </div>
+        </>
       )}
 
       {/* PRATINJAU STRUK — floating overlay (always available, independent of active tab) */}
@@ -572,6 +677,26 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             </div>
             <div className="overflow-y-auto p-5 flex justify-center" style={{ background: "var(--background)" }}>
               <ReceiptPreview printer={draftPrinter} brandName={draftBrand.name} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRATINJAU SLIP GAJI — floating overlay */}
+      {slipPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }} onClick={() => setSlipPreviewOpen(false)}>
+          <div className="w-full sm:w-auto rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92dvh] overflow-hidden flex flex-col" style={{ background: "var(--card)" }} onClick={e => e.stopPropagation()}>
+            <div className="pt-2.5 pb-1 flex justify-center shrink-0 sm:hidden">
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--muted)" }} />
+            </div>
+            <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ borderColor: "var(--border)" }}>
+              <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 15 }}>Pratinjau Slip Gaji</div>
+              <button onClick={() => setSlipPreviewOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--muted)" }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5 flex justify-center" style={{ background: "var(--background)" }}>
+              <SalarySlipPreview slip={draftSlip} brandName={draftBrand.name} />
             </div>
           </div>
         </div>

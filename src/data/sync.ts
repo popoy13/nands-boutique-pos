@@ -436,6 +436,7 @@ export const settingsFromDB = (
   const obj: Record<string, unknown> = {}
   for (const r of rows) if (r && r.key) obj[s(r.key)] = r.value
   const printer = (obj.printer ?? {}) as Partial<AppSettings["printer"]>
+  const salarySlip = (obj.salarySlip ?? {}) as Partial<AppSettings["salarySlip"]>
   const brand = (obj.brand ?? {}) as Partial<AppSettings["brand"]>
   const barcode = (obj.barcode ?? {}) as Partial<AppSettings["barcode"]>
   const payments = (obj.payments ?? {}) as Partial<AppSettings["payments"]>
@@ -446,6 +447,7 @@ export const settingsFromDB = (
   return {
     ...defaultSettings,
     printer: { ...defaultSettings.printer, ...printer },
+    salarySlip: { ...defaultSettings.salarySlip, ...salarySlip },
     brand: { ...defaultSettings.brand, ...brand },
     roles: {
       ...defaultSettings.roles,
@@ -463,6 +465,7 @@ export const settingsFromDB = (
 }
 export const settingsToDB = (st: AppSettings) => [
   { key: "printer", value: st.printer },
+  { key: "salarySlip", value: st.salarySlip },
   { key: "brand", value: st.brand },
   { key: "roles", value: st.roles },
   { key: "barcode", value: st.barcode },

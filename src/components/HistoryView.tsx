@@ -39,7 +39,7 @@ const BUILTIN_COLORS: Record<string, { bg: string; text: string }> = {
 const labelOf = (m: string, payments?: PaymentSettings) =>
   payments?.methods.find(p => p.id === m)?.label ?? BUILTIN_LABELS[m] ?? m;
 const colorOf = (m: string, payments?: PaymentSettings) =>
-  BUILTIN_COLORS[m] ?? { bg: "#f3f4f6", text: "#4b5563" };
+  BUILTIN_COLORS[m] ?? { bg: "var(--secondary)", text: "var(--muted-foreground)" };
 
 export default function HistoryView({ transactions, stores, canDelete = false, canPrint = true, canViewDeleted = false, deletedTransactions = [], onDelete, onUpdate, onPermanentDelete, brandName, printer, payments, currentUser }: Props) {
   const [tab, setTab] = useState<"active" | "deleted">("active");
@@ -434,7 +434,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                       <div className="font-mono text-xs font-semibold mb-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{t.id}</div>
                       <div className="text-xs mb-0.5" style={{ color: "var(--muted-foreground)" }}>{fmtDate(t.date)}</div>
                       <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                        {t.storeName.replace("NAND'S BOUTIQUE - ","")} · {t.cashierName} · {t.items.length} item
+                        {(t.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")} · {t.cashierName} · {t.items.length} item
                         {t.memberName && <span className="ml-1 text-yellow-600">· {t.memberName}</span>}
                       </div>
                     </div>
@@ -455,7 +455,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
                         <div className="font-mono text-xs font-semibold mb-1" style={{ color: "#b91c1c", fontFamily: "'JetBrains Mono', monospace" }}>{t.id}</div>
                         <div className="text-xs mb-0.5" style={{ color: "var(--muted-foreground)" }}>Transaksi: {fmtDate(t.date)} · Dihapus: {fmtDate(d.deletedAt)}</div>
                         <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                          {t.storeName.replace("NAND'S BOUTIQUE - ","")} · Kasir {t.cashierName} · oleh {d.deletedBy}
+                          {(t.storeName ?? "").replace("NAND'S BOUTIQUE - ", "")} · Kasir {t.cashierName} · oleh {d.deletedBy}
                         </div>
                         <div className="text-xs mt-1 truncate" style={{ color: "#b91c1c" }}>Alasan: {d.reason || "—"}</div>
                       </div>

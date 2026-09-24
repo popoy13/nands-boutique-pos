@@ -212,7 +212,7 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
                 </button>
               </div>
               {whatsappError && <div className="text-[11px] mt-1.5" style={{ color: "#dc2626" }}>{whatsappError}</div>}
-              <div className="text-[10px] mt-1.5" style={{ color: "#4d7c5a" }}>WhatsApp akan dibuka dengan pesan struk siap dikirim.</div>
+              <div className="text-[10px] mt-1.5" style={{ color: "#16a34a" }}>WhatsApp akan dibuka dengan pesan struk siap dikirim.</div>
             </div>
             <div className="flex gap-3 w-full mt-3">
               <button onClick={onFinish}

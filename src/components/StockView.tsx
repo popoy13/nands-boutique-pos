@@ -127,10 +127,10 @@ export default function StockView({ products, stores, categories, activeStore, o
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all text-white"
-              style={{ background: "var(--accent)", boxShadow: "0 4px 12px rgba(124,58,237,0.25)" }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: "var(--card)", border: "1.5px solid var(--border)" }}
             >
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               Export Excel
             </button>
           </div>

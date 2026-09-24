@@ -345,7 +345,9 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
               <div className="text-xs font-semibold truncate" style={{ color: TIER_COLOR[selectedMember.tier].text }}>{selectedMember.name}</div>
               <div className="text-xs" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.7 }}>{selectedMember.points} pts · {selectedMember.tier}</div>
             </div>
-            <button onClick={() => setSelectedMember(null)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.6 }}>✕</button>
+            <button onClick={() => setSelectedMember(null)} className="text-xs px-1.5 py-0.5 rounded flex items-center justify-center" style={{ color: TIER_COLOR[selectedMember.tier].text, opacity: 0.6 }} aria-label="Hapus member">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
         ) : (
           <div className="relative">
@@ -521,7 +523,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                   style={{ background: "var(--card)", border: "1.5px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                   <div className="w-full aspect-square bg-gray-100 overflow-hidden">
                     <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    {totalStock === 0 && <div className="absolute inset-0 bg-white/70 flex items-center justify-center"><span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-600">Habis</span></div>}
+                    {totalStock === 0 && <div className="absolute inset-0 bg-white/70 flex items-center justify-center"><span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#fef2f2", color: "#ef4444" }}>Habis</span></div>}
                   </div>
                   <div className="p-2.5">
                     <div className="text-xs text-gray-400 mb-0.5 flex items-center justify-between gap-1" style={{ fontSize: 10 }}>

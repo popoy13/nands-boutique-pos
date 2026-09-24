@@ -832,7 +832,7 @@ export default function SalaryView({ employees, stores, attendance, transactions
                     </tbody>
                   </table>
 
-                  <div className="sm:hidden rounded-xl flex flex-col">
+                  <div className="lg:hidden rounded-xl flex flex-col">
                     {cfgItems.map((emp, i) => {
                       const d = draftFor(emp);
                       const last = i === cfgItems.length - 1;

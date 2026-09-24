@@ -651,7 +651,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             ))}
           </div>
 
-          <button onClick={saveSlip} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
+          <button onClick={saveSlip} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--accent)" }}>
             Simpan Setelan Slip Gaji
           </button>
         </div>
@@ -834,7 +834,7 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             ))}
           </div>
 
-          <button onClick={saveAttendance} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--foreground)" }}>
+          <button onClick={saveAttendance} className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all" style={{ background: "var(--accent)" }}>
             Simpan Jam Operasional
           </button>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Employee } from "../data/types";
 import Avatar from "./Avatar";
+import EmptyState from "./EmptyState";
 import { supabase } from "../lib/supabase";
 
 type MessageKind = "text" | "image" | "audio" | "file" | "location";
@@ -381,7 +382,7 @@ export default function ChatView({
       </div>}
       {error && <div className="mx-5 mt-3 rounded-xl px-3 py-2 text-xs" style={{ color: "#b91c1c", background: "#fee2e2" }}>{error}</div>}
       <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8">
-        {loading ? <div className="h-full flex items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>Memuat chat...</div> : messages.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-center"><div className="text-4xl mb-3">💬</div><div className="font-semibold">Belum ada pesan</div><div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Mulai percakapan dengan tim Anda.</div></div> : messages.map((message, index) => {
+        {loading ? <div className="h-full flex items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>Memuat chat...</div> : messages.length === 0 ? <div className="h-full flex items-center justify-center"><EmptyState icon="💬" title="Belum ada pesan" hint="Mulai percakapan dengan tim Anda." /></div> : messages.map((message, index) => {
           const mine = message.sender_id === currentUser.id;
           const showDate = index === 0 || formatDate(messages[index - 1].created_at) !== formatDate(message.created_at);
           return <div key={message.id}>
@@ -400,7 +401,9 @@ export default function ChatView({
                     </>}
                   </div>
                   {mine && <div className="relative shrink-0">
-                    <button onClick={() => setOpenMessageMenu(openMessageMenu === message.id ? null : message.id)} disabled={busyMessageId === message.id} className="w-7 h-7 rounded-full flex items-center justify-center text-base leading-none disabled:opacity-50" style={{ color: "var(--muted-foreground)", background: "var(--secondary)" }} title="Aksi pesan" aria-label="Aksi pesan">⋮</button>
+                    <button onClick={() => setOpenMessageMenu(openMessageMenu === message.id ? null : message.id)} disabled={busyMessageId === message.id} className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-50" style={{ color: "var(--muted-foreground)", background: "var(--secondary)" }} title="Aksi pesan" aria-label="Aksi pesan">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></svg>
+                    </button>
                     {openMessageMenu === message.id && <div className="absolute right-0 bottom-8 z-10 min-w-40 rounded-xl p-1 shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                       {!message.deleted_at && <button onClick={() => { setOpenMessageMenu(null); void recallMessage(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "var(--accent)" }}>Tarik untuk semua</button>}
                       <button onClick={() => { setOpenMessageMenu(null); void deleteForMe(message); }} className="block w-full text-left px-3 py-2 rounded-lg text-xs" style={{ color: "#dc2626" }}>Hapus dari saya</button>
@@ -415,7 +418,7 @@ export default function ChatView({
         <div ref={bottomRef} />
       </main>
       <footer className="shrink-0 border-t p-3 md:px-8" style={{ background: "var(--card)", borderColor: "var(--border)", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-        {selectedFile && <div className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: "var(--secondary)" }}><span className="truncate flex-1">📎 {selectedFile.name}</span><button onClick={() => setSelectedFile(null)} className="font-bold">×</button></div>}
+        {selectedFile && <div className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: "var(--secondary)" }}><span className="truncate flex-1">📎 {selectedFile.name}</span><button onClick={() => setSelectedFile(null)} className="p-0.5 flex items-center justify-center" aria-label="Buang file" style={{ color: "var(--muted-foreground)" }}><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button></div>}
         <div className="flex items-end gap-2">
           <label className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer shrink-0" style={{ background: "var(--secondary)", color: "var(--muted-foreground)" }} title="Kirim foto atau dokumen">
             <span className="text-lg">📎</span><input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" className="hidden" onChange={e => setSelectedFile(e.target.files?.[0] ?? null)} />
@@ -423,7 +426,9 @@ export default function ChatView({
           <button onClick={shareLocation} disabled={sending} className="w-10 h-10 rounded-xl shrink-0 text-lg disabled:opacity-50" style={{ background: "var(--secondary)" }} title="Bagikan lokasi">📍</button>
           <button onClick={recording ? stopRecording : startRecording} disabled={sending} className="w-10 h-10 rounded-xl shrink-0 text-lg disabled:opacity-50" style={{ background: recording ? "#fee2e2" : "var(--secondary)", color: recording ? "#dc2626" : "inherit" }} title={recording ? "Berhenti merekam" : "Voice note"}>{recording ? "⏹" : "🎙️"}</button>
           <textarea value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder={recording ? "Sedang merekam voice note..." : "Tulis pesan..."} disabled={recording} rows={1} className="flex-1 resize-none rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: "var(--secondary)", minHeight: 40, maxHeight: 100 }} />
-          <button onClick={() => void send()} disabled={sending || recording || (!text.trim() && !selectedFile)} className="w-10 h-10 rounded-xl flex items-center justify-center text-white disabled:opacity-40" style={{ background: "var(--accent)" }} title="Kirim">➤</button>
+          <button onClick={() => void send()} disabled={sending || recording || (!text.trim() && !selectedFile)} className="w-10 h-10 rounded-xl flex items-center justify-center text-white disabled:opacity-40" style={{ background: "var(--accent)" }} title="Kirim">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m-7 7l7-7 7 7" /></svg>
+          </button>
         </div>
       </footer>
     </div>

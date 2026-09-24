@@ -150,8 +150,8 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
                 <button
                   key={emp.id}
                   onClick={() => handleSelect(emp)}
-                  className="p-4 rounded-xl text-left transition-all duration-150 hover:-translate-y-0.5 group"
-                  style={{ background: "var(--background)", border: "1.5px solid var(--border)" }}
+                  className="p-4 rounded-xl text-left transition-all duration-150 hover:-translate-y-0.5 group border-[1.5px] border-[var(--border)] hover:border-[var(--accent)]"
+                  style={{ background: "var(--background)", boxShadow: "0 0 0 rgba(124,58,237,0)" }}
                 >
                   <Avatar src={emp.photo} name={emp.name} role={emp.role} className="w-10 h-10 text-sm mb-3" />
                   <div className="text-sm font-semibold mb-0.5 truncate">{emp.name}</div>

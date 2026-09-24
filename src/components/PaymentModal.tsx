@@ -187,8 +187,8 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
               <div className="text-sm mb-4" style={{ color: "#16a34a" }}>+{receiptData.pointsEarned} poin untuk {receiptData.memberName}</div>
             )}
             <button onClick={handlePrint}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mt-4"
-              style={{ background: "var(--foreground)", color: "white" }}>
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mt-4 text-white"
+              style={{ background: "var(--accent)", boxShadow: "0 4px 14px rgba(124,58,237,0.3)" }}>
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               Cetak Struk
             </button>
@@ -280,10 +280,15 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
                   <input type="number" value={payment} onChange={e => setPayment(Number(e.target.value))}
                     className="w-full px-4 py-3 rounded-xl text-right font-mono text-xl font-bold outline-none mb-3"
                     style={{ background: "var(--background)", border: `2px solid ${isValid ? "var(--border)" : "#fca5a5"}`, fontFamily: "'JetBrains Mono', monospace" }} />
-                  <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div className="grid grid-cols-5 gap-2 mb-3">
+                    <button onClick={() => setPayment(total)}
+                      className="py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-gray-100"
+                      style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
+                      Pas
+                    </button>
                     {QUICK.map(amt => (
                       <button key={amt} onClick={() => setPayment(Math.ceil(total / amt) * amt)}
-                        className="py-2 rounded-xl text-xs font-mono font-medium transition-all hover:bg-gray-100"
+                        className="py-2.5 rounded-xl text-xs font-mono font-medium transition-all hover:bg-gray-100"
                         style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }}>
                         {amt >= 1000 ? `${amt / 1000}rb` : amt}
                       </button>
@@ -309,7 +314,7 @@ export default function PaymentModal({ txId, cart, subtotal, discountAmt, tax, t
 
               <button onClick={handleConfirm} disabled={!isValid}
                 className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all duration-150"
-                style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: isValid ? "var(--foreground)" : "var(--muted)", color: isValid ? "white" : "var(--muted-foreground)" }}>
+                style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: isValid ? "var(--accent)" : "var(--muted)", color: isValid ? "white" : "var(--muted-foreground)", boxShadow: isValid ? "0 4px 14px rgba(124,58,237,0.3)" : "none" }}>
                 Konfirmasi Pembayaran
               </button>
             </div>

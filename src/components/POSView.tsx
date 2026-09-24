@@ -116,6 +116,12 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
     if (addVariantToCart(showPicker.product, variant)) setShowPicker(null);
   };
 
+  const quickAdd = (product: Product) => {
+    const available = product.variants.filter(v => (v.stocks.find(s => s.storeId === activeStore)?.quantity ?? 0) > 0);
+    if (available.length === 1) { addVariantToCart(product, available[0]); return; }
+    openPicker(product);
+  };
+
   const handleScanResult = (code: string): ScanResult => {
     const c = cleanBarcode(code, barcode).toUpperCase();
     const norm = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
@@ -380,10 +386,10 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                 <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{[item.color, item.size].filter(Boolean).join(" / ") || "Tanpa varian"}</div>
                 <div className="text-xs font-mono font-bold mt-1" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(item.subtotal)}</div>
               </div>
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                <button onClick={() => updateQty(item.variantSku, -1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--muted)" }}>−</button>
-                <span className="text-xs font-mono font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.quantity}</span>
-                <button onClick={() => updateQty(item.variantSku, 1)} className="w-5 h-5 rounded text-xs font-bold flex items-center justify-center" style={{ background: "var(--foreground)", color: "white" }}>+</button>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <button onClick={() => updateQty(item.variantSku, -1)} className="w-7 h-7 rounded-lg text-base font-bold flex items-center justify-center" style={{ background: "var(--muted)" }}>−</button>
+                <span className="text-sm font-mono font-bold text-center w-7" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.quantity}</span>
+                <button onClick={() => updateQty(item.variantSku, 1)} className="w-7 h-7 rounded-lg text-base font-bold flex items-center justify-center" style={{ background: "var(--accent)", color: "white" }}>+</button>
               </div>
             </div>
           ))}
@@ -406,7 +412,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                 onKeyDown={e => e.key === "Enter" && applyVoucher()}
                 className="flex-1 px-3 py-2 rounded-xl text-xs outline-none font-mono"
                 style={{ background: "var(--background)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono', monospace" }} />
-              <button onClick={applyVoucher} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--foreground)", color: "white" }}>Pakai</button>
+              <button onClick={applyVoucher} className="px-4 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: "var(--accent)" }}>Pakai</button>
             </div>
           )}
           {voucherMsg && !discountLabel && (
@@ -459,13 +465,13 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           )}
           <div className="flex justify-between font-bold pt-2 border-t mt-1" style={{ borderColor: "var(--border)" }}>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15 }}>Total</span>
-            <span className="font-mono text-base" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</span>
+            <span className="font-mono text-lg" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</span>
           </div>
         </div>
 
         <button disabled={cart.length === 0} onClick={() => { setShowCartOverlay(false); setPendingTxId(generateId(activeStore)); setShowPayment(true); }}
-          className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
-          style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: cart.length > 0 ? "var(--foreground)" : "var(--muted)", color: cart.length > 0 ? "white" : "var(--muted-foreground)" }}>
+          className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-150"
+          style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: cart.length > 0 ? "var(--accent)" : "var(--muted)", color: cart.length > 0 ? "white" : "var(--muted-foreground)", boxShadow: cart.length > 0 ? "0 4px 14px rgba(124,58,237,0.3)" : "none" }}>
           Lanjut Pembayaran
         </button>
       </div>
@@ -496,8 +502,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             {categoryChips.map(cat => (
               <button key={cat} onClick={() => setActiveCategory(cat)}
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 shrink-0"
-                style={{ background: activeCategory === cat ? "var(--foreground)" : "var(--card)", color: activeCategory === cat ? "white" : "var(--muted-foreground)", border: `1.5px solid ${activeCategory === cat ? "var(--foreground)" : "var(--border)"}` }}>
+                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 shrink-0"
+                style={{ background: activeCategory === cat ? "var(--accent)" : "var(--card)", color: activeCategory === cat ? "white" : "var(--muted-foreground)", border: `1.5px solid ${activeCategory === cat ? "var(--accent)" : "var(--border)"}`, boxShadow: activeCategory === cat ? "0 2px 8px rgba(124,58,237,0.25)" : "none" }}>
                 {cat}
               </button>
             ))}
@@ -510,7 +516,7 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
               const totalStock = product.variants.reduce((s, v) => s + (v.stocks.find(st => st.storeId === activeStore)?.quantity ?? 0), 0);
               const inCart = cart.filter(i => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
               return (
-                <button key={product.id} onClick={() => openPicker(product)} disabled={totalStock === 0}
+                <button key={product.id} onClick={() => quickAdd(product)} disabled={totalStock === 0}
                   className="group relative rounded-2xl overflow-hidden text-left transition-all duration-150 hover:-translate-y-0.5 disabled:opacity-40"
                   style={{ background: "var(--card)", border: "1.5px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                   <div className="w-full aspect-square bg-gray-100 overflow-hidden">
@@ -523,10 +529,10 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                       <span className="font-mono truncate" style={{ fontSize: 9, color: "var(--muted-foreground)" }}>{(() => { const s = product.variants[0]?.sku ?? ""; const i = Math.max(s.lastIndexOf("-"), s.lastIndexOf("_")); return i > 0 ? s.slice(0, i) : s; })()}</span>
                     </div>
                     <div className="text-xs font-semibold leading-tight mb-1.5 line-clamp-2">{product.name}</div>
-                    <div className="text-xs font-bold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</div>
-                    <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Stok: {totalStock}</div>
+                    <div className="text-sm font-bold" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(product.basePrice)}</div>
+                    <div className="text-[11px] mt-0.5 font-semibold" style={{ color: totalStock > 0 ? "#16a34a" : "#ef4444" }}>Stok: {totalStock}</div>
                   </div>
-                  {inCart > 0 && <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "var(--accent)" }}>{inCart}</div>}
+                  {inCart > 0 && <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md" style={{ background: "var(--accent)" }}>{inCart}</div>}
                 </button>
               );
             })}
@@ -600,8 +606,8 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
                 )}
               </div>
               <button onClick={addToCart} disabled={pickerColor === PICK_UNSET || pickerSize === PICK_UNSET || storeStockQty === 0}
-                className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
-                style={{ background: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "var(--foreground)" : "var(--muted)", color: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "white" : "var(--muted-foreground)" }}>
+                className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-150"
+                style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 600, background: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "var(--accent)" : "var(--muted)", color: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "white" : "var(--muted-foreground)", boxShadow: pickerColor !== PICK_UNSET && pickerSize !== PICK_UNSET && storeStockQty > 0 ? "0 4px 14px rgba(124,58,237,0.3)" : "none" }}>
                 Tambah ke Keranjang
               </button>
             </div>
@@ -639,11 +645,11 @@ export default function POSView({ activeStore, storeName, cashierId, cashierName
         <div className="fixed bottom-0 inset-x-0 lg:hidden z-30 px-4 pb-5 pt-8 pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-3 p-3 rounded-2xl shadow-2xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium" style={{ color: "var(--muted-foreground)" }}>{cart.reduce((s, i) => s + i.quantity, 0)} item</div>
-              <div className="text-sm font-mono font-bold truncate" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</div>
+              <div className="text-[11px] font-medium" style={{ color: "var(--muted-foreground)" }}>{cart.reduce((s, i) => s + i.quantity, 0)} item · {cart.length} varian</div>
+              <div className="text-base font-mono font-bold truncate" style={{ color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</div>
             </div>
-            <button onClick={() => setShowCartOverlay(true)} className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
-              style={{ background: "var(--foreground)", fontFamily: "'Outfit', sans-serif" }}>
+            <button onClick={() => setShowCartOverlay(true)} className="shrink-0 px-4 py-3 rounded-xl text-sm font-semibold text-white"
+              style={{ background: "var(--accent)", fontFamily: "'Outfit', sans-serif" }}>
               Lihat Keranjang
             </button>
           </div>

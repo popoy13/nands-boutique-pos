@@ -831,6 +831,42 @@ const canDepositBank = has("deposit", "bank");
         activeTab={safeTab}
         unreadCounts={unreadCounts}
       />
+
+      <SyncToast />
+    </div>
+  );
+}
+
+function SyncToast() {
+  const [state, setState] = useState<{ kind: "fail" | "ok"; msg: string } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const show = (s: { kind: "fail" | "ok"; msg: string }, ttl: number) => {
+      setState(s);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setState(null), ttl);
+    };
+    const onFail = () => show({ kind: "fail", msg: "Gagal menyimpan — mencoba lagi otomatis…" }, 8000);
+    const onRecovered = () => show({ kind: "ok", msg: "Data tersimpan" }, 2500);
+    window.addEventListener("nands-sync-fail", onFail);
+    window.addEventListener("nands-sync-recovered", onRecovered);
+    return () => {
+      window.removeEventListener("nands-sync-fail", onFail);
+      window.removeEventListener("nands-sync-recovered", onRecovered);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  if (!state) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-xl text-sm font-medium text-white shadow-lg flex items-center gap-2" style={{ background: state.kind === "fail" ? "#dc2626" : "#16a34a" }}>
+      {state.kind === "fail" ? (
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 16M4 20L20 4" /></svg>
+      ) : (
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+      )}
+      {state.msg}
     </div>
   );
 }

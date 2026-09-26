@@ -78,6 +78,9 @@ export function useSyncedStore(): SyncedStore {
   const pendingRef = useRef<Record<string, unknown>>({});
   const removedRef = useRef<Record<string, string[]>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const retryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const retryAttemptsRef = useRef<Record<string, number>>({});
+  const lastFailTableRef = useRef<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const appliedRef = useRef<(payload: { table: string; rows: unknown[] }) => void>(() => {});
   const lastStatusRef = useRef("");
@@ -89,16 +92,26 @@ export function useSyncedStore(): SyncedStore {
     removedRef.current[table] = [...new Set([...(removedRef.current[table] ?? []), ...gone])];
   };
 
-const onAttendanceFail = (again: unknown) => {
-    pendingRef.current["attendance_records"] = again;
-    if (timersRef.current["attendance_records"]) return;
-    timersRef.current["attendance_records"] = setTimeout(() => {
-      timersRef.current["attendance_records"] = null;
-      const retry = pendingRef.current["attendance_records"];
-      pendingRef.current["attendance_records"] = null;
+const scheduleRetry = (table: string, again: unknown) => {
+    if (again === undefined || again === null) return;
+    // Simpan payload ulang di antrean, sehingga percobaan berikutnya memakai
+    // data TERBARU bila ada perubahan baru sebelum retry.
+    pendingRef.current[table] = again;
+    const attempt = retryAttemptsRef.current[table] ?? 0;
+    const delay = Math.min(1500 * Math.pow(2, attempt), 30000);
+    retryAttemptsRef.current[table] = attempt + 1;
+    lastFailTableRef.current = table;
+    try {
+      window.dispatchEvent(new CustomEvent("nands-sync-fail", { detail: { table } }));
+    } catch { /* noop */ }
+    if (retryTimersRef.current[table]) return;
+    retryTimersRef.current[table] = setTimeout(() => {
+      retryTimersRef.current[table] = null;
+      const retry = pendingRef.current[table];
+      pendingRef.current[table] = null;
       if (retry === undefined || retry === null) return;
-      void writeTable("attendance_records", retry, onAttendanceFail);
-    }, 2000);
+      void writeTable(table, retry, scheduleRetry);
+    }, delay);
   };
 
 const propagate = (table: string, rows: unknown) => {
@@ -108,7 +121,7 @@ const propagate = (table: string, rows: unknown) => {
     // delay) and retry so clock-in/out is not silently lost.
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
-    void writeTable(table, payload, onAttendanceFail);
+    void writeTable(table, payload, scheduleRetry);
     return;
   }
   if (timersRef.current[table]) return;
@@ -117,11 +130,11 @@ const propagate = (table: string, rows: unknown) => {
     const payload = pendingRef.current[table];
     pendingRef.current[table] = null;
     if (payload === undefined) return;
-    await writeTable(table, payload);
+    await writeTable(table, payload, scheduleRetry);
   }, DEBOUNCE_MS);
 };
 
-async function writeTable(table: string, payload: unknown, onFail?: (payload: unknown) => void) {
+async function writeTable(table: string, payload: unknown, onFail?: (table: string, payload: unknown) => void) {
   if (payload === undefined) return;
   try {
     switch (table) {
@@ -166,9 +179,16 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       try { await deleteRows(table, removedIds); } catch (e) { console.warn("[sync] hapus baris gagal:", table, e); }
     }
     removedRef.current[table] = [];
+    retryAttemptsRef.current[table] = 0;
+    if (lastFailTableRef.current === table) {
+      lastFailTableRef.current = null;
+      try {
+        window.dispatchEvent(new CustomEvent("nands-sync-recovered", { detail: { table } }));
+      } catch { /* noop */ }
+    }
   } catch (e) {
     console.warn("[sync] tulis ke database gagal:", table, e);
-    onFail?.(payload);
+    onFail?.(table, payload);
   }
 }
 
@@ -343,10 +363,52 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
     await Promise.all(tasks);
   };
 
+  const resyncNow = async () => {
+    if (!readyRef.current) return;
+    if (Object.values(pendingRef.current).some(v => v !== undefined && v !== null)) return;
+    const res = await loadAll();
+    if (!res.ok || !res.data) return;
+    const d = res.data;
+    validEmpIdsRef.current = new Set(d.employees.map(e => e.id));
+    setProductsState(d.products);
+    setStoresState(d.stores);
+    setEmployeesState(d.employees);
+    setMembersState(d.members);
+    setDiscountsState(d.discounts);
+    setAttendanceState(d.attendance);
+    setTransactionsState(d.transactions);
+    setDeletedTransactionsState(d.deletedTransactions);
+    setSettingsState(d.settings);
+    setCategoriesState(d.categories);
+    setExpensesState(d.expenses);
+    setDepositsState(d.deposits);
+    setSalaryConfigState(d.salaryConfig);
+    setSalaryRecordsState(d.salaryRecords);
+    setKasbonState(d.kasbon);
+    salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords, kasbon: d.kasbon };
+    setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
+    productsRemovedRef.current = { products: [], variants: [] };
+    for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
+  };
+
   useEffect(() => {
-    const onPageHide = () => { void flush(); };
-    window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
+    const onHide = () => { void flush(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void resyncNow(); };
+    const onOnline = () => { void flush(); void resyncNow(); };
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("visibilitychange", onHide);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    const t = setInterval(() => { if (document.visibilityState === "visible") void resyncNow(); }, 60000);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+      clearInterval(t);
+    };
   }, []);
 
   const applyRemote = (payload: { table: string; rows: unknown[] }) => {
@@ -444,30 +506,7 @@ async function writeTable(table: string, payload: unknown, onFail?: (payload: un
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED" && lastStatusRef.current !== "SUBSCRIBED" && readyRef.current) {
           if (Object.values(pendingRef.current).some(v => v !== undefined && v !== null)) return;
-          const res = await loadAll();
-          if (res.ok && res.data) {
-            const d = res.data;
-            validEmpIdsRef.current = new Set(d.employees.map(e => e.id));
-            setProductsState(d.products);
-            setStoresState(d.stores);
-            setEmployeesState(d.employees);
-            setMembersState(d.members);
-            setDiscountsState(d.discounts);
-            setAttendanceState(d.attendance);
-            setTransactionsState(d.transactions);
-            setDeletedTransactionsState(d.deletedTransactions);
-            setSettingsState(d.settings);
-            setCategoriesState(d.categories);
-            setExpensesState(d.expenses);
-            setDepositsState(d.deposits);
-            setSalaryConfigState(d.salaryConfig);
-            setSalaryRecordsState(d.salaryRecords);
-            setKasbonState(d.kasbon);
-            salaryRef.current = { config: d.salaryConfig, records: d.salaryRecords, kasbon: d.kasbon };
-            setCategoriesCache(new Map(d.categories.map(c => [c.id, c.name])));
-            productsRemovedRef.current = { products: [], variants: [] };
-            for (const k of Object.keys(removedRef.current)) removedRef.current[k] = [];
-          }
+          await resyncNow();
         }
         lastStatusRef.current = status;
       });

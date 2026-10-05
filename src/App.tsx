@@ -32,6 +32,7 @@ import { hashPin, isHashedPin } from "./lib/auth";
 import { checkForAppUpdate, type AppUpdate } from "./lib/appUpdate";
 import { notifyUser, requestNotificationPermission } from "./lib/notifications";
 import { supabase } from "./lib/supabase";
+import { recordAudit, loadSessionVersions, getLocalSessionVersion, setLocalSessionVersion, clearLocalSessionVersion } from "./lib/security";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_EVENTS = ["mousemove", "keydown", "click", "touchstart", "scroll"] as const;
@@ -117,6 +118,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const [brandCache] = useState(loadBrandCache);
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdate | null>(null);
   const [unreadCounts, setUnreadCounts] = useState(loadUnreadCounts);
+  const [sessionVersions, setSessionVersions] = useState<Record<string, number>>({});
+  const sessionVersionsRef = useRef(sessionVersions);
+  sessionVersionsRef.current = sessionVersions;
   const page = menu;
   const [activeStore, setActiveStore] = useState(() => {
     try {
@@ -241,6 +245,36 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     setCurrentUser(fresh);
   }, [ready, employees]);
 
+  // Muat versi sesi (untuk pencabutan lintas perangkat) saat siap + tiap 30 detik.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const load = async () => {
+      const versions = await loadSessionVersions();
+      if (!cancelled) setSessionVersions(versions);
+    };
+    void load();
+    const timer = setInterval(() => void load(), 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [ready]);
+
+  // Sesinya dicabut admin di perangkat lain -> logout otomatis.
+  useEffect(() => {
+    if (!ready || !currentUser) return;
+    const expected = sessionVersions[currentUser.id];
+    if (expected && expected > getLocalSessionVersion(currentUser.id)) {
+      recordAudit(currentUser, "session_revoked", `perangkat=${navigator.userAgent.slice(0, 80)}`);
+      clearLocalSessionVersion(currentUser.id);
+      setCurrentUser(null);
+      try {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_EXPIRY_KEY);
+        localStorage.setItem("nands-revoked-for", currentUser.name || currentUser.id);
+      } catch { /* ignore */ }
+      if (!location.pathname.includes("index.html")) location.href = "index.html";
+    }
+  }, [ready, currentUser, sessionVersions]);
+
   // Migrasi PIN lama (masih plaintext) ke hash PBKDF2 terkini.
   const pinMigratedRef = useRef(false);
   useEffect(() => {
@@ -262,6 +296,8 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     const reset = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
+        recordAudit(currentUser, "logout_idle", `toko=${activeStore}`);
+        clearLocalSessionVersion(currentUser.id);
         setCurrentUser(null);
         try {
           localStorage.removeItem(SESSION_KEY);
@@ -318,6 +354,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
 
   const handleLogin = (emp: Employee) => {
     setCurrentUser(emp);
+    setLocalSessionVersion(emp.id, sessionVersions[emp.id] ?? 0);
     try {
       localStorage.setItem(SESSION_KEY, emp.id);
       localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + IDLE_TIMEOUT_MS));
@@ -333,6 +370,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   };
 
   const handleLogout = () => {
+    const actor = currentUser;
+    recordAudit(actor, "logout", `toko=${activeStore}`);
+    clearLocalSessionVersion(actor?.id ?? "");
     setCurrentUser(null);
     try {
       localStorage.removeItem(SESSION_KEY);

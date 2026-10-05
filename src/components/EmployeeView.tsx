@@ -7,6 +7,7 @@ import type { AppSettings } from "../data/settings";
 import { getRoleLabel, getRoleColor, ensureRoles } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { hashPin, isWeakPin, verifyPin } from "../lib/auth";
+import { recordAudit, bumpSessionVersion, loadSessionVersions } from "../lib/security";
 import { assetUrl } from "../lib/assets";
 import Pagination from "./Pagination";
 import SalaryView from "./SalaryView";
@@ -161,15 +162,19 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
       setIsNew(false);
       setPinInput("");
       showToast("Data karyawan disimpan");
+      recordAudit(currentUser, isNew ? "employee_create" : "employee_update",
+        `${toSave.name} (${toSave.role}, toko=${toSave.storeId}${pinNew ? ", PIN diganti" : ""})`);
     } finally {
       savingRef.current = false;
     }
   };
 
   const handleDelete = (id: string) => {
+    const target = employees.find(e => e.id === id);
     onSave(employees.filter(e => e.id !== id));
     if (editing?.id === id) setEditing(null);
     showToast("Karyawan dihapus");
+    recordAudit(currentUser, "employee_delete", `${target?.name ?? id} (${target?.role ?? ""})`);
   };
 
   const confirmPinDelete = () => {
@@ -196,7 +201,21 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
   };
 
   const handleToggleStatus = (id: string) => {
-    onSave(employees.map(e => e.id === id ? { ...e, status: e.status === "active" ? "inactive" : "active" } : e));
+    const target = employees.find(e => e.id === id);
+    const nextStatus = target?.status === "active" ? "inactive" : "active";
+    onSave(employees.map(e => e.id === id ? { ...e, status: nextStatus } : e));
+    recordAudit(currentUser, "employee_status", `${target?.name ?? id} -> ${nextStatus}`);
+  };
+
+  const revokeSessions = async (emp: Employee) => {
+    try {
+      const before = await loadSessionVersions();
+      await bumpSessionVersion(emp.id, before);
+      showToast(`Sesi "${emp.name}" dicabut dari semua perangkat`);
+      recordAudit(currentUser, "session_revoked_by_admin", emp.name);
+    } catch {
+      showToast("Gagal mencabut sesi. Periksa koneksi.", false);
+    }
   };
 
   // Export Excel
@@ -671,6 +690,16 @@ export default function EmployeeView({ employees, stores, onSave, canEdit = true
                     >
                       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
+                    {currentUser?.role === "admin" && (
+                      <button
+                        onClick={() => void revokeSessions(emp)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                        style={{ background: "#fffbeb" }}
+                        title="Cabut semua sesi di perangkat lain"
+                      >
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 16l2 2m0 0l-2-2m2 2l-2-2m-3.5-1.5L3 9l18-6-6 18-3-7.5z" /></svg>
+                      </button>
+                    )}
                   </div>}
                 </div>
               ))}

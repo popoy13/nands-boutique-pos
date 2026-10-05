@@ -52,6 +52,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      htmlSecurityHeaders(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -74,6 +75,51 @@ export default defineConfig(({ mode }) => {
     },
   }
 })
+
+/**
+ * Build-only security hardening: injects a Content-Security-Policy and
+ * cache-control meta tags into the generated HTML shells. The inline
+ * react-refresh preamble used by the Figma dev preview would be blocked
+ * by a strict frame, so the policy is applied to production builds only.
+ */
+function htmlSecurityHeaders(): Plugin {
+  const contentSecurityPolicy = [
+    "default-src 'self'",
+    "script-src 'self' https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' data: blob: https:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://popoy13.github.io https://cdn.jsdelivr.net",
+    "worker-src 'self' blob: https://cdn.jsdelivr.net",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests",
+  ].join("; ")
+
+  return {
+    name: 'html-security-headers',
+    apply: 'build',
+    transformIndexHtml(html) {
+      return {
+        html,
+        tags: [
+          {
+            tag: 'meta',
+            attrs: { 'http-equiv': 'Content-Security-Policy', content: contentSecurityPolicy },
+            injectTo: 'head-prepend',
+          },
+          {
+            tag: 'meta',
+            attrs: { 'http-equiv': 'Cache-Control', content: 'no-store' },
+            injectTo: 'head-prepend',
+          },
+        ],
+      }
+    },
+  }
+}
 
 type FigmaSiteConfiguration = {
   title?: string

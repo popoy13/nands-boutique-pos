@@ -5,6 +5,7 @@ import { validateImageFile } from "../lib/imageFile";
 import type { Expense } from "../data/types";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
+import { recordAudit } from "../lib/security";
 import DateRangeFilter from "./DateRangeFilter";
 import Pagination from "./Pagination";
 import EmptyState from "./EmptyState";
@@ -101,13 +102,17 @@ export default function ExpenseView({ expenses, stores, employees = [], currentU
     setEditing(null);
     setIsNew(false);
     showToast(isNew ? "Pengeluaran ditambahkan" : "Pengeluaran diperbarui");
+    recordAudit(currentUser, isNew ? "expense_create" : "expense_update",
+      `${clean.id}, Rp${clean.amount.toLocaleString("id-ID")}, ${clean.description ?? ""}`.slice(0, 300));
   };
 
   const handleDelete = (id: string) => {
+    const target = expenses.find(e => e.id === id);
     onSave(expenses.filter(e => e.id !== id));
     onDelete?.(id);
     if (editing?.id === id) setEditing(null);
     showToast("Pengeluaran dihapus");
+    recordAudit(currentUser, "expense_delete", `${target?.id ?? id}, Rp${target?.amount ?? 0}`);
   };
 
   const handleExport = () => {

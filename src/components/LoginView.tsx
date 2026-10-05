@@ -3,6 +3,7 @@ import type { Employee } from "../data/types";
 import { getRoleLabel, getRoleColor } from "../data/roles";
 import type { RoleConfig } from "../data/roles";
 import { verifyPin, hashPin, isLocked, recordFailedAttempt, clearAttempts } from "../lib/auth";
+import { recordAudit } from "../lib/security";
 import Avatar from "./Avatar";
 import { assetUrl } from "../lib/assets";
 
@@ -23,6 +24,17 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
   const [search, setSearch] = useState("");
   const [lockTimer, setLockTimer] = useState(0);
   const submittingRef = useRef(false);
+  const [revokedMsg, setRevokedMsg] = useState("");
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("nands-revoked-for");
+      if (v) {
+        setRevokedMsg(v);
+        localStorage.removeItem("nands-revoked-for");
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (lockTimer <= 0) return;
@@ -65,8 +77,10 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
         : pinToCheck === selected.pin;
       if (ok) {
         clearAttempts(selected.id);
+        recordAudit(selected, "login", `toko=${selected.storeId}, perangkat=${navigator.userAgent.slice(0, 80)}`);
         onLogin(selected);
       } else {
+        recordAudit(selected, "login_failed", "PIN salah");
         const result = recordFailedAttempt(selected.id);
         if (result.locked) {
           setLockTimer(result.secondsLeft);
@@ -105,6 +119,11 @@ export default function LoginView({ employees, stores, brand, roles, onLogin }: 
       </div>
 
       <div className="relative w-full max-w-2xl mx-4 my-auto py-6">
+        {revokedMsg && (
+          <div className="mb-4 px-4 py-2.5 rounded-xl text-xs font-semibold text-center" style={{ background: "#fef2f2", color: "#ef4444" }}>
+            Sesi akun anda dicabut oleh admin. Silakan masuk kembali untuk melanjutkan.
+          </div>
+        )}
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-3">

@@ -4,6 +4,7 @@ import type { PrinterSettings, PaymentSettings } from "../data/settings";
 import DateRangeFilter, { todayISO } from "./DateRangeFilter";
 import { escapeHtml } from "../lib/sanitize";
 import { verifyPin } from "../lib/auth";
+import { recordAudit } from "../lib/security";
 import Pagination from "./Pagination";
 import EmptyState from "./EmptyState";
 
@@ -79,6 +80,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
     if (!currentUser) {
       deletingRef.current = true;
       try {
+      recordAudit(currentUser, "transaction_delete", `${confirmDelete}, alasan="${deleteReason.trim()}"`);
       onDelete?.(confirmDelete, deleteReason.trim());
       setConfirmDelete(null);
       setSelected(null);
@@ -93,6 +95,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
       ? await verifyPin(pinVerifyInput, currentUser.pin)
       : pinVerifyInput === currentUser.pin;
     if (pinOk) {
+      recordAudit(currentUser, "transaction_delete", `${confirmDelete}, alasan="${deleteReason.trim()}"`);
       onDelete?.(confirmDelete, deleteReason.trim());
       setConfirmDelete(null);
       setPinVerify(false);
@@ -340,7 +343,7 @@ export default function HistoryView({ transactions, stores, canDelete = false, c
             <div className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>Riwayat transaksi terhapus ini akan dihapus selamanya dari aplikasi dan database. Tindakan ini tidak dapat dibatalkan.</div>
             <div className="flex gap-2">
               <button onClick={() => setConfirmPermDel(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--background)", border: "1px solid var(--border)" }}>Tidak</button>
-              <button onClick={() => { onPermanentDelete?.(confirmPermDel); setConfirmPermDel(null); setSelDeleted(null); }}
+              <button onClick={() => { recordAudit(currentUser, "transaction_delete_permanent", confirmPermDel); onPermanentDelete?.(confirmPermDel); setConfirmPermDel(null); setSelDeleted(null); }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "#ef4444" }}>Ya, Hapus</button>
             </div>
           </div>

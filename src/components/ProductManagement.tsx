@@ -6,6 +6,7 @@ import { exportProductsCsv, parseProductsCsv } from "../data/csvProducts";
 import { compressImage } from "../lib/compressImage";
 import { validateImageFile } from "../lib/imageFile";
 import { verifyPin } from "../lib/auth";
+import { recordAudit } from "../lib/security";
 import Pagination from "./Pagination";
 import EmptyState from "./EmptyState";
 
@@ -347,13 +348,16 @@ export default function ProductManagement({ products, stores, categories, onUpda
     setEditing(null);
     setIsNew(false);
     showToast("Produk disimpan");
+    recordAudit(currentUser, isNew ? "product_create" : "product_update", `${editing.name} (${editing.category ?? ""})`.slice(0, 200));
   };
 
   const handleDelete = (id: string) => {
+    const target = products.find(p => p.id === id);
     onSave(products.filter(p => p.id !== id));
     setConfirmDelete(null);
     if (editing?.id === id) setEditing(null);
     showToast("Produk dihapus");
+    recordAudit(currentUser, "product_delete", `${target?.name ?? id} (${target?.category ?? ""})`.slice(0, 200));
   };
 
   const updateVariant = (idx: number, key: keyof ProductVariant, val: any) => {

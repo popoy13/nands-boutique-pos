@@ -7,6 +7,7 @@ import { compressImage } from "../lib/compressImage";
 import { validateImageFile } from "../lib/imageFile";
 import { assetUrl } from "../lib/assets";
 import type { ResetResult } from "../data/sync";
+import AuditLogView from "./AuditLogView";
 
 interface Props {
   settings: AppSettings;
@@ -1189,6 +1190,11 @@ export default function SettingsView({ settings, stores, employees, onSaveSettin
             Simpan Menu Utama
           </button>
         </div>
+      )}
+
+      {/* RESET DATA (admin only) */}
+      {tab === "reset" && isAdmin && (
+        <AuditLogView currentUser={currentUser} />
       )}
 
       {/* RESET DATA (admin only) */}

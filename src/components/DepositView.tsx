@@ -5,6 +5,7 @@ import { validateImageFile } from "../lib/imageFile";
 import type { CashDeposit } from "../data/types";
 import { todayISO } from "../lib/dates";
 import { assetUrl } from "../lib/assets";
+import { recordAudit } from "../lib/security";
 import { compressImage } from "../lib/compressImage";
 import { readStruk } from "../lib/ocr";
 import DateRangeFilter from "./DateRangeFilter";
@@ -134,13 +135,17 @@ export default function DepositView({ deposits, stores, employees = [], banks, o
     setEditing(null);
     setIsNew(false);
     showToast(isNew ? "Setor tunai dicatat" : "Setor tunai diperbarui");
+    recordAudit(currentUser, isNew ? "deposit_create" : "deposit_update",
+      `${clean.id}, ${clean.bank}, Rp${clean.amount.toLocaleString("id-ID")}`.slice(0, 200));
   };
 
   const handleDelete = (id: string) => {
+    const target = deposits.find(d => d.id === id);
     onSave(deposits.filter(d => d.id !== id));
     onDelete?.(id);
     if (editing?.id === id) setEditing(null);
     showToast("Setor tunai dihapus");
+    recordAudit(currentUser, "deposit_delete", `${target?.id ?? id}, ${target?.bank ?? ""}, Rp${target?.amount ?? 0}`);
   };
 
   const handleExport = () => {

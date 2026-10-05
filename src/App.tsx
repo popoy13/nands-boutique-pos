@@ -119,12 +119,19 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
   const [unreadCounts, setUnreadCounts] = useState(loadUnreadCounts);
   const page = menu;
   const [activeStore, setActiveStore] = useState(() => {
-    try { return localStorage.getItem("nands-active-store") || "s1"; } catch { return "s1"; }
+    try {
+      const uid = localStorage.getItem(SESSION_KEY);
+      const key = uid ? `nands-active-store-${uid}` : "nands-active-store";
+      return localStorage.getItem(key) || "s1";
+    } catch { return "s1"; }
   });
 
   useEffect(() => {
-    try { localStorage.setItem("nands-active-store", activeStore); } catch { /* ignore */ }
-  }, [activeStore]);
+    try {
+      const key = currentUser ? `nands-active-store-${currentUser.id}` : "nands-active-store";
+      localStorage.setItem(key, activeStore);
+    } catch { /* ignore */ }
+  }, [activeStore, currentUser]);
 
   useEffect(() => {
     if (!ready) return;
@@ -230,6 +237,7 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     }
     const fresh = employees.find(e => e.id === storedId);
     if (!fresh) return;
+    setActiveStore(loadSavedActiveStore(fresh));
     setCurrentUser(fresh);
   }, [ready, employees]);
 
@@ -301,6 +309,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
     if (fresh.role !== currentUser.role || fresh.name !== currentUser.name || fresh.storeId !== currentUser.storeId) {
       setCurrentUser(fresh);
     }
+    if (fresh.storeId !== currentUser.storeId) {
+      setActiveStore(loadSavedActiveStore(fresh));
+    }
   }, [ready, employees, currentUser]);
 
   const storeName = stores.find(s => s.id === activeStore)?.name ?? "";
@@ -312,9 +323,9 @@ export default function App({ menu = "index" }: { menu?: string } = {}) {
       localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + IDLE_TIMEOUT_MS));
     } catch { /* ignore */ }
     const allowed = getAllowedMenus(emp.role, settings.roles);
-    const nextStore = (emp.role !== "admin" && emp.role !== "manager" && emp.role !== "manager_operasional") ? emp.storeId : activeStore;
+    const nextStore = loadSavedActiveStore(emp);
     setActiveStore(nextStore);
-    try { localStorage.setItem("nands-active-store", nextStore); } catch { /* ignore */ }
+    try { localStorage.setItem(`nands-active-store-${emp.id}`, nextStore); } catch { /* ignore */ }
     const todayStr = todayISO();
     const clockedToday = attendance.some(r => r.employeeId === emp.id && r.date === todayStr && r.storeId === nextStore);
     const target = allowed.includes("attendance") && !clockedToday ? "attendance" : (allowed[0] ?? "pos");
@@ -836,6 +847,14 @@ const canDepositBank = has("deposit", "bank");
     </div>
   );
 }
+
+const loadSavedActiveStore = (emp: Employee): string => {
+  try {
+    const saved = localStorage.getItem(`nands-active-store-${emp.id}`);
+    if (saved) return saved;
+  } catch { /* ignore */ }
+  return emp.role === "admin" ? "s1" : emp.storeId;
+};
 
 function SyncToast() {
   const [state, setState] = useState<{ kind: "fail" | "ok"; msg: string } | null>(null);
